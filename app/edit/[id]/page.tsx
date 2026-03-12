@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../lib/store";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { getSupabase } from "../lib/supabase";
+import { useRouter } from "next/navigation";
+
+const supabase = getSupabase();
 
 function toDateInputValue(iso: string) {
   const d = new Date(iso);

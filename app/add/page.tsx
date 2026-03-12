@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { getSupabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
+
+const supabase = getSupabase();
 
 function isoFromDateTime(dateStr: string, timeStr: string) {
   const [y, m, d] = dateStr.split("-").map(Number);
