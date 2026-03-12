@@ -2,9 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getSupabase } from "../../lib/supabase";
-import { useRouter } from "next/navigation";
-
-const supabase = getSupabase();
+import { useParams, useRouter } from "next/navigation";
 
 function toDateInputValue(iso: string) {
   const d = new Date(iso);
