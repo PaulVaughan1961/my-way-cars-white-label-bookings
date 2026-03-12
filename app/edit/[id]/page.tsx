@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getSupabase } from "./lib/supabase";
+import { getSupabase } from "../../lib/supabase";
+import { useParams, useRouter } from "next/navigation";
 
 type BookingRow = {
   id: string;
