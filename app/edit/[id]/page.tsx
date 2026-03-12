@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "../../lib/supabase";
 import { useParams, useRouter } from "next/navigation";
 
