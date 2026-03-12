@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { getSupabase } from "../lib/supabase";
+import { getSupabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 
 const supabase = getSupabase();
