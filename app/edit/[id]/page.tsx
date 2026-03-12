@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "../../lib/supabase";
 import { useParams, useRouter } from "next/navigation";
 
+const supabase = getSupabase();
+
 function toDateInputValue(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
