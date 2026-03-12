@@ -1,27 +1,84 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import {
-  getBookings,
-  subscribe,
-  
-  updateBooking,
-  type Booking,
-  type BookingStatus,
-  type PaymentStatus,
-} from "./lib/store";
+import { useEffect, useMemo, useState } from "react";
+import { getSupabase } from "./lib/supabase";
 
-function bookingTimeValue(booking: Booking) {
-  return new Date(booking.pickup_datetime).getTime();
+type BookingRow = {
+  id: string;
+  status?: string | null;
+  payment_status?: string | null;
+  lead_passenger?: string | null;
+  customer_name?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  pickup?: string | null;
+  pickup_address?: string | null;
+  from_address?: string | null;
+  dropoff?: string | null;
+  dropoff_address?: string | null;
+  to_address?: string | null;
+  notes?: string | null;
+  fare?: number | string | null;
+  quoted_fare?: number | string | null;
+  amount?: number | string | null;
+  pickup_at?: string | null;
+  journey_at?: string | null;
+  date_time?: string | null;
+  created_at?: string | null;
+  [key: string]: unknown;
+};
+
+function pickString(row: BookingRow, keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
 }
 
-function fmtDateTime(iso: string) {
-  const dt = new Date(iso);
-  if (Number.isNaN(dt.getTime())) return iso;
+function pickNumber(row: BookingRow, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return null;
+}
 
-  return dt.toLocaleString(undefined, {
+function getWhen(row: BookingRow): string {
+  return pickString(row, ["pickup_at", "journey_at", "date_time", "created_at"]);
+}
+
+function getName(row: BookingRow): string {
+  return pickString(row, ["lead_passenger", "customer_name", "name"]) || "Unnamed booking";
+}
+
+function getPhone(row: BookingRow): string {
+  return pickString(row, ["phone", "mobile"]);
+}
+
+function getPickup(row: BookingRow): string {
+  return pickString(row, ["pickup", "pickup_address", "from_address"]);
+}
+
+function getDropoff(row: BookingRow): string {
+  return pickString(row, ["dropoff", "dropoff_address", "to_address"]);
+}
+
+function getFare(row: BookingRow): number | null {
+  return pickNumber(row, ["fare", "quoted_fare", "amount"]);
+}
+
+function fmtDateTime(value: string): string {
+  if (!value) return "No date set";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString(undefined, {
     weekday: "short",
     year: "numeric",
     month: "short",
@@ -31,472 +88,325 @@ function fmtDateTime(iso: string) {
   });
 }
 
-function fmtCountdown(iso: string, nowMs: number) {
-  const diff = new Date(iso).getTime() - nowMs;
-
-  if (Number.isNaN(diff)) return "Time unavailable";
-
-  if (diff <= 0) {
-    const overdueMs = Math.abs(diff);
-    const hours = Math.floor(overdueMs / 3600000);
-    const minutes = Math.floor((overdueMs % 3600000) / 60000);
-    return `Started ${hours > 0 ? `${hours}h ` : ""}${minutes}m ago`;
-  }
-
-  const totalMinutes = Math.floor(diff / 60000);
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-
-  if (days > 0) return `In ${days}d ${hours}h ${minutes}m`;
-  if (hours > 0) return `In ${hours}h ${minutes}m`;
-  return `In ${minutes}m`;
-}
-
-function telHref(phone?: string | null) {
-  if (!phone) return "#";
+function telHref(phone: string): string {
   return `tel:${phone.replace(/\s+/g, "")}`;
 }
 
-function smsHref(phone?: string | null) {
-  if (!phone) return "#";
+function smsHref(phone: string): string {
   return `sms:${phone.replace(/\s+/g, "")}`;
 }
 
-function mapHref(address: string) {
+function mapHref(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
-function statusBadgeClass(status: BookingStatus) {
-  switch (status) {
-    case "Scheduled":
-      return "bg-blue-100 text-blue-800";
-    case "POB":
-      return "bg-amber-100 text-amber-800";
-    case "Completed":
-      return "bg-green-100 text-green-800";
-    case "Cancelled":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-slate-100 text-slate-800";
+export default function HomePage() {
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function loadBookings() {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .order("pickup_at", { ascending: true });
+
+      if (error) throw error;
+      setBookings((data as BookingRow[]) ?? []);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load bookings";
+      setErrorMessage(message);
+    } finally {
+      setLoading(false);
+    }
   }
-}
-
-function paymentBadgeClass(payment: PaymentStatus) {
-  switch (payment) {
-    case "Paid":
-      return "bg-green-100 text-green-800";
-    case "Unpaid":
-    default:
-      return "bg-slate-100 text-slate-800";
-  }
-}
-
-function stopClick(e: React.MouseEvent) {
-  e.stopPropagation();
-}
-
-function BookingCard({
-  booking,
-  expanded,
-  onToggle,
-  onMarkPOB,
-  onMarkCompleted,
-  onMarkPaid,
-  onCancel,
-  nowMs,
-  isNextJob = false,
-}: {
-  booking: Booking;
-  expanded: boolean;
-  onToggle: (id: string) => void;
-  onMarkPOB: (id: string) => void;
-  onMarkCompleted: (id: string) => void;
-  onMarkPaid: (id: string) => void;
-  onCancel: (id: string) => void;
-  nowMs: number;
-  isNextJob?: boolean;
-}) {
-  return (
-    <div
-      onClick={() => onToggle(booking.id)}
-      className={`cursor-pointer rounded-2xl border bg-white p-4 shadow-sm transition ${
-        isNextJob ? "border-slate-900" : "border-slate-200"
-      }`}
-    >
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="text-lg font-semibold text-slate-900">
-            {booking.passenger_name}
-          </div>
-          <div className="text-sm text-slate-500">
-            {fmtDateTime(booking.pickup_datetime)}
-          </div>
-          <div className="mt-1 text-sm font-medium text-slate-700">
-            {fmtCountdown(booking.pickup_datetime, nowMs)}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass(
-              booking.status
-            )}`}
-          >
-            {booking.status}
-          </span>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${paymentBadgeClass(
-              booking.payment_status
-            )}`}
-          >
-            {booking.payment_status}
-          </span>
-        </div>
-      </div>
-
-<div className="space-y-2 text-sm text-slate-700">
-  <div>
-    <span className="font-semibold">From:</span> {booking.pickup_address}
-  </div>
-  <div>
-    <span className="font-semibold">To:</span> {booking.dropoff_address}
-  </div>
-  {booking.fare !== null && booking.fare !== undefined ? (
-    <div>
-      <span className="font-semibold">Fare:</span> £
-      {Number(booking.fare).toFixed(2)}
-    </div>
-  ) : null}
-
-{booking.notes && !expanded ? (
-  <div className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 border border-amber-200">
-    📝 Driver note
-  </div>
-) : null}
-</div>
-
-      {expanded ? (
-        <>
-          <div className="mt-3 space-y-2 text-sm text-slate-700">
-            {booking.passenger_phone ? (
-              <div>
-                <span className="font-semibold">Phone:</span> {booking.passenger_phone}
-              </div>
-            ) : null}
-
-            {booking.distance_miles !== null && booking.distance_miles !== undefined ? (
-              <div>
-                <span className="font-semibold">Distance:</span> {booking.distance_miles} miles
-              </div>
-            ) : null}
-
-          {booking.notes ? (
-            <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
-             <span className="font-semibold">Driver note:</span> {booking.notes}
-              </div>
-               ) : null}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2" onClick={stopClick}>
-            {booking.passenger_phone ? (
-              <>
-                <a
-                  href={telHref(booking.passenger_phone)}
-                  className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white"
-                >
-                  Call
-                </a>
-                <a
-                  href={smsHref(booking.passenger_phone)}
-                  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-                >
-                  Text
-                </a>
-              </>
-            ) : null}
-
-            <a
-              href={mapHref(booking.pickup_address)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Navigate to pickup
-            </a>
-
-            <a
-              href={mapHref(booking.dropoff_address)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Navigate to dropoff
-            </a>
-
-          <Link
-  href={`/edit/${booking.id}`}
-  onClick={stopClick}
-  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
->
-  Edit
-</Link>
-
-{booking.status === "Scheduled" ? (
-  <button
-    onClick={() => onMarkPOB(booking.id)}
-    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white"
-  >
-    Mark POB
-  </button>
-) : null}
-
-            {booking.status !== "Completed" && booking.status !== "Cancelled" ? (
-              <button
-                onClick={() => onMarkCompleted(booking.id)}
-                className="rounded-xl bg-green-600 px-3 py-2 text-sm font-medium text-white"
-              >
-                Mark completed
-              </button>
-            ) : null}
-
-            {booking.payment_status !== "Paid" ? (
-              <button
-                onClick={() => onMarkPaid(booking.id)}
-                className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white"
-              >
-                Mark paid
-              </button>
-            ) : null}
-
-            {booking.status !== "Cancelled" && booking.status !== "Completed" ? (
-              <button
-                onClick={() => onCancel(booking.id)}
-                className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white"
-              >
-                Cancel
-              </button>
-            ) : null}
-          </div>
-        </>
-      ) : (
-        <div className="mt-3 text-xs text-slate-500">Tap card to open details</div>
-      )}
-    </div>
-  );
-}
-
-export default function Page() {
-  const bookings = useSyncExternalStore(subscribe, getBookings, getBookings);
-  const [statusFilter, setStatusFilter] = useState<
-    "All" | "Scheduled" | "POB" | "Completed" | "Cancelled"
-  >("All");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNowMs(Date.now());
-    }, 30000);
-
-    return () => clearInterval(timer);
+    void loadBookings();
   }, []);
 
-  const sortedBookings = useMemo(() => {
-    const safe = Array.isArray(bookings) ? bookings : [];
-    return [...safe].sort((a, b) => bookingTimeValue(a) - bookingTimeValue(b));
-  }, [bookings]);
+  const filteredBookings = useMemo(() => {
+    const now = Date.now();
+
+    const sorted = [...bookings].sort((a, b) => {
+      const aTime = new Date(getWhen(a)).getTime();
+      const bTime = new Date(getWhen(b)).getTime();
+      const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
+      const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+      return safeA - safeB;
+    });
+
+    if (statusFilter === "All") return sorted;
+
+    if (statusFilter === "Upcoming") {
+      return sorted.filter((row) => {
+        const when = new Date(getWhen(row)).getTime();
+        const status = (row.status ?? "Scheduled").toString();
+        return !Number.isNaN(when) && when >= now && status !== "Cancelled" && status !== "Completed";
+      });
+    }
+
+    return sorted.filter((row) => (row.status ?? "Scheduled") === statusFilter);
+  }, [bookings, statusFilter]);
 
   const nextJob = useMemo(() => {
-    return sortedBookings.find((b) => {
-      if (!(b.status === "Scheduled" || b.status === "POB")) return false;
-      return bookingTimeValue(b) >= nowMs - 12 * 60 * 60 * 1000;
-    });
-  }, [sortedBookings, nowMs]);
-
-  const filteredBookings = useMemo(() => {
-    if (statusFilter === "All") return sortedBookings;
-    return sortedBookings.filter((b) => b.status === statusFilter);
-  }, [sortedBookings, statusFilter]);
-
-  const upcomingBookings = useMemo(() => {
-    return filteredBookings.filter(
-      (b) =>
-        (b.status === "Scheduled" || b.status === "POB") &&
-        (!nextJob || b.id !== nextJob.id)
+    const now = Date.now();
+    return (
+      [...bookings]
+        .filter((row) => {
+          const when = new Date(getWhen(row)).getTime();
+          const status = (row.status ?? "Scheduled").toString();
+          return !Number.isNaN(when) && when >= now && status !== "Cancelled" && status !== "Completed";
+        })
+        .sort((a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime())[0] ?? null
     );
-  }, [filteredBookings, nextJob]);
+  }, [bookings]);
 
-  const completedBookings = useMemo(() => {
-    return filteredBookings.filter((b) => b.status === "Completed");
-  }, [filteredBookings]);
+  async function updateBooking(id: string, patch: Record<string, unknown>) {
+    try {
+      setBusyId(id);
+      setErrorMessage("");
 
-  const cancelledBookings = useMemo(() => {
-    return filteredBookings.filter((b) => b.status === "Cancelled");
-  }, [filteredBookings]);
+      const supabase = getSupabase();
+      const { error } = await supabase.from("bookings").update(patch).eq("id", id);
 
-  async function handleMarkPOB(id: string) {
-    await updateBooking(id, { status: "POB" });
+      if (error) throw error;
+
+      setBookings((current) =>
+        current.map((row) => (row.id === id ? { ...row, ...patch } : row))
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update booking";
+      setErrorMessage(message);
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  async function handleMarkCompleted(id: string) {
+  async function onMarkCompleted(id: string) {
     await updateBooking(id, { status: "Completed" });
   }
 
-  async function handleMarkPaid(id: string) {
+  async function onMarkPaid(id: string) {
     await updateBooking(id, { payment_status: "Paid" });
   }
 
-  async function handleCancel(id: string) {
+  async function onCancel(id: string) {
+    const ok = window.confirm("Cancel this booking?");
+    if (!ok) return;
     await updateBooking(id, { status: "Cancelled" });
   }
 
-  function toggleExpanded(id: string) {
-    setExpandedId((current) => (current === id ? null : id));
+  function BookingCard({ booking }: { booking: BookingRow }) {
+    const when = getWhen(booking);
+    const name = getName(booking);
+    const phone = getPhone(booking);
+    const pickup = getPickup(booking);
+    const dropoff = getDropoff(booking);
+    const fare = getFare(booking);
+    const status = (booking.status ?? "Scheduled").toString();
+    const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
+    const notes = pickString(booking, ["notes"]);
+    const isBusy = busyId === booking.id;
+
+    return (
+      <div className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-lg font-semibold">{name}</div>
+            <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
+          </div>
+          <div className="text-right text-sm">
+            <div className="font-medium">{status}</div>
+            <div className="text-slate-500">{paymentStatus}</div>
+          </div>
+        </div>
+
+        <div className="space-y-1 text-sm text-slate-700">
+          <div>
+            <span className="font-medium">From:</span> {pickup || "—"}
+          </div>
+          <div>
+            <span className="font-medium">To:</span> {dropoff || "—"}
+          </div>
+          <div>
+            <span className="font-medium">Phone:</span> {phone || "—"}
+          </div>
+          <div>
+            <span className="font-medium">Fare:</span>{" "}
+            {fare === null ? "—" : `£${fare.toFixed(2)}`}
+          </div>
+          {notes ? (
+            <div>
+              <span className="font-medium">Notes:</span> {notes}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={`/edit/${booking.id}`}
+            className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+          >
+            Edit
+          </Link>
+
+          {phone ? (
+            <a
+              href={telHref(phone)}
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Call
+            </a>
+          ) : null}
+
+          {phone ? (
+            <a
+              href={smsHref(phone)}
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Text
+            </a>
+          ) : null}
+
+          {pickup ? (
+            <a
+              href={mapHref(pickup)}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Pickup map
+            </a>
+          ) : null}
+
+          {dropoff ? (
+            <a
+              href={mapHref(dropoff)}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Dropoff map
+            </a>
+          ) : null}
+
+          {status !== "Completed" ? (
+            <button
+              onClick={() => void onMarkCompleted(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Mark completed
+            </button>
+          ) : null}
+
+          {paymentStatus !== "Paid" ? (
+            <button
+              onClick={() => void onMarkPaid(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Mark paid
+            </button>
+          ) : null}
+
+          {status !== "Cancelled" ? (
+            <button
+              onClick={() => void onCancel(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-5xl px-4 py-6">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">My Way Cars Dispatch</h1>
-            <p className="mt-1 text-sm text-slate-600">Live bookings dashboard</p>
-          </div>
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">My Way Cars</h1>
+              <p className="text-sm text-slate-600">Booking dashboard</p>
+            </div>
 
-          <Link
-            href="/add"
-            className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
-          >
-            + New booking
-          </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/add"
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+              >
+                Add booking
+              </Link>
+
+              <button
+                onClick={() => void loadBookings()}
+                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-2">
-          {(["All", "Scheduled", "POB", "Completed", "Cancelled"] as const).map(
-            (filter) => (
+        {nextJob ? (
+          <section className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="mb-3 text-lg font-semibold text-slate-900">Next job</div>
+            <BookingCard booking={nextJob} />
+          </section>
+        ) : (
+          <section className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="text-lg font-semibold text-slate-900">You’re clear</div>
+            <p className="mt-1 text-sm text-slate-600">No upcoming scheduled jobs found.</p>
+          </section>
+        )}
+
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {["All", "Upcoming", "Scheduled", "Completed", "Cancelled"].map((value) => (
               <button
-                key={filter}
-                onClick={() => setStatusFilter(filter)}
-                className={`rounded-xl px-4 py-2 text-sm font-medium ${
-                  statusFilter === filter
+                key={value}
+                onClick={() => setStatusFilter(value)}
+                className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                  statusFilter === value
                     ? "bg-slate-900 text-white"
-                    : "border border-slate-200 bg-white text-slate-700"
+                    : "bg-slate-200 text-slate-900"
                 }`}
               >
-                {filter}
+                {value}
               </button>
-            )
+            ))}
+          </div>
+
+          {errorMessage ? (
+            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="text-sm text-slate-600">Loading bookings…</div>
+          ) : filteredBookings.length === 0 ? (
+            <div className="text-sm text-slate-600">No bookings found.</div>
+          ) : (
+            <div className="space-y-4">
+              {filteredBookings.map((booking) => (
+                <BookingCard key={booking.id} booking={booking} />
+              ))}
+            </div>
           )}
-        </div>
-
-        {(statusFilter === "All" || statusFilter === "Scheduled" || statusFilter === "POB") && (
-          <section className="mb-8">
-            <h2 className="mb-3 text-xl font-semibold text-slate-900">Next job</h2>
-
-            {nextJob ? (
-              <BookingCard
-                booking={nextJob}
-                expanded={expandedId === nextJob.id}
-                onToggle={toggleExpanded}
-                onMarkPOB={handleMarkPOB}
-                onMarkCompleted={handleMarkCompleted}
-                onMarkPaid={handleMarkPaid}
-                onCancel={handleCancel}
-                nowMs={nowMs}
-                isNextJob
-              />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-500">
-                You&apos;re clear.
-              </div>
-            )}
-          </section>
-        )}
-
-        {(statusFilter === "All" || statusFilter === "Scheduled" || statusFilter === "POB") && (
-          <section className="mb-8">
-            <h2 className="mb-3 text-xl font-semibold text-slate-900">Upcoming</h2>
-
-            {upcomingBookings.length > 0 ? (
-              <div className="grid gap-4">
-                {upcomingBookings.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    expanded={expandedId === booking.id}
-                    onToggle={toggleExpanded}
-                    onMarkPOB={handleMarkPOB}
-                    onMarkCompleted={handleMarkCompleted}
-                    onMarkPaid={handleMarkPaid}
-                    onCancel={handleCancel}
-                    nowMs={nowMs}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-500">
-                No upcoming bookings.
-              </div>
-            )}
-          </section>
-        )}
-
-        {(statusFilter === "All" || statusFilter === "Completed") && (
-          <section className="mb-8">
-            <h2 className="mb-3 text-xl font-semibold text-slate-900">Completed</h2>
-
-            {completedBookings.length > 0 ? (
-              <div className="grid gap-4">
-                {completedBookings.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    expanded={expandedId === booking.id}
-                    onToggle={toggleExpanded}
-                    onMarkPOB={handleMarkPOB}
-                    onMarkCompleted={handleMarkCompleted}
-                    onMarkPaid={handleMarkPaid}
-                    onCancel={handleCancel}
-                    nowMs={nowMs}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-500">
-                No completed bookings.
-              </div>
-            )}
-          </section>
-        )}
-
-        {(statusFilter === "All" || statusFilter === "Cancelled") && (
-          <section className="mb-8">
-            <h2 className="mb-3 text-xl font-semibold text-slate-900">Cancelled</h2>
-
-            {cancelledBookings.length > 0 ? (
-              <div className="grid gap-4">
-                {cancelledBookings.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    expanded={expandedId === booking.id}
-                    onToggle={toggleExpanded}
-                    onMarkPOB={handleMarkPOB}
-                    onMarkCompleted={handleMarkCompleted}
-                    onMarkPaid={handleMarkPaid}
-                    onCancel={handleCancel}
-                    nowMs={nowMs}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-500">
-                No cancelled bookings.
-              </div>
-            )}
-          </section>
-        )}
+        </section>
       </div>
     </main>
   );
