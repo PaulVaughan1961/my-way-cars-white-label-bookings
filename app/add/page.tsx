@@ -41,7 +41,7 @@ export default function AddBookingPage() {
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [via, setVia] = useState("");
 
-  const [pax, setPax] = useState<number>(1);
+  const [pax, setPax] = useState("1");
   const [bagsLarge, setBagsLarge] = useState<number>(0);
   const [bagsSmall, setBagsSmall] = useState<number>(0);
 
@@ -102,20 +102,25 @@ export default function AddBookingPage() {
           : null;
 
       const outboundInsert = await supabase.from("bookings").insert([
-  {
-    passenger_name: passengerName.trim(),
-    passenger_phone: passengerPhone.trim(),
-    pickup_address: pickupAddress.trim(),
-    dropoff_address: dropoffAddress.trim(),
-    pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
-    distance_miles: distanceMilesNumber,
-    fare: estFareGBP,
-    notes: notes.trim() || null,
-    status: "Scheduled",
-    payment_status: "Unpaid",
-    created_at: new Date().toISOString(),
-  },
-]);
+        {
+          passenger_name: passengerName.trim(),
+          passenger_phone: passengerPhone.trim(),
+          pickup_address: pickupAddress.trim(),
+          dropoff_address: dropoffAddress.trim(),
+          pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
+          distance_miles: distanceMilesNumber,
+          fare: estFareGBP,
+          notes: notes.trim() || null,
+          status: "Scheduled",
+          payment_status: "Unpaid",
+          created_at: new Date().toISOString(),
+          passengers: pax === "" ? 1 : Number(pax),
+          via: via.trim() || null,
+          bags_large: bagsLarge,
+          bags_small: bagsSmall,
+          local_authority: localAuthority.trim() || null,
+        },
+      ]);
 
       if (outboundInsert.error) {
         console.error(outboundInsert.error);
@@ -133,20 +138,25 @@ export default function AddBookingPage() {
           : dropoffAddress.trim();
 
         const returnInsert = await supabase.from("bookings").insert([
-  {
-    passenger_name: passengerName.trim(),
-    passenger_phone: passengerPhone.trim(),
-    pickup_address: retPickup,
-    dropoff_address: retDrop,
-    pickup_datetime: isoFromDateTime(returnDate, returnTime),
-    distance_miles: distanceMilesNumber,
-    fare: null,
-    notes: notes.trim() || null,
-    status: "Scheduled",
-    payment_status: "Unpaid",
-    created_at: new Date().toISOString(),
-  },
-]);
+          {
+            passenger_name: passengerName.trim(),
+            passenger_phone: passengerPhone.trim(),
+            pickup_address: retPickup,
+            dropoff_address: retDrop,
+            pickup_datetime: isoFromDateTime(returnDate, returnTime),
+            distance_miles: distanceMilesNumber,
+            fare: null,
+            notes: notes.trim() || null,
+            status: "Scheduled",
+            payment_status: "Unpaid",
+            created_at: new Date().toISOString(),
+            passengers: pax === "" ? 1 : Number(pax),
+            via: via.trim() || null,
+            bags_large: bagsLarge,
+            bags_small: bagsSmall,
+            local_authority: localAuthority.trim() || null,
+          },
+        ]);
 
         if (returnInsert.error) {
           console.error(returnInsert.error);
@@ -258,10 +268,16 @@ export default function AddBookingPage() {
               <label className="text-sm font-medium">Pax</label>
               <input
                 type="number"
+                inputMode="numeric"
                 min={1}
+                step={1}
                 className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
                 value={pax}
-                onChange={(e) => setPax(Number(e.target.value || 1))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/\D/g, "");
+                  setPax(cleaned === "" ? "" : String(Math.max(1, Number(cleaned))));
+                }}
               />
             </div>
             <div>

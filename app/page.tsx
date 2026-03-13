@@ -17,6 +17,11 @@ type BookingRow = {
   payment_status?: string | null;
   status?: string | null;
   notes?: string | null;
+  passengers?: number | string | null;
+  via?: string | null;
+  bags_large?: number | string | null;
+  bags_small?: number | string | null;
+  local_authority?: string | null;
 
   lead_passenger?: string | null;
   customer_name?: string | null;
@@ -127,12 +132,37 @@ function mapHref(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
+function getCountdownLabel(value: string, nowMs: number): string {
+  if (!value) return "No date set";
+
+  const targetMs = new Date(value).getTime();
+  if (Number.isNaN(targetMs)) return "Invalid date";
+
+  const diff = targetMs - nowMs;
+
+  if (diff <= 0) {
+    return "Due now";
+  }
+
+  const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [errorMessage, setErrorMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [nowMs, setNowMs] = useState(Date.now());
 
   async function loadBookings() {
     try {
@@ -158,33 +188,42 @@ export default function HomePage() {
     }
   }
 
-useEffect(() => {
-  void loadBookings();
+  useEffect(() => {
+    void loadBookings();
 
-  const supabase = getSupabase();
+    const supabase = getSupabase();
 
-  const channel = supabase
-    .channel("bookings-realtime")
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "bookings",
-      },
-      () => {
-        void loadBookings();
-      }
-    )
-    .subscribe();
+    const channel = supabase
+      .channel("bookings-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bookings",
+        },
+        () => {
+          void loadBookings();
+        }
+      )
+      .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const filteredBookings = useMemo(() => {
     const now = Date.now();
+    const needle = searchTerm.trim().toLowerCase();
 
     const sorted = [...bookings].sort((a, b) => {
       const aTime = new Date(getWhen(a)).getTime();
@@ -196,10 +235,10 @@ useEffect(() => {
       return safeA - safeB;
     });
 
-    if (statusFilter === "All") return sorted;
+    let result = sorted;
 
     if (statusFilter === "Upcoming") {
-      return sorted.filter((row) => {
+      result = result.filter((row) => {
         const when = new Date(getWhen(row)).getTime();
         const status = (row.status ?? "Scheduled").toString();
         return (
@@ -209,12 +248,32 @@ useEffect(() => {
           status !== "Completed"
         );
       });
+    } else if (statusFilter !== "All") {
+      result = result.filter(
+        (row) => (row.status ?? "Scheduled").toString() === statusFilter
+      );
     }
 
-    return sorted.filter(
-      (row) => (row.status ?? "Scheduled").toString() === statusFilter
-    );
-  }, [bookings, statusFilter]);
+    if (!needle) return result;
+
+    return result.filter((row) => {
+      const haystack = [
+        getName(row),
+        getPhone(row),
+        getPickup(row),
+        getDropoff(row),
+        pickString(row, ["notes"]),
+        pickString(row, ["via"]),
+        pickString(row, ["local_authority"]),
+        (row.status ?? "Scheduled").toString(),
+        (row.payment_status ?? "Unpaid").toString(),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(needle);
+    });
+  }, [bookings, statusFilter, searchTerm]);
 
   const nextJob = useMemo(() => {
     const now = Date.now();
@@ -274,7 +333,24 @@ useEffect(() => {
     await updateBooking(id, { status: "Cancelled" });
   }
 
-  function BookingCard({ booking }: { booking: BookingRow }) {
+  function toggleExpanded(id: string) {
+    setExpandedIds((current) => ({
+      ...current,
+      [id]: !current[id],
+    }));
+  }
+
+  function stopCardToggle(e: React.MouseEvent) {
+    e.stopPropagation();
+  }
+
+  function BookingCard({
+    booking,
+    forceExpanded = false,
+  }: {
+    booking: BookingRow;
+    forceExpanded?: boolean;
+  }) {
     const when = getWhen(booking);
     const name = getName(booking);
     const phone = getPhone(booking);
@@ -284,19 +360,36 @@ useEffect(() => {
     const status = (booking.status ?? "Scheduled").toString();
     const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
     const notes = pickString(booking, ["notes"]);
+    const via = pickString(booking, ["via"]);
+    const localAuthority = pickString(booking, ["local_authority"]);
+    const passengers = pickNumber(booking, ["passengers"]);
+    const bagsLarge = pickNumber(booking, ["bags_large"]);
+    const bagsSmall = pickNumber(booking, ["bags_small"]);
+    const distanceMiles = pickNumber(booking, ["distance_miles"]);
     const isBusy = busyId === booking.id;
+    const expanded = forceExpanded || !!expandedIds[booking.id];
+    const countdown = getCountdownLabel(when, nowMs);
 
     return (
-      <div className="rounded-2xl border bg-white p-4 shadow-sm">
+      <div
+        onClick={() => toggleExpanded(booking.id)}
+        className="cursor-pointer rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md"
+      >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <div className="text-lg font-semibold">{name}</div>
             <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
+            <div className="mt-1 text-xs font-medium text-amber-700">
+              Countdown: {countdown}
+            </div>
           </div>
 
           <div className="text-right text-sm">
             <div className="font-medium">{status}</div>
             <div className="text-slate-500">{paymentStatus}</div>
+            <div className="mt-1 text-xs text-slate-400">
+              {expanded ? "Tap to collapse" : "Tap to expand"}
+            </div>
           </div>
         </div>
 
@@ -314,14 +407,54 @@ useEffect(() => {
             <span className="font-medium">Fare:</span>{" "}
             {fare === null ? "—" : `£${fare.toFixed(2)}`}
           </div>
-          {notes ? (
-            <div>
-              <span className="font-medium">Notes:</span> {notes}
-            </div>
-          ) : null}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        {expanded ? (
+          <div className="mt-4 space-y-2 border-t pt-4 text-sm text-slate-700">
+            <div>
+              <span className="font-medium">Passengers:</span>{" "}
+              {passengers === null ? "—" : passengers}
+            </div>
+            <div>
+              <span className="font-medium">Distance:</span>{" "}
+              {distanceMiles === null ? "—" : `${distanceMiles} miles`}
+            </div>
+            <div>
+              <span className="font-medium">Via:</span> {via || "—"}
+            </div>
+            <div>
+              <span className="font-medium">Large bags:</span>{" "}
+              {bagsLarge === null ? "—" : bagsLarge}
+            </div>
+            <div>
+              <span className="font-medium">Small bags:</span>{" "}
+              {bagsSmall === null ? "—" : bagsSmall}
+            </div>
+            <div>
+              <span className="font-medium">Local authority:</span>{" "}
+              {localAuthority || "—"}
+            </div>
+            <div>
+              <span className="font-medium">Created:</span>{" "}
+              {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
+            </div>
+            <div>
+              <span className="font-medium">Booking ID:</span> {booking.id}
+            </div>
+            <div>
+              <span className="font-medium">Notes:</span> {notes || "—"}
+            </div>
+          </div>
+        ) : notes ? (
+          <div className="mt-3 text-sm text-slate-700">
+            <span className="font-medium">Notes:</span> {notes}
+          </div>
+        ) : null}
+
+        <div
+          className="mt-4 flex flex-wrap gap-2"
+          onClick={stopCardToggle}
+        >
           <Link
             href={`/edit/${booking.id}`}
             className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
@@ -434,7 +567,7 @@ useEffect(() => {
         {nextJob ? (
           <section className="rounded-3xl bg-white p-5 shadow-sm">
             <div className="mb-3 text-lg font-semibold text-slate-900">Next job</div>
-            <BookingCard booking={nextJob} />
+            <BookingCard booking={nextJob} forceExpanded />
           </section>
         ) : (
           <section className="rounded-3xl bg-white p-5 shadow-sm">
@@ -446,6 +579,15 @@ useEffect(() => {
         )}
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search name, phone, pickup, dropoff, notes..."
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+
           <div className="mb-4 flex flex-wrap gap-2">
             {["All", "Upcoming", "Scheduled", "Completed", "Cancelled"].map((value) => (
               <button
