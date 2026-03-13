@@ -158,9 +158,30 @@ export default function HomePage() {
     }
   }
 
-  useEffect(() => {
-    void loadBookings();
-  }, []);
+useEffect(() => {
+  void loadBookings();
+
+  const supabase = getSupabase();
+
+  const channel = supabase
+    .channel("bookings-realtime")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "bookings",
+      },
+      () => {
+        void loadBookings();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
 
   const filteredBookings = useMemo(() => {
     const now = Date.now();
