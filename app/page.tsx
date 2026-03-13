@@ -6,34 +6,42 @@ import { getSupabase } from "./lib/supabase";
 
 type BookingRow = {
   id: string;
-  status?: string | null;
+  created_at?: string | null;
+  passenger_name?: string | null;
+  passenger_phone?: string | null;
+  pickup_address?: string | null;
+  dropoff_address?: string | null;
+  pickup_datetime?: string | null;
+  distance_miles?: number | string | null;
+  fare?: number | string | null;
   payment_status?: string | null;
+  status?: string | null;
+  notes?: string | null;
+
   lead_passenger?: string | null;
   customer_name?: string | null;
   name?: string | null;
   phone?: string | null;
   mobile?: string | null;
   pickup?: string | null;
-  pickup_address?: string | null;
   from_address?: string | null;
   dropoff?: string | null;
-  dropoff_address?: string | null;
   to_address?: string | null;
-  notes?: string | null;
-  fare?: number | string | null;
   quoted_fare?: number | string | null;
   amount?: number | string | null;
   pickup_at?: string | null;
   journey_at?: string | null;
   date_time?: string | null;
-  created_at?: string | null;
+
   [key: string]: unknown;
 };
 
 function pickString(row: BookingRow, keys: string[]): string {
   for (const key of keys) {
     const value = row[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
   }
   return "";
 }
@@ -41,33 +49,50 @@ function pickString(row: BookingRow, keys: string[]): string {
 function pickNumber(row: BookingRow, keys: string[]): number | null {
   for (const key of keys) {
     const value = row[key];
-    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
     if (typeof value === "string" && value.trim()) {
       const parsed = Number(value);
-      if (!Number.isNaN(parsed)) return parsed;
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
     }
   }
   return null;
 }
 
 function getWhen(row: BookingRow): string {
-  return pickString(row, ["pickup_at", "journey_at", "date_time", "created_at"]);
+  return pickString(row, [
+    "pickup_datetime",
+    "pickup_at",
+    "journey_at",
+    "date_time",
+    "created_at",
+  ]);
 }
 
 function getName(row: BookingRow): string {
-  return pickString(row, ["lead_passenger", "customer_name", "name"]) || "Unnamed booking";
+  return (
+    pickString(row, [
+      "passenger_name",
+      "lead_passenger",
+      "customer_name",
+      "name",
+    ]) || "Unnamed booking"
+  );
 }
 
 function getPhone(row: BookingRow): string {
-  return pickString(row, ["phone", "mobile"]);
+  return pickString(row, ["passenger_phone", "phone", "mobile"]);
 }
 
 function getPickup(row: BookingRow): string {
-  return pickString(row, ["pickup", "pickup_address", "from_address"]);
+  return pickString(row, ["pickup_address", "pickup", "from_address"]);
 }
 
 function getDropoff(row: BookingRow): string {
-  return pickString(row, ["dropoff", "dropoff_address", "to_address"]);
+  return pickString(row, ["dropoff_address", "dropoff", "to_address"]);
 }
 
 function getFare(row: BookingRow): number | null {
@@ -76,8 +101,10 @@ function getFare(row: BookingRow): number | null {
 
 function fmtDateTime(value: string): string {
   if (!value) return "No date set";
+
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
+
   return d.toLocaleString(undefined, {
     weekday: "short",
     year: "numeric",
@@ -113,15 +140,18 @@ export default function HomePage() {
       setErrorMessage("");
 
       const supabase = getSupabase();
+
       const { data, error } = await supabase
         .from("bookings")
         .select("*")
-        .order("pickup_at", { ascending: true });
+        .order("pickup_datetime", { ascending: true });
 
       if (error) throw error;
+
       setBookings((data as BookingRow[]) ?? []);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load bookings";
+      const message =
+        error instanceof Error ? error.message : "Failed to load bookings";
       setErrorMessage(message);
     } finally {
       setLoading(false);
@@ -138,8 +168,10 @@ export default function HomePage() {
     const sorted = [...bookings].sort((a, b) => {
       const aTime = new Date(getWhen(a)).getTime();
       const bTime = new Date(getWhen(b)).getTime();
+
       const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
       const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+
       return safeA - safeB;
     });
 
@@ -149,23 +181,39 @@ export default function HomePage() {
       return sorted.filter((row) => {
         const when = new Date(getWhen(row)).getTime();
         const status = (row.status ?? "Scheduled").toString();
-        return !Number.isNaN(when) && when >= now && status !== "Cancelled" && status !== "Completed";
+        return (
+          !Number.isNaN(when) &&
+          when >= now &&
+          status !== "Cancelled" &&
+          status !== "Completed"
+        );
       });
     }
 
-    return sorted.filter((row) => (row.status ?? "Scheduled") === statusFilter);
+    return sorted.filter(
+      (row) => (row.status ?? "Scheduled").toString() === statusFilter
+    );
   }, [bookings, statusFilter]);
 
   const nextJob = useMemo(() => {
     const now = Date.now();
+
     return (
       [...bookings]
         .filter((row) => {
           const when = new Date(getWhen(row)).getTime();
           const status = (row.status ?? "Scheduled").toString();
-          return !Number.isNaN(when) && when >= now && status !== "Cancelled" && status !== "Completed";
+
+          return (
+            !Number.isNaN(when) &&
+            when >= now &&
+            status !== "Cancelled" &&
+            status !== "Completed"
+          );
         })
-        .sort((a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime())[0] ?? null
+        .sort(
+          (a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
+        )[0] ?? null
     );
   }, [bookings]);
 
@@ -183,7 +231,8 @@ export default function HomePage() {
         current.map((row) => (row.id === id ? { ...row, ...patch } : row))
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update booking";
+      const message =
+        error instanceof Error ? error.message : "Failed to update booking";
       setErrorMessage(message);
     } finally {
       setBusyId(null);
@@ -223,6 +272,7 @@ export default function HomePage() {
             <div className="text-lg font-semibold">{name}</div>
             <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
           </div>
+
           <div className="text-right text-sm">
             <div className="font-medium">{status}</div>
             <div className="text-slate-500">{paymentStatus}</div>
@@ -368,7 +418,9 @@ export default function HomePage() {
         ) : (
           <section className="rounded-3xl bg-white p-5 shadow-sm">
             <div className="text-lg font-semibold text-slate-900">You’re clear</div>
-            <p className="mt-1 text-sm text-slate-600">No upcoming scheduled jobs found.</p>
+            <p className="mt-1 text-sm text-slate-600">
+              No upcoming scheduled jobs found.
+            </p>
           </section>
         )}
 
