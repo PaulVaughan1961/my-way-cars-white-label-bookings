@@ -580,13 +580,18 @@ export default function HomePage() {
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4">
-<input
-  type="text"
-  placeholder="Search name, phone, pickup, dropoff, notes..."
-  value={searchTerm}
-  onChange={(e) => setSearchTerm(e.target.value)}
-  className="w-full rounded-xl border px-4 py-2"
-/>
+<div className="mb-4">
+  <label className="mb-2 block text-sm font-semibold text-slate-700">
+    Search bookings
+  </label>
+  <input
+    type="text"
+    placeholder="Search by name, phone, pickup, dropoff or notes"
+    value={searchTerm}
+    onChange={(e) => setSearchTerm(e.target.value)}
+    className="w-full rounded-2xl border-2 border-slate-300 bg-white px-4 py-3 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
+  />
+</div>
           </div>
 
           <div className="mb-4 flex flex-wrap gap-2">
