@@ -583,7 +583,7 @@ export default function HomePage() {
     <BookingCard booking={nextJob} forceExpanded />
   </section>
 ) : (
-  <section id="next-job" className="rounded-3xl bg-white p-5 shadow-sm">
+  <section id="next-job" className="rounded-3xl bg-slate-50 border border-slate-200 p-5 shadow-sm">
     <div className="text-lg font-semibold text-slate-900">You’re clear</div>
     <p className="mt-1 text-sm text-slate-600">
       No upcoming scheduled jobs found.
