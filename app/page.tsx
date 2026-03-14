@@ -564,88 +564,89 @@ export default function HomePage() {
           </div>
         </div>
 
-        {nextJob ? (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
-            <div className="mb-3 text-lg font-semibold text-slate-900">Next job</div>
-            <BookingCard booking={nextJob} forceExpanded />
-          </section>
-        ) : (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
-            <div className="text-lg font-semibold text-slate-900">You’re clear</div>
-            <p className="mt-1 text-sm text-slate-600">
-              No upcoming scheduled jobs found.
-            </p>
-          </section>
-        )}
+   
+   {nextJob ? (
+  <section className="rounded-3xl border-l-4 border-slate-900 bg-slate-100 p-5 shadow-md">
+    <div className="mb-3 text-lg font-semibold text-slate-900">Next job</div>
+    <BookingCard booking={nextJob} forceExpanded />
+  </section>
+) : (
+  <section className="rounded-3xl bg-white p-5 shadow-sm">
+    <div className="text-lg font-semibold text-slate-900">You’re clear</div>
+    <p className="mt-1 text-sm text-slate-600">
+      No upcoming scheduled jobs found.
+    </p>
+  </section>
+)}
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="mb-4">
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Search bookings
-            </label>
+<section className="rounded-3xl bg-white p-5 shadow-sm">
+  <div className="mb-4">
+    <label className="mb-2 block text-sm font-semibold text-slate-700">
+      Search bookings
+    </label>
 
-            <div className="relative">
-<span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="h-5 w-5"
-  >
-    <circle cx="11" cy="11" r="8"></circle>
-    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-  </svg>
-</span>
+    <div className="relative">
+      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5"
+        >
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </span>
 
-              <input
-                type="text"
-                placeholder="Search by name, phone, pickup, dropoff or notes"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-2xl border-2 border-slate-300 bg-white pl-10 pr-4 py-3 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
-              />
-            </div>
-          </div>
+      <input
+        type="text"
+        placeholder="Search by name, phone, pickup, dropoff or notes"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full rounded-2xl border-2 border-slate-300 bg-white pl-10 pr-4 py-3 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
+      />
+    </div>
+  </div>
 
-          <div className="mb-4 flex flex-wrap gap-2">
-            {["All", "Upcoming", "Scheduled", "Completed", "Cancelled"].map((value) => (
-              <button
-                key={value}
-                onClick={() => setStatusFilter(value)}
-                className={`rounded-xl px-3 py-2 text-sm font-medium ${
-                  statusFilter === value
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-200 text-slate-900"
-                }`}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
+  <div className="mb-4 flex flex-wrap gap-2">
+    {["All", "Upcoming", "Scheduled", "Completed", "Cancelled"].map((value) => (
+      <button
+        key={value}
+        onClick={() => setStatusFilter(value)}
+        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+          statusFilter === value
+            ? "bg-slate-900 text-white"
+            : "bg-slate-200 text-slate-900"
+        }`}
+      >
+        {value}
+      </button>
+    ))}
+  </div>
 
-          {errorMessage ? (
-            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-              {errorMessage}
-            </div>
-          ) : null}
+  {errorMessage ? (
+    <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+      {errorMessage}
+    </div>
+  ) : null}
 
-          {loading ? (
-            <div className="text-sm text-slate-600">Loading bookings…</div>
-          ) : filteredBookings.length === 0 ? (
-            <div className="text-sm text-slate-600">No bookings found.</div>
-          ) : (
-            <div className="space-y-4">
-              {filteredBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-    </main>
-  );
+  {loading ? (
+    <div className="text-sm text-slate-600">Loading bookings…</div>
+  ) : filteredBookings.length === 0 ? (
+    <div className="text-sm text-slate-600">No bookings found.</div>
+  ) : (
+    <div className="space-y-4">
+      {filteredBookings.map((booking) => (
+        <BookingCard key={booking.id} booking={booking} />
+      ))}
+    </div>
+  )}
+</section>
+</div>
+</main>
+);
 }
