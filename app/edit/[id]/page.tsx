@@ -1,413 +1,435 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "../../lib/supabase";
 import { useParams, useRouter } from "next/navigation";
 
+const supabase = getSupabase();
+
 type BookingRow = {
   id: string;
-  status?: string | null;
-  payment_status?: string | null;
-  lead_passenger?: string | null;
-  customer_name?: string | null;
-  name?: string | null;
-  phone?: string | null;
-  mobile?: string | null;
-  pickup?: string | null;
-  pickup_address?: string | null;
-  from_address?: string | null;
-  dropoff?: string | null;
-  dropoff_address?: string | null;
-  to_address?: string | null;
-  notes?: string | null;
-  fare?: number | string | null;
-  quoted_fare?: number | string | null;
-  amount?: number | string | null;
-  pickup_at?: string | null;
-  journey_at?: string | null;
-  date_time?: string | null;
   created_at?: string | null;
-  [key: string]: unknown;
+  passenger_name?: string | null;
+  passenger_phone?: string | null;
+  pickup_address?: string | null;
+  dropoff_address?: string | null;
+  pickup_datetime?: string | null;
+  distance_miles?: number | string | null;
+  fare?: number | string | null;
+  payment_status?: string | null;
+  status?: string | null;
+  notes?: string | null;
+  passengers?: number | string | null;
+  via?: string | null;
+  bags_large?: number | string | null;
+  bags_small?: number | string | null;
+  local_authority?: string | null;
 };
 
-function pickString(row: BookingRow, keys: string[]): string {
-  for (const key of keys) {
-    const value = row[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return "";
-}
-
-function pickNumber(row: BookingRow, keys: string[]): number | null {
-  for (const key of keys) {
-    const value = row[key];
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string" && value.trim()) {
-      const parsed = Number(value);
-      if (!Number.isNaN(parsed)) return parsed;
-    }
-  }
-  return null;
-}
-
-function getWhen(row: BookingRow): string {
-  return pickString(row, ["pickup_at", "journey_at", "date_time", "created_at"]);
-}
-
-function getName(row: BookingRow): string {
-  return pickString(row, ["lead_passenger", "customer_name", "name"]) || "Unnamed booking";
-}
-
-function getPhone(row: BookingRow): string {
-  return pickString(row, ["phone", "mobile"]);
-}
-
-function getPickup(row: BookingRow): string {
-  return pickString(row, ["pickup", "pickup_address", "from_address"]);
-}
-
-function getDropoff(row: BookingRow): string {
-  return pickString(row, ["dropoff", "dropoff_address", "to_address"]);
-}
-
-function getFare(row: BookingRow): number | null {
-  return pickNumber(row, ["fare", "quoted_fare", "amount"]);
-}
-
-function fmtDateTime(value: string): string {
-  if (!value) return "No date set";
+function localDateFromIso(value: string | null | undefined) {
+  if (!value) return "";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString(undefined, {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-function telHref(phone: string): string {
-  return `tel:${phone.replace(/\s+/g, "")}`;
+function localTimeFromIso(value: string | null | undefined) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
-function smsHref(phone: string): string {
-  return `sms:${phone.replace(/\s+/g, "")}`;
+function isoFromDateTime(dateStr: string, timeStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [hh, mm] = timeStr.split(":").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
+  return dt.toISOString();
 }
 
-function mapHref(address: string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-}
+export default function EditBookingPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
 
-export default function HomePage() {
-  const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  async function loadBookings() {
-    try {
-      setLoading(true);
-      setErrorMessage("");
-
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("*")
-        .order("pickup_at", { ascending: true });
-
-      if (error) throw error;
-      setBookings((data as BookingRow[]) ?? []);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load bookings";
-      setErrorMessage(message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [passengerName, setPassengerName] = useState("");
+  const [passengerPhone, setPassengerPhone] = useState("");
+  const [pickupDate, setPickupDate] = useState("");
+  const [pickupTime, setPickupTime] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [dropoffAddress, setDropoffAddress] = useState("");
+  const [via, setVia] = useState("");
+  const [pax, setPax] = useState("1");
+  const [bagsLarge, setBagsLarge] = useState<number>(0);
+  const [bagsSmall, setBagsSmall] = useState<number>(0);
+  const [estFare, setEstFare] = useState<string>("");
+  const [distanceMiles, setDistanceMiles] = useState<string>("");
+  const [notes, setNotes] = useState("");
+  const [localAuthority, setLocalAuthority] = useState("");
+  const [status, setStatus] = useState("Scheduled");
+  const [paymentStatus, setPaymentStatus] = useState("Unpaid");
 
   useEffect(() => {
-    void loadBookings();
-  }, []);
+    if (!id) return;
 
-  const filteredBookings = useMemo(() => {
-    const now = Date.now();
+    async function loadBooking() {
+      try {
+        setLoading(true);
+        setErrorMessage("");
 
-    const sorted = [...bookings].sort((a, b) => {
-      const aTime = new Date(getWhen(a)).getTime();
-      const bTime = new Date(getWhen(b)).getTime();
-      const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
-      const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
-      return safeA - safeB;
-    });
+        const { data, error } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-    if (statusFilter === "All") return sorted;
+        if (error) throw error;
 
-    if (statusFilter === "Upcoming") {
-      return sorted.filter((row) => {
-        const when = new Date(getWhen(row)).getTime();
-        const status = (row.status ?? "Scheduled").toString();
-        return !Number.isNaN(when) && when >= now && status !== "Cancelled" && status !== "Completed";
-      });
+        const row = data as BookingRow;
+
+        setPassengerName(row.passenger_name ?? "");
+        setPassengerPhone(row.passenger_phone ?? "");
+        setPickupDate(localDateFromIso(row.pickup_datetime));
+        setPickupTime(localTimeFromIso(row.pickup_datetime));
+        setPickupAddress(row.pickup_address ?? "");
+        setDropoffAddress(row.dropoff_address ?? "");
+        setVia(row.via ?? "");
+        setPax(
+          row.passengers === null || row.passengers === undefined
+            ? "1"
+            : String(row.passengers)
+        );
+        setBagsLarge(Number(row.bags_large ?? 0));
+        setBagsSmall(Number(row.bags_small ?? 0));
+        setEstFare(
+          row.fare === null || row.fare === undefined ? "" : String(row.fare)
+        );
+        setDistanceMiles(
+          row.distance_miles === null || row.distance_miles === undefined
+            ? ""
+            : String(row.distance_miles)
+        );
+        setNotes(row.notes ?? "");
+        setLocalAuthority(row.local_authority ?? "");
+        setStatus((row.status ?? "Scheduled").toString());
+        setPaymentStatus((row.payment_status ?? "Unpaid").toString());
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to load booking"
+        );
+      } finally {
+        setLoading(false);
+      }
     }
 
-    return sorted.filter((row) => (row.status ?? "Scheduled") === statusFilter);
-  }, [bookings, statusFilter]);
+    void loadBooking();
+  }, [id]);
 
-  const nextJob = useMemo(() => {
-    const now = Date.now();
+  const canSave = useMemo(() => {
     return (
-      [...bookings]
-        .filter((row) => {
-          const when = new Date(getWhen(row)).getTime();
-          const status = (row.status ?? "Scheduled").toString();
-          return !Number.isNaN(when) && when >= now && status !== "Cancelled" && status !== "Completed";
-        })
-        .sort((a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime())[0] ?? null
+      passengerName.trim().length > 0 &&
+      passengerPhone.trim().length > 0 &&
+      pickupAddress.trim().length > 0 &&
+      dropoffAddress.trim().length > 0 &&
+      pickupDate.trim().length > 0 &&
+      pickupTime.trim().length > 0
     );
-  }, [bookings]);
+  }, [
+    passengerName,
+    passengerPhone,
+    pickupAddress,
+    dropoffAddress,
+    pickupDate,
+    pickupTime,
+  ]);
 
-  async function updateBooking(id: string, patch: Record<string, unknown>) {
+  function onCancel() {
+    router.push("/");
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id || !canSave || saving) return;
+
+    setSaving(true);
+    setErrorMessage("");
+
     try {
-      setBusyId(id);
-      setErrorMessage("");
+      const fareValue =
+        estFare.trim().length > 0
+          ? Number(estFare.replace(/[^\d.]/g, ""))
+          : null;
 
-      const supabase = getSupabase();
-      const { error } = await supabase.from("bookings").update(patch).eq("id", id);
+      const distanceValue =
+        distanceMiles.trim().length > 0
+          ? Number(distanceMiles.replace(/[^\d.]/g, ""))
+          : null;
+
+      const payload = {
+        passenger_name: passengerName.trim(),
+        passenger_phone: passengerPhone.trim(),
+        pickup_address: pickupAddress.trim(),
+        dropoff_address: dropoffAddress.trim(),
+        pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
+        distance_miles: distanceValue,
+        fare: fareValue,
+        notes: notes.trim() || null,
+        status,
+        payment_status: paymentStatus,
+        passengers: pax === "" ? 1 : Number(pax),
+        via: via.trim() || null,
+        bags_large: bagsLarge,
+        bags_small: bagsSmall,
+        local_authority: localAuthority.trim() || null,
+      };
+
+      const { error } = await supabase.from("bookings").update(payload).eq("id", id);
 
       if (error) throw error;
 
-      setBookings((current) =>
-        current.map((row) => (row.id === id ? { ...row, ...patch } : row))
-      );
+      router.push("/");
+      router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update booking";
-      setErrorMessage(message);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to update booking"
+      );
     } finally {
-      setBusyId(null);
+      setSaving(false);
     }
   }
 
-  async function onMarkCompleted(id: string) {
-    await updateBooking(id, { status: "Completed" });
-  }
-
-  async function onMarkPaid(id: string) {
-    await updateBooking(id, { payment_status: "Paid" });
-  }
-
-  async function onCancel(id: string) {
-    const ok = window.confirm("Cancel this booking?");
-    if (!ok) return;
-    await updateBooking(id, { status: "Cancelled" });
-  }
-
-  function BookingCard({ booking }: { booking: BookingRow }) {
-    const when = getWhen(booking);
-    const name = getName(booking);
-    const phone = getPhone(booking);
-    const pickup = getPickup(booking);
-    const dropoff = getDropoff(booking);
-    const fare = getFare(booking);
-    const status = (booking.status ?? "Scheduled").toString();
-    const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
-    const notes = pickString(booking, ["notes"]);
-    const isBusy = busyId === booking.id;
-
+  if (loading) {
     return (
-      <div className="rounded-2xl border bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold">{name}</div>
-            <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
-          </div>
-          <div className="text-right text-sm">
-            <div className="font-medium">{status}</div>
-            <div className="text-slate-500">{paymentStatus}</div>
+      <main className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-md p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow">
+            Loading booking…
           </div>
         </div>
-
-        <div className="space-y-1 text-sm text-slate-700">
-          <div>
-            <span className="font-medium">From:</span> {pickup || "—"}
-          </div>
-          <div>
-            <span className="font-medium">To:</span> {dropoff || "—"}
-          </div>
-          <div>
-            <span className="font-medium">Phone:</span> {phone || "—"}
-          </div>
-          <div>
-            <span className="font-medium">Fare:</span>{" "}
-            {fare === null ? "—" : `£${fare.toFixed(2)}`}
-          </div>
-          {notes ? (
-            <div>
-              <span className="font-medium">Notes:</span> {notes}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={`/edit/${booking.id}`}
-            className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-          >
-            Edit
-          </Link>
-
-          {phone ? (
-            <a
-              href={telHref(phone)}
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Call
-            </a>
-          ) : null}
-
-          {phone ? (
-            <a
-              href={smsHref(phone)}
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Text
-            </a>
-          ) : null}
-
-          {pickup ? (
-            <a
-              href={mapHref(pickup)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Pickup map
-            </a>
-          ) : null}
-
-          {dropoff ? (
-            <a
-              href={mapHref(dropoff)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Dropoff map
-            </a>
-          ) : null}
-
-          {status !== "Completed" ? (
-            <button
-              onClick={() => void onMarkCompleted(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Mark completed
-            </button>
-          ) : null}
-
-          {paymentStatus !== "Paid" ? (
-            <button
-              onClick={() => void onMarkPaid(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Mark paid
-            </button>
-          ) : null}
-
-          {status !== "Cancelled" ? (
-            <button
-              onClick={() => void onCancel(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Cancel
-            </button>
-          ) : null}
-        </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">My Way Cars</h1>
-              <p className="text-sm text-slate-600">Booking dashboard</p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/add"
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-              >
-                Add booking
-              </Link>
-
-              <button
-                onClick={() => void loadBookings()}
-                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900"
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
+    <main className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-md p-4">
+        <div className="mb-4">
+          <h1 className="text-xl font-semibold">Edit booking</h1>
+          <p className="text-sm text-gray-600">
+            Update the booking details and save changes.
+          </p>
         </div>
 
-        {nextJob ? (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
-            <div className="mb-3 text-lg font-semibold text-slate-900">Next job</div>
-            <BookingCard booking={nextJob} />
-          </section>
-        ) : (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
-            <div className="text-lg font-semibold text-slate-900">You’re clear</div>
-            <p className="mt-1 text-sm text-slate-600">No upcoming scheduled jobs found.</p>
-          </section>
-        )}
-
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap gap-2">
-            {["All", "Upcoming", "Scheduled", "Completed", "Cancelled"].map((value) => (
-              <button
-                key={value}
-                onClick={() => setStatusFilter(value)}
-                className={`rounded-xl px-3 py-2 text-sm font-medium ${
-                  statusFilter === value
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-200 text-slate-900"
-                }`}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
-
+        <form
+          onSubmit={onSubmit}
+          className="rounded-2xl border border-gray-200 bg-white p-4 shadow space-y-4"
+        >
           {errorMessage ? (
-            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
               {errorMessage}
             </div>
           ) : null}
 
-          {loading ? (
-            <div className="text-sm text-slate-600">Loading bookings…</div>
-          ) : filteredBookings.length === 0 ? (
-            <div className="text-sm text-slate-600">No bookings found.</div>
-          ) : (
-            <div className="space-y-4">
-              {filteredBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} />
-              ))}
+          <div>
+            <label className="text-sm font-medium">Passenger name</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={passengerName}
+              onChange={(e) => setPassengerName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Passenger phone</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={passengerPhone}
+              onChange={(e) => setPassengerPhone(e.target.value)}
+              inputMode="tel"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">Pickup date</label>
+              <input
+                type="date"
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={pickupDate}
+                onChange={(e) => setPickupDate(e.target.value)}
+              />
             </div>
-          )}
-        </section>
+            <div>
+              <label className="text-sm font-medium">Pickup time</label>
+              <input
+                type="time"
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={pickupTime}
+                onChange={(e) => setPickupTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Pickup address</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-blue-50 p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={pickupAddress}
+              onChange={(e) => setPickupAddress(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Dropoff address</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-blue-50 p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={dropoffAddress}
+              onChange={(e) => setDropoffAddress(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Via (optional)</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={via}
+              onChange={(e) => setVia(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm font-medium">Pax</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={pax}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/\D/g, "");
+                  setPax(cleaned === "" ? "" : String(Math.max(1, Number(cleaned))));
+                }}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Large bags</label>
+              <input
+                type="number"
+                min={0}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={bagsLarge}
+                onChange={(e) => setBagsLarge(Number(e.target.value || 0))}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Small bags</label>
+              <input
+                type="number"
+                min={0}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={bagsSmall}
+                onChange={(e) => setBagsSmall(Number(e.target.value || 0))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Estimated fare (£)</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={estFare}
+              onChange={(e) => setEstFare(e.target.value)}
+              inputMode="decimal"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Distance (miles)</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={distanceMiles}
+              onChange={(e) => setDistanceMiles(e.target.value)}
+              inputMode="decimal"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Notes (optional)</label>
+            <textarea
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Local authority (optional)</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={localAuthority}
+              onChange={(e) => setLocalAuthority(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">Status</label>
+              <select
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="Scheduled">Scheduled</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="POB">POB</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Payment status</label>
+              <select
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={paymentStatus}
+                onChange={(e) => setPaymentStatus(e.target.value)}
+              >
+                <option value="Unpaid">Unpaid</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!canSave || saving}
+            className={`w-full rounded-xl py-3 font-semibold text-white ${
+              canSave && !saving ? "bg-gray-900" : "bg-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full rounded-xl border border-gray-200 py-3 font-semibold"
+          >
+            Cancel
+          </button>
+        </form>
       </div>
     </main>
   );
