@@ -379,9 +379,19 @@ export default function HomePage() {
           <div>
             <div className="text-lg font-semibold">{name}</div>
             <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
-            <div className="mt-1 text-xs font-medium text-amber-700">
-              Countdown: {countdown}
-            </div>
+<div
+  className={`mt-1 text-xs font-medium ${
+    countdown.includes("d")
+      ? "text-slate-500"
+      : countdown.includes("h")
+      ? "text-amber-600"
+      : countdown.includes("m")
+      ? "text-red-600"
+      : "text-red-700 font-bold"
+  }`}
+>
+  Countdown: {countdown}
+</div>
           </div>
 
           <div className="text-right text-sm">
