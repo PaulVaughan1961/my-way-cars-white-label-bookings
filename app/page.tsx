@@ -514,15 +514,25 @@ export default function HomePage() {
             </a>
           ) : null}
 
-          {status !== "Completed" ? (
-            <button
-              onClick={() => void onMarkCompleted(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Mark completed
-            </button>
-          ) : null}
+      {status === "Scheduled" ? (
+  <button
+    onClick={() => void updateBooking(booking.id, { status: "POB" })}
+    disabled={isBusy}
+    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Mark POB
+  </button>
+) : null}
+
+{status !== "Completed" ? (
+  <button
+    onClick={() => void onMarkCompleted(booking.id)}
+    disabled={isBusy}
+    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Mark completed
+  </button>
+) : null}
 
           {paymentStatus !== "Paid" ? (
             <button
