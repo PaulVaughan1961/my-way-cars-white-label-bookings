@@ -566,7 +566,7 @@ export default function HomePage() {
 
    
    {nextJob ? (
-  <section className="rounded-3xl border-l-4 border-slate-900 bg-slate-100 p-5 shadow-md">
+  <section className="rounded-3xl border-l-4 border-slate-300 bg-slate-50 p-5 shadow-sm">
     <div className="mb-3 text-lg font-semibold text-slate-900">Next job</div>
     <BookingCard booking={nextJob} forceExpanded />
   </section>
