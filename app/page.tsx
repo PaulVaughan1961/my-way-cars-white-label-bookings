@@ -657,6 +657,14 @@ export default function HomePage() {
   )}
 </section>
 </div>
+
+<Link
+  href="/add"
+  className="fixed bottom-6 right-6 z-50 rounded-full bg-slate-900 px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-slate-800 sm:hidden"
+>
+  + Add booking
+</Link>
+
 </main>
 );
 }
