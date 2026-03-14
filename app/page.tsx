@@ -622,7 +622,7 @@ export default function HomePage() {
     </div>
   </div>
 
-  <div className="mb-4 flex flex-wrap gap-2">
+  <div className="mb-4 flex flex-wrap gap-2 sticky top-0 z-20 bg-white py-2">
     {["All", "Upcoming", "Scheduled", "Completed", "Cancelled"].map((value) => (
       <button
         key={value}
