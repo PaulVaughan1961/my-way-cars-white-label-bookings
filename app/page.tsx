@@ -375,7 +375,11 @@ export default function HomePage() {
     return (
       <div
         onClick={() => toggleExpanded(booking.id)}
-        className="cursor-pointer rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md"
+      className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
+  status === "POB"
+    ? "border-amber-300 bg-amber-50 shadow-md"
+    : "bg-white shadow-sm"
+}`}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
