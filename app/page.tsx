@@ -333,6 +333,35 @@ const todayStats = useMemo(() => {
   return { jobs, revenue, unpaid };
 }, [bookings]);
 
+const dashboardStats = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let jobs = 0;
+  let revenue = 0;
+  let unpaid = 0;
+
+  bookings.forEach((row) => {
+    const when = new Date(getWhen(row));
+    if (Number.isNaN(when.getTime()) || when < today) return;
+
+    const status = (row.status ?? "Scheduled").toString();
+    const payment = (row.payment_status ?? "Unpaid").toString();
+    const fare = getFare(row) ?? 0;
+
+    if (status === "Completed") {
+      jobs += 1;
+      revenue += fare;
+
+      if (payment === "Unpaid") {
+        unpaid += fare;
+      }
+    }
+  });
+
+  return { jobs, revenue, unpaid };
+}, [bookings]);
+
   const nextJob = useMemo(() => {
     const now = Date.now();
 
@@ -667,6 +696,30 @@ const todayStats = useMemo(() => {
             </div>
           </div>
         </div>
+
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+  <div className="mb-2 text-lg font-semibold text-slate-900">Dashboard</div>
+  <div className="flex flex-wrap gap-3 text-sm">
+    <div className="rounded-xl bg-slate-100 px-4 py-3">
+      <div className="text-slate-500">Jobs today</div>
+      <div className="text-lg font-bold text-slate-900">{dashboardStats.jobs}</div>
+    </div>
+
+    <div className="rounded-xl bg-slate-100 px-4 py-3">
+      <div className="text-slate-500">Revenue</div>
+      <div className="text-lg font-bold text-slate-900">
+        £{dashboardStats.revenue.toFixed(2)}
+      </div>
+    </div>
+
+    <div className="rounded-xl bg-amber-50 px-4 py-3">
+      <div className="text-amber-700">Unpaid</div>
+      <div className="text-lg font-bold text-amber-800">
+        £{dashboardStats.unpaid.toFixed(2)}
+      </div>
+    </div>
+  </div>
+</section>
 
    
    {nextJob ? (
