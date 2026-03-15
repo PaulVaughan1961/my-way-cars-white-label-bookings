@@ -157,6 +157,7 @@ function getCountdownLabel(value: string, nowMs: number): string {
 export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [errorMessage, setErrorMessage] = useState("");
@@ -168,6 +169,7 @@ export default function HomePage() {
     try {
       setLoading(true);
       setErrorMessage("");
+      
 
       const supabase = getSupabase();
 
