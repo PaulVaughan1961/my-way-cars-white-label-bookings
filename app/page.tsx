@@ -302,6 +302,33 @@ const unpaidTotal = useMemo(() => {
       return sum + (fare ?? 0);
     }
 
+    const todayStats = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let jobs = 0;
+  let revenue = 0;
+  let unpaid = 0;
+
+  bookings.forEach((row) => {
+    const when = new Date(getWhen(row));
+    const status = (row.status ?? "Scheduled").toString();
+    const payment = (row.payment_status ?? "Unpaid").toString();
+    const fare = getFare(row) ?? 0;
+
+    if (!Number.isNaN(when.getTime()) && when >= today && status === "Completed") {
+      jobs += 1;
+      revenue += fare;
+
+      if (payment === "Unpaid") {
+        unpaid += fare;
+      }
+    }
+  });
+
+  return { jobs, revenue, unpaid };
+}, [bookings]);
+
     return sum;
   }, 0);
 }, [bookings]);
@@ -657,11 +684,21 @@ const unpaidTotal = useMemo(() => {
 )}
 
 <section className="rounded-3xl bg-white p-5 shadow-sm">
+
   {unpaidTotal > 0 ? (
-  <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-medium text-amber-800">
-    Unpaid total: £{unpaidTotal.toFixed(2)}
+    <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-medium text-amber-800">
+      Unpaid total: £{unpaidTotal.toFixed(2)}
+    </div>
+  ) : null}
+
+  <div className="mb-4 rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm">
+    <div className="font-semibold text-slate-800 mb-1">Today</div>
+    <div className="flex gap-4 text-slate-700">
+      <span>Jobs: {todayStats.jobs}</span>
+      <span>Revenue: £{todayStats.revenue.toFixed(2)}</span>
+      <span>Unpaid: £{todayStats.unpaid.toFixed(2)}</span>
+    </div>
   </div>
-) : null}
   <div className="mb-4">
     <label className="mb-2 block text-sm font-semibold text-slate-700">
       Search bookings
