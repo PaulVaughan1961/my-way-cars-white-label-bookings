@@ -527,15 +527,7 @@ const sorted = [...bookings].sort((a, b) => {
             </a>
           ) : null}
 
-      {status === "Scheduled" ? (
-  <button
-    onClick={() => void updateBooking(booking.id, { status: "POB" })}
-    disabled={isBusy}
-    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Mark POB
-  </button>
-) : null}
+
 
 {status === "Scheduled" ? (
   <button
