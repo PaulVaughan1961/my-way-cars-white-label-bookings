@@ -610,7 +610,7 @@ const dashboardStats = useMemo(() => {
   <button
     onClick={() => void updateBooking(booking.id, { status: "POB" })}
     disabled={isBusy}
-    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
   >
     Mark POB
   </button>
@@ -625,7 +625,7 @@ const dashboardStats = useMemo(() => {
       })
     }
     disabled={isBusy}
-    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
   >
     Complete (Unpaid)
   </button>
@@ -640,7 +640,7 @@ const dashboardStats = useMemo(() => {
       })
     }
     disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
   >
     Complete & Paid
   </button>
@@ -650,21 +650,21 @@ const dashboardStats = useMemo(() => {
   <button
     onClick={() => void onMarkPaid(booking.id)}
     disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
   >
     Mark paid
   </button>
 ) : null}
 
-          {status !== "Cancelled" ? (
-            <button
-              onClick={() => void onCancel(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Cancel
-            </button>
-          ) : null}
+{status !== "Cancelled" ? (
+  <button
+    onClick={() => void onCancel(booking.id)}
+    disabled={isBusy}
+    className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+  >
+    Cancel
+  </button>
+) : null}
         </div>
       </div>
     );
