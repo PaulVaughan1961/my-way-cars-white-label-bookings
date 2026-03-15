@@ -537,25 +537,55 @@ const sorted = [...bookings].sort((a, b) => {
   </button>
 ) : null}
 
-{status !== "Completed" ? (
+{status === "Scheduled" ? (
   <button
-    onClick={() => void onMarkCompleted(booking.id)}
+    onClick={() => void updateBooking(booking.id, { status: "POB" })}
     disabled={isBusy}
-    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
   >
-    Mark completed
+    Mark POB
   </button>
 ) : null}
 
-          {paymentStatus !== "Paid" ? (
-            <button
-              onClick={() => void onMarkPaid(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Mark paid
-            </button>
-          ) : null}
+{status !== "Completed" ? (
+  <button
+    onClick={() =>
+      void updateBooking(booking.id, {
+        status: "Completed",
+        payment_status: "Unpaid",
+      })
+    }
+    disabled={isBusy}
+    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Complete (Unpaid)
+  </button>
+) : null}
+
+{status !== "Completed" ? (
+  <button
+    onClick={() =>
+      void updateBooking(booking.id, {
+        status: "Completed",
+        payment_status: "Paid",
+      })
+    }
+    disabled={isBusy}
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Complete & Paid
+  </button>
+) : null}
+
+{status === "Completed" && paymentStatus !== "Paid" ? (
+  <button
+    onClick={() => void onMarkPaid(booking.id)}
+    disabled={isBusy}
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Mark paid
+  </button>
+) : null}
 
           {status !== "Cancelled" ? (
             <button
