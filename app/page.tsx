@@ -302,6 +302,42 @@ const unpaidTotal = useMemo(() => {
       return sum + (fare ?? 0);
     }
 
+    return sum;
+  }, 0);
+}, [bookings]);
+
+const todayStats = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let jobs = 0;
+  let revenue = 0;
+  let unpaid = 0;
+
+  bookings.forEach((row) => {
+    const when = new Date(getWhen(row));
+    const status = (row.status ?? "Scheduled").toString();
+    const payment = (row.payment_status ?? "Unpaid").toString();
+    const fare = getFare(row) ?? 0;
+
+    if (!Number.isNaN(when.getTime()) && when >= today && status === "Completed") {
+      jobs += 1;
+      revenue += fare;
+
+      if (payment === "Unpaid") {
+        unpaid += fare;
+      }
+    }
+  });
+
+  return { jobs, revenue, unpaid };
+}, [bookings]);
+
+    if (payment === "Unpaid" && status === "Completed") {
+      const fare = getFare(row);
+      return sum + (fare ?? 0);
+    }
+
     const todayStats = useMemo(() => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
