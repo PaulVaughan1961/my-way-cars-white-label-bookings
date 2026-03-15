@@ -292,6 +292,20 @@ const sorted = [...bookings].sort((a, b) => {
     });
   }, [bookings, statusFilter, searchTerm]);
 
+const unpaidTotal = useMemo(() => {
+  return bookings.reduce((sum, row) => {
+    const payment = (row.payment_status ?? "Unpaid").toString();
+    const status = (row.status ?? "Scheduled").toString();
+
+    if (payment === "Unpaid" && status === "Completed") {
+      const fare = getFare(row);
+      return sum + (fare ?? 0);
+    }
+
+    return sum;
+  }, 0);
+}, [bookings]);
+
   const nextJob = useMemo(() => {
     const now = Date.now();
 
@@ -643,6 +657,11 @@ const sorted = [...bookings].sort((a, b) => {
 )}
 
 <section className="rounded-3xl bg-white p-5 shadow-sm">
+  {unpaidTotal > 0 ? (
+  <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-medium text-amber-800">
+    Unpaid total: £{unpaidTotal.toFixed(2)}
+  </div>
+) : null}
   <div className="mb-4">
     <label className="mb-2 block text-sm font-semibold text-slate-700">
       Search bookings
