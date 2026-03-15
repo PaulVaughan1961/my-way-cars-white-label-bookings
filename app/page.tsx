@@ -259,11 +259,17 @@ const sorted = [...bookings].sort((a, b) => {
           status !== "Completed"
         );
       });
-    } else if (statusFilter !== "All") {
-      result = result.filter(
-        (row) => (row.status ?? "Scheduled").toString() === statusFilter
-      );
-    }
+} else if (statusFilter === "Unpaid") {
+  result = result.filter((row) => {
+    const payment = (row.payment_status ?? "Unpaid").toString();
+    const status = (row.status ?? "Scheduled").toString();
+    return payment === "Unpaid" && status === "Completed";
+  });
+} else if (statusFilter !== "All") {
+  result = result.filter(
+    (row) => (row.status ?? "Scheduled").toString() === statusFilter
+  );
+}
 
     if (!needle) return result;
 
@@ -670,7 +676,7 @@ const sorted = [...bookings].sort((a, b) => {
   </div>
 
   <div className="mb-4 flex flex-wrap gap-2 sticky top-0 z-20 bg-white py-2">
-    {["All", "Upcoming", "Scheduled", "Completed", "Cancelled"].map((value) => (
+   {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map((value) => (
       <button
         key={value}
         onClick={() => setStatusFilter(value)}
