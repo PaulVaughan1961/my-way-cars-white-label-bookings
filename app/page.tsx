@@ -227,15 +227,24 @@ export default function HomePage() {
     const now = Date.now();
     const needle = searchTerm.trim().toLowerCase();
 
-    const sorted = [...bookings].sort((a, b) => {
-      const aTime = new Date(getWhen(a)).getTime();
-      const bTime = new Date(getWhen(b)).getTime();
+const sorted = [...bookings].sort((a, b) => {
+  const aTime = new Date(getWhen(a)).getTime();
+  const bTime = new Date(getWhen(b)).getTime();
 
-      const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
-      const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+  const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
+  const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
 
-      return safeA - safeB;
-    });
+  const aStatus = (a.status ?? "Scheduled").toString();
+  const bStatus = (b.status ?? "Scheduled").toString();
+
+  // Completed and Cancelled should show newest first
+  if (aStatus === "Completed" || aStatus === "Cancelled") {
+    return safeB - safeA;
+  }
+
+  // Scheduled / Upcoming show earliest first
+  return safeA - safeB;
+});
 
     let result = sorted;
 
