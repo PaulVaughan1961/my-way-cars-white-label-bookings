@@ -155,9 +155,9 @@ function getCountdownLabel(value: string, nowMs: number): string {
 }
 
 export default function HomePage() {
-const [bookings, setBookings] = useState<BookingRow[]>([]);
-const [loading, setLoading] = useState(true);
-const [busyId, setBusyId] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [errorMessage, setErrorMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -168,7 +168,7 @@ const [busyId, setBusyId] = useState<string | null>(null);
     try {
       setLoading(true);
       setErrorMessage("");
-
+      
 
       const supabase = getSupabase();
 
@@ -393,26 +393,7 @@ const nextJob = useMemo(() => {
         (a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
       )[0] ?? null
   );
-}, [bookings]);s
-
-    return (
-      [...bookings]
-        .filter((row) => {
-          const when = new Date(getWhen(row)).getTime();
-          const status = (row.status ?? "Scheduled").toString();
-
-          return (
-            !Number.isNaN(when) &&
-            when >= now &&
-            status !== "Cancelled" &&
-            status !== "Completed"
-          );
-        })
-        .sort(
-          (a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
-        )[0] ?? null
-    );
-  }, [bookings]);
+}, [bookings]);
 
   async function updateBooking(id: string, patch: Record<string, unknown>) {
     try {
@@ -639,7 +620,7 @@ const nextJob = useMemo(() => {
   <button
     onClick={() => void updateBooking(booking.id, { status: "POB" })}
     disabled={isBusy}
-    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
   >
     Mark POB
   </button>
@@ -654,7 +635,7 @@ const nextJob = useMemo(() => {
       })
     }
     disabled={isBusy}
-    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
   >
     Complete (Unpaid)
   </button>
@@ -669,7 +650,7 @@ const nextJob = useMemo(() => {
       })
     }
     disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
   >
     Complete & Paid
   </button>
@@ -679,21 +660,21 @@ const nextJob = useMemo(() => {
   <button
     onClick={() => void onMarkPaid(booking.id)}
     disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
   >
     Mark paid
   </button>
 ) : null}
 
-{status !== "Cancelled" ? (
-  <button
-    onClick={() => void onCancel(booking.id)}
-    disabled={isBusy}
-    className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 active:scale-95 active:shadow-inner transition"
-  >
-    Cancel
-  </button>
-) : null}
+          {status !== "Cancelled" ? (
+            <button
+              onClick={() => void onCancel(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          ) : null}
         </div>
       </div>
     );
@@ -752,15 +733,18 @@ const nextJob = useMemo(() => {
 </section>
 
    
-   {nextJob ? (
-  <section className="rounded-3xl border-l-4 border-slate-300 bg-slate-50 p-5 shadow-sm">
+{nextJob ? (
+  <section
+    id="next-job"
+    className="rounded-3xl border-l-4 border-slate-300 bg-slate-50 p-5 shadow-sm"
+  >
     <div className="mb-3 text-xl font-bold text-slate-900">
-  {(nextJob?.status ?? "Scheduled").toString() === "POB" ? "Current Job" : "Next Job"}
-</div>
+      {(nextJob?.status ?? "Scheduled").toString() === "POB" ? "Current Job" : "Next Job"}
+    </div>
     <BookingCard booking={nextJob} forceExpanded />
   </section>
 ) : (
-  <section id="next-job" className="rounded-3xl bg-slate-50 border border-slate-200 p-5 shadow-sm">
+  <section className="rounded-3xl bg-slate-50 border border-slate-200 p-5 shadow-sm">
     <div className="text-lg font-semibold text-slate-900">You’re clear</div>
     <p className="mt-1 text-sm text-slate-600">
       No upcoming scheduled jobs found.
