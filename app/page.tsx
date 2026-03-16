@@ -363,8 +363,37 @@ const dashboardStats = useMemo(() => {
   return { jobs, revenue, unpaid };
 }, [bookings]);
 
-  const nextJob = useMemo(() => {
-    const now = Date.now();
+const nextJob = useMemo(() => {
+  const now = Date.now();
+
+  const pobJob =
+    [...bookings]
+      .filter((row) => (row.status ?? "Scheduled").toString() === "POB")
+      .sort(
+        (a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
+      )[0] ?? null;
+
+  if (pobJob) return pobJob;
+
+  return (
+    [...bookings]
+      .filter((row) => {
+        const when = new Date(getWhen(row)).getTime();
+        const status = (row.status ?? "Scheduled").toString();
+
+        return (
+          !Number.isNaN(when) &&
+          when >= now &&
+          status !== "Cancelled" &&
+          status !== "Completed" &&
+          status !== "POB"
+        );
+      })
+      .sort(
+        (a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
+      )[0] ?? null
+  );
+}, [bookings]);s
 
     return (
       [...bookings]
