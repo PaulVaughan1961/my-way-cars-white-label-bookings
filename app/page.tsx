@@ -758,8 +758,7 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
    
 {nextJob ? (
   <section
-    id="next-job"
-    className="rounded-3xl border-l-4 border-slate-300 bg-slate-50 p-5 shadow-sm"
+id="next-job"
   >
     <div className="mb-3 text-xl font-bold text-slate-900">
       {(nextJob?.status ?? "Scheduled").toString() === "POB" ? "Current Job" : "Next Job"}
