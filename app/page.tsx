@@ -754,7 +754,9 @@ const nextJob = useMemo(() => {
    
    {nextJob ? (
   <section className="rounded-3xl border-l-4 border-slate-300 bg-slate-50 p-5 shadow-sm">
-    <div className="mb-3 text-xl font-bold text-slate-900">Next Job</div>
+    <div className="mb-3 text-xl font-bold text-slate-900">
+  {(nextJob?.status ?? "Scheduled").toString() === "POB" ? "Current Job" : "Next Job"}
+</div>
     <BookingCard booking={nextJob} forceExpanded />
   </section>
 ) : (
