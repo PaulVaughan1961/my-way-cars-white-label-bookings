@@ -492,7 +492,7 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
         }
 
         if (diff <= 60 * 60 * 1000) {
-          return "border-amber-200 bg-amber-50 shadow-sm";
+          return "border-blue-300 bg-blue-50 shadow-sm";
         }
 
         return "bg-white shadow-sm";
