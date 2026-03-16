@@ -480,10 +480,23 @@ const nextJob = useMemo(() => {
     return (
       <div
         onClick={() => toggleExpanded(booking.id)}
-      className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
+className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
   status === "POB"
     ? "border-amber-300 bg-amber-50 shadow-md"
-    : "bg-white shadow-sm"
+    : (() => {
+        const whenMs = new Date(when).getTime();
+        const diff = whenMs - nowMs;
+
+        if (diff <= 15 * 60 * 1000) {
+          return "border-red-300 bg-red-50 shadow-sm";
+        }
+
+        if (diff <= 60 * 60 * 1000) {
+          return "border-amber-200 bg-amber-50 shadow-sm";
+        }
+
+        return "bg-white shadow-sm";
+      })()
 }`}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
