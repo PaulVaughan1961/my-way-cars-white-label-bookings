@@ -158,6 +158,7 @@ export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
   const [errorMessage, setErrorMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -168,6 +169,15 @@ export default function HomePage() {
     try {
       setLoading(true);
       setErrorMessage("");
+
+      async function onRefresh() {
+  try {
+    setRefreshing(true);
+    await loadBookings();
+  } finally {
+    setRefreshing(false);
+  }
+}
       
 
       const supabase = getSupabase();
@@ -698,12 +708,13 @@ const nextJob = useMemo(() => {
                 Add booking
               </Link>
 
-              <button
-                onClick={() => void loadBookings()}
-                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900"
-              >
-                Refresh
-              </button>
+<button
+  onClick={() => void onRefresh()}
+  disabled={refreshing}
+  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+>
+  {refreshing ? "Refreshing..." : "Refresh"}
+</button>
             </div>
           </div>
         </div>
