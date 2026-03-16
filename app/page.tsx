@@ -165,12 +165,31 @@ export default function HomePage() {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(Date.now());
 
-  async function loadBookings() {
-    try {
-      setLoading(true);
-      setErrorMessage("");
+async function loadBookings() {
+  try {
+    setLoading(true);
+    setErrorMessage("");
 
-      async function onRefresh() {
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("*")
+      .order("pickup_datetime", { ascending: true });
+
+    if (error) throw error;
+
+    setBookings((data as BookingRow[]) ?? []);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load bookings";
+    setErrorMessage(message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function onRefresh() {
   try {
     setRefreshing(true);
     await loadBookings();
@@ -178,26 +197,6 @@ export default function HomePage() {
     setRefreshing(false);
   }
 }
-      
-
-      const supabase = getSupabase();
-
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("*")
-        .order("pickup_datetime", { ascending: true });
-
-      if (error) throw error;
-
-      setBookings((data as BookingRow[]) ?? []);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to load bookings";
-      setErrorMessage(message);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   useEffect(() => {
     void loadBookings();
