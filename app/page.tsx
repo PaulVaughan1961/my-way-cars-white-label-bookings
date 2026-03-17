@@ -104,6 +104,18 @@ function getFare(row: BookingRow): number | null {
   return pickNumber(row, ["fare", "quoted_fare", "amount"]);
 }
 
+function getDriver(row: BookingRow): string {
+  return pickString(row, ["driver_name", "driver_allocated", "assigned_driver"]);
+}
+
+function getVehicle(row: BookingRow): string {
+  return pickString(row, ["vehicle", "car_used", "assigned_vehicle"]);
+}
+
+function getBookingType(row: BookingRow): string {
+  return pickString(row, ["booking_type", "journey_type"]);
+}
+
 function fmtDateTime(value: string): string {
   if (!value) return "No date set";
 
@@ -452,30 +464,33 @@ const nextJob = useMemo(() => {
   }
 
   function BookingCard({
-    booking,
-    forceExpanded = false,
-  }: {
-    booking: BookingRow;
-    forceExpanded?: boolean;
-  }) {
-    const when = getWhen(booking);
-    const name = getName(booking);
-    const phone = getPhone(booking);
-    const pickup = getPickup(booking);
-    const dropoff = getDropoff(booking);
-    const fare = getFare(booking);
-    const status = (booking.status ?? "Scheduled").toString();
-    const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
-    const notes = pickString(booking, ["notes"]);
-    const via = pickString(booking, ["via"]);
-    const localAuthority = pickString(booking, ["local_authority"]);
-    const passengers = pickNumber(booking, ["passengers"]);
-    const bagsLarge = pickNumber(booking, ["bags_large"]);
-    const bagsSmall = pickNumber(booking, ["bags_small"]);
-    const distanceMiles = pickNumber(booking, ["distance_miles"]);
-    const isBusy = busyId === booking.id;
-    const expanded = forceExpanded || !!expandedIds[booking.id];
-    const countdown = getCountdownLabel(when, nowMs);
+  booking,
+  forceExpanded = false,
+}: {
+  booking: BookingRow;
+  forceExpanded?: boolean;
+}) {
+  const driver = getDriver(booking);
+  const vehicle = getVehicle(booking);
+  const bookingType = getBookingType(booking);
+  const when = getWhen(booking);
+  const name = getName(booking);
+  const phone = getPhone(booking);
+  const pickup = getPickup(booking);
+  const dropoff = getDropoff(booking);
+  const fare = getFare(booking);
+  const status = (booking.status ?? "Scheduled").toString();
+  const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
+  const notes = pickString(booking, ["notes"]);
+  const via = pickString(booking, ["via"]);
+  const localAuthority = pickString(booking, ["local_authority"]);
+  const passengers = pickNumber(booking, ["passengers"]);
+  const bagsLarge = pickNumber(booking, ["bags_large"]);
+  const bagsSmall = pickNumber(booking, ["bags_small"]);
+  const distanceMiles = pickNumber(booking, ["distance_miles"]);
+  const isBusy = busyId === booking.id;
+  const expanded = forceExpanded || !!expandedIds[booking.id];
+  const countdown = getCountdownLabel(when, nowMs);
 
     return (
       <div
@@ -527,63 +542,81 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           </div>
         </div>
 
-        <div className="space-y-1 text-sm text-slate-700">
-          <div>
-            <span className="font-medium">From:</span> {pickup || "—"}
-          </div>
-          <div>
-            <span className="font-medium">To:</span> {dropoff || "—"}
-          </div>
-          <div>
-            <span className="font-medium">Phone:</span> {phone || "—"}
-          </div>
-          <div>
-            <span className="font-medium">Fare:</span>{" "}
-            {fare === null ? "—" : `£${fare.toFixed(2)}`}
-          </div>
-        </div>
+<div className="space-y-1 text-sm text-slate-700">
+  <div>
+    <span className="font-medium">From:</span> {pickup || "—"}
+  </div>
+  <div>
+    <span className="font-medium">To:</span> {dropoff || "—"}
+  </div>
+  <div>
+    <span className="font-medium">Phone:</span> {phone || "—"}
+  </div>
+  <div>
+    <span className="font-medium">Fare:</span>{" "}
+    {fare === null ? "—" : `£${fare.toFixed(2)}`}
+  </div>
+  <div>
+    <span className="font-medium">Driver:</span> {driver || "Unassigned"}
+  </div>
+  <div>
+    <span className="font-medium">Vehicle:</span> {vehicle || "Unassigned"}
+  </div>
+  <div>
+    <span className="font-medium">Type:</span> {bookingType || "—"}
+  </div>
+</div>
 
-        {expanded ? (
-          <div className="mt-4 space-y-2 border-t pt-4 text-sm text-slate-700">
-            <div>
-              <span className="font-medium">Passengers:</span>{" "}
-              {passengers === null ? "—" : passengers}
-            </div>
-            <div>
-              <span className="font-medium">Distance:</span>{" "}
-              {distanceMiles === null ? "—" : `${distanceMiles} miles`}
-            </div>
-            <div>
-              <span className="font-medium">Via:</span> {via || "—"}
-            </div>
-            <div>
-              <span className="font-medium">Large bags:</span>{" "}
-              {bagsLarge === null ? "—" : bagsLarge}
-            </div>
-            <div>
-              <span className="font-medium">Small bags:</span>{" "}
-              {bagsSmall === null ? "—" : bagsSmall}
-            </div>
-            <div>
-              <span className="font-medium">Local authority:</span>{" "}
-              {localAuthority || "—"}
-            </div>
-            <div>
-              <span className="font-medium">Created:</span>{" "}
-              {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
-            </div>
-            <div>
-              <span className="font-medium">Booking ID:</span> {booking.id}
-            </div>
-            <div>
-              <span className="font-medium">Notes:</span> {notes || "—"}
-            </div>
-          </div>
-        ) : notes ? (
-          <div className="mt-3 text-sm text-slate-700">
-            <span className="font-medium">Notes:</span> {notes}
-          </div>
-        ) : null}
+{expanded ? (
+  <div className="mt-4 space-y-2 border-t pt-4 text-sm text-slate-700">
+    <div>
+      <span className="font-medium">Driver allocated:</span> {driver || "—"}
+    </div>
+    <div>
+      <span className="font-medium">Vehicle used:</span> {vehicle || "—"}
+    </div>
+    <div>
+      <span className="font-medium">Booking type:</span> {bookingType || "—"}
+    </div>
+    <div>
+      <span className="font-medium">Passengers:</span>{" "}
+      {passengers === null ? "—" : passengers}
+    </div>
+    <div>
+      <span className="font-medium">Distance:</span>{" "}
+      {distanceMiles === null ? "—" : `${distanceMiles} miles`}
+    </div>
+    <div>
+      <span className="font-medium">Via:</span> {via || "—"}
+    </div>
+    <div>
+      <span className="font-medium">Large bags:</span>{" "}
+      {bagsLarge === null ? "—" : bagsLarge}
+    </div>
+    <div>
+      <span className="font-medium">Small bags:</span>{" "}
+      {bagsSmall === null ? "—" : bagsSmall}
+    </div>
+    <div>
+      <span className="font-medium">Local authority:</span>{" "}
+      {localAuthority || "—"}
+    </div>
+    <div>
+      <span className="font-medium">Created:</span>{" "}
+      {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
+    </div>
+    <div>
+      <span className="font-medium">Booking ID:</span> {booking.id}
+    </div>
+    <div>
+      <span className="font-medium">Notes:</span> {notes || "—"}
+    </div>
+  </div>
+) : notes ? (
+  <div className="mt-3 text-sm text-slate-700">
+    <span className="font-medium">Notes:</span> {notes}
+  </div>
+) : null}
 
         <div
           className="mt-4 flex flex-wrap gap-2"

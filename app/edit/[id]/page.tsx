@@ -24,6 +24,9 @@ type BookingRow = {
   bags_large?: number | string | null;
   bags_small?: number | string | null;
   local_authority?: string | null;
+  driver_name?: string | null;
+  vehicle?: string | null;
+  booking_type?: string | null;
 };
 
 function localDateFromIso(value: string | null | undefined) {
@@ -75,6 +78,9 @@ export default function EditBookingPage() {
   const [distanceMiles, setDistanceMiles] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [localAuthority, setLocalAuthority] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [vehicle, setVehicle] = useState("");
+  const [bookingType, setBookingType] = useState("");
   const [status, setStatus] = useState("Scheduled");
   const [paymentStatus, setPaymentStatus] = useState("Unpaid");
 
@@ -120,6 +126,9 @@ export default function EditBookingPage() {
         );
         setNotes(row.notes ?? "");
         setLocalAuthority(row.local_authority ?? "");
+        setDriverName(row.driver_name ?? "");
+        setVehicle(row.vehicle ?? "");
+        setBookingType(row.booking_type ?? "");
         setStatus((row.status ?? "Scheduled").toString());
         setPaymentStatus((row.payment_status ?? "Unpaid").toString());
       } catch (error) {
@@ -190,6 +199,9 @@ export default function EditBookingPage() {
         bags_large: bagsLarge,
         bags_small: bagsSmall,
         local_authority: localAuthority.trim() || null,
+        driver_name: driverName.trim() || null,
+        vehicle: vehicle.trim() || null,
+        booking_type: bookingType.trim() || null,
       };
 
       const { error } = await supabase.from("bookings").update(payload).eq("id", id);
@@ -231,7 +243,7 @@ export default function EditBookingPage() {
 
         <form
           onSubmit={onSubmit}
-          className="rounded-2xl border border-gray-200 bg-white p-4 shadow space-y-4"
+          className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow"
         >
           {errorMessage ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
@@ -366,6 +378,39 @@ export default function EditBookingPage() {
           </div>
 
           <div>
+            <label className="text-sm font-medium">Driver (optional)</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={driverName}
+              onChange={(e) => setDriverName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Vehicle (optional)</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={vehicle}
+              onChange={(e) => setVehicle(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Booking type (optional)</label>
+            <select
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={bookingType}
+              onChange={(e) => setBookingType(e.target.value)}
+            >
+              <option value="">Select type</option>
+              <option value="Local">Local</option>
+              <option value="Long Distance">Long Distance</option>
+              <option value="Airport">Airport</option>
+              <option value="Seaport">Seaport</option>
+            </select>
+          </div>
+
+          <div>
             <label className="text-sm font-medium">Notes (optional)</label>
             <textarea
               className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
@@ -416,7 +461,7 @@ export default function EditBookingPage() {
             type="submit"
             disabled={!canSave || saving}
             className={`w-full rounded-xl py-3 font-semibold text-white ${
-              canSave && !saving ? "bg-gray-900" : "bg-gray-400 cursor-not-allowed"
+              canSave && !saving ? "bg-gray-900" : "cursor-not-allowed bg-gray-400"
             }`}
           >
             {saving ? "Saving..." : "Save changes"}
