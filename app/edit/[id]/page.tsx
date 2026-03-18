@@ -258,7 +258,7 @@ const row = data as BookingRow;
           <p className="text-sm text-gray-600">
             Update the booking details and save changes.
           </p>
-          <p className="text-xs text-red-600">Driver dropdown version</p>
+          
         </div>
 
         <form
@@ -401,18 +401,39 @@ const row = data as BookingRow;
   <select
     className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
     value={driverName}
-  onChange={(e) => {
+ onChange={async (e) => {
   const selectedName = e.target.value;
   setDriverName(selectedName);
 
-const selectedDriver = drivers.find(
-  (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
-);
+  const selectedDriver = drivers.find(
+    (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
+  );
 
   if (selectedDriver) {
-    if (selectedDriver.default_vehicle) {
-      setVehicle(selectedDriver.default_vehicle);
-    }
+if (selectedDriver.default_vehicle) {
+  const vehicleName = selectedDriver.default_vehicle;
+
+  const { data: vehicleData } = await supabase
+    .from("vehicles")
+    .select("*")
+    .eq("name", vehicleName)
+    .single();
+
+  if (vehicleData) {
+    const fullVehicle = [
+      `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
+      vehicleData.registration,
+      vehicleData.plate_number,
+      vehicleData.council,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    setVehicle(fullVehicle);
+  } else {
+    setVehicle(vehicleName);
+  }
+}
 
     if (selectedDriver.default_authority) {
       setLocalAuthority(selectedDriver.default_authority);
