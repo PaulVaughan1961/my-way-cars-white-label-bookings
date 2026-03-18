@@ -28,7 +28,13 @@ type BookingRow = {
   vehicle?: string | null;
   booking_type?: string | null;
 };
-
+type DriverRow = {
+  id: string;
+  name: string;
+  default_vehicle?: string | null;
+  default_authority?: string | null;
+  active?: boolean | null;
+};
 function localDateFromIso(value: string | null | undefined) {
   if (!value) return "";
   const d = new Date(value);
@@ -78,7 +84,9 @@ export default function EditBookingPage() {
   const [distanceMiles, setDistanceMiles] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [localAuthority, setLocalAuthority] = useState("");
-  const [driverName, setDriverName] = useState("");
+  const [drivers, setDrivers] = useState<DriverRow[]>([]);
+const [driverName, setDriverName] = useState("");
+  
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
   const [status, setStatus] = useState("Scheduled");
@@ -92,15 +100,25 @@ export default function EditBookingPage() {
         setLoading(true);
         setErrorMessage("");
 
-        const { data, error } = await supabase
-          .from("bookings")
-          .select("*")
-          .eq("id", id)
-          .single();
+const { data, error } = await supabase
+  .from("bookings")
+  .select("*")
+  .eq("id", id)
+  .single();
 
-        if (error) throw error;
+if (error) throw error;
 
-        const row = data as BookingRow;
+const { data: driverData, error: driverError } = await supabase
+  .from("drivers")
+  .select("id, name, default_vehicle, default_authority, active")
+  .eq("active", true)
+  .order("name", { ascending: true });
+
+if (driverError) throw driverError;
+
+setDrivers((driverData as DriverRow[]) ?? []);
+
+const row = data as BookingRow;
 
         setPassengerName(row.passenger_name ?? "");
         setPassengerPhone(row.passenger_phone ?? "");
@@ -191,6 +209,7 @@ export default function EditBookingPage() {
         pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
         distance_miles: distanceValue,
         fare: fareValue,
+        driver_name: driverName.trim() || null,
         notes: notes.trim() || null,
         status,
         payment_status: paymentStatus,
@@ -199,7 +218,7 @@ export default function EditBookingPage() {
         bags_large: bagsLarge,
         bags_small: bagsSmall,
         local_authority: localAuthority.trim() || null,
-        driver_name: driverName.trim() || null,
+        
         vehicle: vehicle.trim() || null,
         booking_type: bookingType.trim() || null,
       };
@@ -239,6 +258,7 @@ export default function EditBookingPage() {
           <p className="text-sm text-gray-600">
             Update the booking details and save changes.
           </p>
+          <p className="text-xs text-red-600">Driver dropdown version</p>
         </div>
 
         <form
@@ -376,15 +396,40 @@ export default function EditBookingPage() {
               inputMode="decimal"
             />
           </div>
-
           <div>
-            <label className="text-sm font-medium">Driver (optional)</label>
-            <input
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-              value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
-            />
-          </div>
+  <label className="text-sm font-medium">Driver (optional)</label>
+  <select
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={driverName}
+  onChange={(e) => {
+  const selectedName = e.target.value;
+  setDriverName(selectedName);
+
+const selectedDriver = drivers.find(
+  (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
+);
+
+  if (selectedDriver) {
+    if (selectedDriver.default_vehicle) {
+      setVehicle(selectedDriver.default_vehicle);
+    }
+
+    if (selectedDriver.default_authority) {
+      setLocalAuthority(selectedDriver.default_authority);
+    }
+  }
+}}
+  >
+    <option value="">Select driver</option>
+    {drivers.map((driver) => (
+      <option key={driver.id} value={driver.name}>
+        {driver.name}
+      </option>
+    ))}
+  </select>
+</div>
+
+
 
           <div>
             <label className="text-sm font-medium">Vehicle (optional)</label>
