@@ -396,50 +396,55 @@ const row = data as BookingRow;
               inputMode="decimal"
             />
           </div>
-          <div>
-  <label className="text-sm font-medium">Driver (optional)</label>
+  <div className="border-t border-gray-200 pt-4">
+  <h2 className="text-sm font-semibold text-gray-700">
+    Assignment & compliance
+  </h2>
+</div>        
+<div>
+  <label className="text-sm font-medium">Driver</label>
   <select
     className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
     value={driverName}
- onChange={async (e) => {
-  const selectedName = e.target.value;
-  setDriverName(selectedName);
+    onChange={async (e) => {
+      const selectedName = e.target.value;
+      setDriverName(selectedName);
 
-  const selectedDriver = drivers.find(
-    (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
-  );
+      const selectedDriver = drivers.find(
+        (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
+      );
 
-  if (selectedDriver) {
-if (selectedDriver.default_vehicle) {
-  const vehicleName = selectedDriver.default_vehicle;
+      if (selectedDriver) {
+        if (selectedDriver.default_vehicle) {
+          const vehicleName = selectedDriver.default_vehicle;
 
-  const { data: vehicleData } = await supabase
-    .from("vehicles")
-    .select("*")
-    .eq("name", vehicleName)
-    .single();
+          const { data: vehicleData } = await supabase
+            .from("vehicles")
+            .select("*")
+            .eq("name", vehicleName)
+            .single();
 
-  if (vehicleData) {
-const fullVehicle = [
-  `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
-  vehicleData.registration ? `Reg: ${vehicleData.registration}` : null,
-  vehicleData.plate_number ? `Plate: ${vehicleData.plate_number}` : null,
-  vehicleData.council ? `Authority: ${vehicleData.council}` : null,
-]
-  .filter(Boolean)
-  .join(" | ");
+          if (vehicleData) {
+            const fullVehicle = [
+              `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
+              vehicleData.registration ? `Reg: ${vehicleData.registration}` : null,
+              vehicleData.plate_number ? `Plate: ${vehicleData.plate_number}` : null,
+              vehicleData.council ? `Authority: ${vehicleData.council}` : null,
+            ]
+              .filter(Boolean)
+              .join(" | ");
 
-    setVehicle(fullVehicle);
-  } else {
-    setVehicle(vehicleName);
-  }
-}
+            setVehicle(fullVehicle);
+          } else {
+            setVehicle(vehicleName);
+          }
+        }
 
-    if (selectedDriver.default_authority) {
-      setLocalAuthority(selectedDriver.default_authority);
-    }
-  }
-}}
+        if (selectedDriver.default_authority) {
+          setLocalAuthority(selectedDriver.default_authority);
+        }
+      }
+    }}
   >
     <option value="">Select driver</option>
     {drivers.map((driver) => (
@@ -450,50 +455,28 @@ const fullVehicle = [
   </select>
 </div>
 
+<div>
+  <label className="text-sm font-medium">
+    Vehicle (auto-filled, editable)
+  </label>
+  <input
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={vehicle}
+    onChange={(e) => setVehicle(e.target.value)}
+  />
+</div>
 
+<div>
+  <label className="text-sm font-medium">
+    Licensing authority (auto-filled, editable)
+  </label>
+  <input
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={localAuthority}
+    onChange={(e) => setLocalAuthority(e.target.value)}
+  />
+</div>
 
-          <div>
-            <label className="text-sm font-medium">Vehicle (optional)</label>
-            <input
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-              value={vehicle}
-              onChange={(e) => setVehicle(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Booking type (optional)</label>
-            <select
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-              value={bookingType}
-              onChange={(e) => setBookingType(e.target.value)}
-            >
-              <option value="">Select type</option>
-              <option value="Local">Local</option>
-              <option value="Long Distance">Long Distance</option>
-              <option value="Airport">Airport</option>
-              <option value="Seaport">Seaport</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Notes (optional)</label>
-            <textarea
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Local authority (optional)</label>
-            <input
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-              value={localAuthority}
-              onChange={(e) => setLocalAuthority(e.target.value)}
-            />
-          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
