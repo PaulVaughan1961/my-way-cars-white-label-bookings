@@ -557,7 +557,10 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
     {fare === null ? "—" : `£${fare.toFixed(2)}`}
   </div>
   <div>
-    <span className="font-medium">Driver:</span> {driver || "Unassigned"}
+<span className="font-medium">Driver:</span>{" "}
+<span className="font-semibold text-blue-700">
+  {driver || "Unassigned"}
+</span>
   </div>
   <div>
     <span className="font-medium">Vehicle:</span> {vehicle || "Unassigned"}
@@ -568,9 +571,33 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
 </div>
 
 {expanded ? (
-  <div className="mt-4 space-y-2 border-t pt-4 text-sm text-slate-700">
-  <div>
- </div>
+<div className="mt-4 border-t pt-4">
+  <div className="mb-3 text-sm font-semibold text-slate-900">
+    Compliance / Job details
+  </div>
+
+  <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
+    <div>
+      <span className="font-medium">Status:</span> {booking.status || "—"}
+    </div>
+    <div>
+      <span className="font-medium">Payment:</span> {booking.payment_status || "—"}
+    </div>
+
+    <div>
+ <span className="font-medium">Driver:</span>{" "}
+<span className="font-semibold text-blue-700">
+  {driver || "—"}
+</span>
+    </div>
+    <div>
+
+<span className="font-medium">Vehicle:</span>{" "}
+<span className="font-semibold text-purple-700">
+  {vehicle || "—"}
+</span>
+    </div>
+
     <div>
       <span className="font-medium">Passengers:</span>{" "}
       {passengers === null ? "—" : passengers}
@@ -579,9 +606,15 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
       <span className="font-medium">Distance:</span>{" "}
       {distanceMiles === null ? "—" : `${distanceMiles} miles`}
     </div>
+
     <div>
       <span className="font-medium">Via:</span> {via || "—"}
     </div>
+<div>
+  <span className="font-medium">Journey type:</span>{" "}
+  {(booking as any).journey_type || (booking as any).type || "—"}
+</div>
+
     <div>
       <span className="font-medium">Large bags:</span>{" "}
       {bagsLarge === null ? "—" : bagsLarge}
@@ -590,6 +623,7 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
       <span className="font-medium">Small bags:</span>{" "}
       {bagsSmall === null ? "—" : bagsSmall}
     </div>
+
     <div>
       <span className="font-medium">Local authority:</span>{" "}
       {localAuthority || "—"}
@@ -598,13 +632,16 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
       <span className="font-medium">Created:</span>{" "}
       {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
     </div>
-    <div>
+
+    <div className="sm:col-span-2">
       <span className="font-medium">Booking ID:</span> {booking.id}
     </div>
-    <div>
+
+    <div className="sm:col-span-2">
       <span className="font-medium">Notes:</span> {notes || "—"}
     </div>
   </div>
+</div>
 ) : notes ? (
   <div className="mt-3 text-sm text-slate-700">
     <span className="font-medium">Notes:</span> {notes}
