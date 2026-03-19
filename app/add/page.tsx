@@ -1,10 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 
 const supabase = getSupabase();
+
+type DriverRow = {
+  id: string;
+  name: string;
+  default_vehicle?: string | null;
+  default_authority?: string | null;
+  active?: boolean | null;
+};
 
 function isoFromDateTime(dateStr: string, timeStr: string) {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -51,12 +59,33 @@ export default function AddBookingPage() {
   const [notes, setNotes] = useState("");
   const [localAuthority, setLocalAuthority] = useState<string>("");
 
+  const [drivers, setDrivers] = useState<DriverRow[]>([]);
+  const [driverName, setDriverName] = useState("");
+  const [vehicle, setVehicle] = useState("");
+  const [bookingType, setBookingType] = useState("");
+
   const [isReturn, setIsReturn] = useState(false);
   const [reverseReturn, setReverseReturn] = useState(true);
   const [returnDate, setReturnDate] = useState(todayYYYYMMDD());
   const [returnTime, setReturnTime] = useState("17:30");
 
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+  async function loadDrivers() {
+    const { data, error } = await supabase
+      .from("drivers")
+      .select("id, name, default_vehicle, default_authority, active")
+      .eq("active", true)
+      .order("name", { ascending: true });
+
+    if (!error) {
+      setDrivers((data as DriverRow[]) ?? []);
+    }
+  }
+
+  void loadDrivers();
+}, []);
 
   const canSave = useMemo(() => {
     return (
@@ -101,26 +130,29 @@ export default function AddBookingPage() {
           ? Number(distanceMiles.replace(/[^\d.]/g, ""))
           : null;
 
-      const outboundInsert = await supabase.from("bookings").insert([
-        {
-          passenger_name: passengerName.trim(),
-          passenger_phone: passengerPhone.trim(),
-          pickup_address: pickupAddress.trim(),
-          dropoff_address: dropoffAddress.trim(),
-          pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
-          distance_miles: distanceMilesNumber,
-          fare: estFareGBP,
-          notes: notes.trim() || null,
-          status: "Scheduled",
-          payment_status: "Unpaid",
-          created_at: new Date().toISOString(),
-          passengers: pax === "" ? 1 : Number(pax),
-          via: via.trim() || null,
-          bags_large: bagsLarge,
-          bags_small: bagsSmall,
-          local_authority: localAuthority.trim() || null,
-        },
-      ]);
+const outboundInsert = await supabase.from("bookings").insert([
+  {
+    passenger_name: passengerName.trim(),
+    passenger_phone: passengerPhone.trim(),
+    pickup_address: pickupAddress.trim(),
+    dropoff_address: dropoffAddress.trim(),
+    pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
+    distance_miles: distanceMilesNumber,
+    fare: estFareGBP,
+    notes: notes.trim() || null,
+    status: "Scheduled",
+    payment_status: "Unpaid",
+    created_at: new Date().toISOString(),
+    passengers: pax === "" ? 1 : Number(pax),
+    via: via.trim() || null,
+    bags_large: bagsLarge,
+    bags_small: bagsSmall,
+    local_authority: localAuthority.trim() || null,
+    driver_name: driverName.trim() || null,
+    vehicle: vehicle.trim() || null,
+    booking_type: bookingType.trim() || null,
+  },
+]);
 
       if (outboundInsert.error) {
         console.error(outboundInsert.error);
@@ -323,6 +355,103 @@ export default function AddBookingPage() {
               inputMode="decimal"
             />
           </div>
+          <div className="border-t border-gray-200 pt-4">
+  <h2 className="text-sm font-semibold text-gray-700">
+    Assignment & compliance
+  </h2>
+</div>
+
+<div>
+  <label className="text-sm font-medium">Driver</label>
+  <select
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={driverName}
+    onChange={async (e) => {
+      const selectedName = e.target.value;
+      setDriverName(selectedName);
+
+      const selectedDriver = drivers.find(
+        (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
+      );
+
+      if (selectedDriver) {
+        if (selectedDriver.default_vehicle) {
+          const vehicleName = selectedDriver.default_vehicle;
+
+          const { data: vehicleData } = await supabase
+            .from("vehicles")
+            .select("*")
+            .eq("name", vehicleName)
+            .single();
+
+          if (vehicleData) {
+            const fullVehicle = [
+              `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
+              vehicleData.registration ? `Reg: ${vehicleData.registration}` : null,
+              vehicleData.plate_number ? `Plate: ${vehicleData.plate_number}` : null,
+              vehicleData.council ? `Authority: ${vehicleData.council}` : null,
+            ]
+              .filter(Boolean)
+              .join(" | ");
+
+            setVehicle(fullVehicle);
+          } else {
+            setVehicle(vehicleName);
+          }
+        }
+
+        if (selectedDriver.default_authority) {
+          setLocalAuthority(selectedDriver.default_authority);
+        }
+      }
+    }}
+  >
+    <option value="">Select driver</option>
+    {drivers.map((driver) => (
+      <option key={driver.id} value={driver.name}>
+        {driver.name}
+      </option>
+    ))}
+  </select>
+</div>
+
+<div>
+  <label className="text-sm font-medium">
+    Vehicle (auto-filled, editable)
+  </label>
+  <input
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={vehicle}
+    onChange={(e) => setVehicle(e.target.value)}
+  />
+</div>
+
+<div>
+  <label className="text-sm font-medium">
+    Licensing authority (auto-filled, editable)
+  </label>
+  <input
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={localAuthority}
+    onChange={(e) => setLocalAuthority(e.target.value)}
+    placeholder="e.g. West Berkshire"
+  />
+</div>
+
+<div>
+  <label className="text-sm font-medium">Booking type (optional)</label>
+  <select
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={bookingType}
+    onChange={(e) => setBookingType(e.target.value)}
+  >
+    <option value="">Select type</option>
+    <option value="Local">Local</option>
+    <option value="Long Distance">Long Distance</option>
+    <option value="Airport">Airport</option>
+    <option value="Seaport">Seaport</option>
+  </select>
+</div>
 
           <div>
             <label className="text-sm font-medium">Notes (optional)</label>
@@ -335,15 +464,8 @@ export default function AddBookingPage() {
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium">Local authority (optional)</label>
-            <input
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-              value={localAuthority}
-              onChange={(e) => setLocalAuthority(e.target.value)}
-              placeholder="e.g. West Berkshire"
-            />
-          </div>
+        
+         
 
           <div className="rounded-xl border border-gray-200 p-3">
             <label className="flex items-center gap-2 text-sm font-medium">
