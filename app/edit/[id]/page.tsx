@@ -420,14 +420,14 @@ if (selectedDriver.default_vehicle) {
     .single();
 
   if (vehicleData) {
-    const fullVehicle = [
-      `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
-      vehicleData.registration,
-      vehicleData.plate_number,
-      vehicleData.council,
-    ]
-      .filter(Boolean)
-      .join(" | ");
+const fullVehicle = [
+  `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
+  vehicleData.registration ? `Reg: ${vehicleData.registration}` : null,
+  vehicleData.plate_number ? `Plate: ${vehicleData.plate_number}` : null,
+  vehicleData.council ? `Authority: ${vehicleData.council}` : null,
+]
+  .filter(Boolean)
+  .join(" | ");
 
     setVehicle(fullVehicle);
   } else {
