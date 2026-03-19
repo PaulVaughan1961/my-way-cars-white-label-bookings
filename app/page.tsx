@@ -569,15 +569,8 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
 
 {expanded ? (
   <div className="mt-4 space-y-2 border-t pt-4 text-sm text-slate-700">
-    <div>
-      <span className="font-medium">Driver allocated:</span> {driver || "—"}
-    </div>
-    <div>
-      <span className="font-medium">Vehicle used:</span> {vehicle || "—"}
-    </div>
-    <div>
-      <span className="font-medium">Booking type:</span> {bookingType || "—"}
-    </div>
+  <div>
+ </div>
     <div>
       <span className="font-medium">Passengers:</span>{" "}
       {passengers === null ? "—" : passengers}
