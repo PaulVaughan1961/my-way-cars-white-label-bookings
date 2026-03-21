@@ -507,30 +507,6 @@ export default function EditBookingPage() {
                 </option>
               ))}
             </select>
-            {(() => {
-  const selectedDriver = drivers.find(
-    (d) =>
-      d.name?.trim().toLowerCase() === driverName.trim().toLowerCase()
-  );
-
-  if (
-    selectedDriver &&
-    selectedDriver.current_vehicle &&
-    selectedDriver.default_vehicle &&
-    selectedDriver.current_vehicle !== selectedDriver.default_vehicle
-  ) {
-    return (
-      <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-        ⚠ {selectedDriver.name} is using a non-default vehicle
-        <div className="text-xs mt-1">
-          Default: {selectedDriver.default_vehicle} | Current: {selectedDriver.current_vehicle}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-})()}
           </div>
 
           <div>
