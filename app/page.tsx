@@ -542,139 +542,136 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           </div>
         </div>
 
-<div className="space-y-1 text-sm text-slate-700">
-  <div>
-    <span className="font-medium">From:</span> {pickup || "—"}
-  </div>
-  <div>
-    <span className="font-medium">To:</span> {dropoff || "—"}
-  </div>
-  <div>
-    <span className="font-medium">Phone:</span> {phone || "—"}
-  </div>
-  <div>
-    <span className="font-medium">Fare:</span>{" "}
-    {fare === null ? "—" : `£${fare.toFixed(2)}`}
-  </div>
-  <div>
-    <span className="font-medium">Driver:</span>{" "}
-    <span className="font-semibold text-blue-700">
-      {driver || "Unassigned"}
-    </span>
-  </div>
-  <div>
-    <span className="font-medium">Vehicle:</span> {vehicle || "Unassigned"}
-  </div>
-  <div>
-    <span className="font-medium">Type:</span> {bookingType || "—"}
-  </div>
-
-  {(() => {
-    const hasDriver = !!driver;
-    const whenMs = new Date(when).getTime();
-    const diff = whenMs - nowMs;
-
-    if (hasDriver) {
-      return (
-        <div className="mt-2 rounded-xl border border-green-300 bg-green-50 p-2 text-sm font-semibold text-green-700">
-          Driver assigned
-        </div>
-      );
-    }
-
-    if (!Number.isNaN(whenMs) && diff <= 2 * 60 * 60 * 1000) {
-      return (
-        <div className="mt-2 rounded-xl border border-red-300 bg-red-50 p-2 text-sm font-semibold text-red-700 animate-pulse">
-          URGENT — driver not assigned
-        </div>
-      );
-    }
-
-    return (
-      <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-2 text-sm font-semibold text-amber-700">
-        Driver not yet assigned
+{expanded && (
+  <>
+    <div className="space-y-1 text-sm text-slate-700">
+      <div>
+        <span className="font-medium">From:</span> {pickup || "—"}
       </div>
-    );
-  })()}
-</div>
+      <div>
+        <span className="font-medium">To:</span> {dropoff || "—"}
+      </div>
+      <div>
+        <span className="font-medium">Phone:</span> {phone || "—"}
+      </div>
+      <div>
+        <span className="font-medium">Fare:</span>{" "}
+        {fare === null ? "—" : `£${fare.toFixed(2)}`}
+      </div>
+      <div>
+        <span className="font-medium">Driver:</span>{" "}
+        <span className="font-semibold text-blue-700">
+          {driver || "Unassigned"}
+        </span>
+      </div>
+      <div>
+        <span className="font-medium">Vehicle:</span> {vehicle || "Unassigned"}
+      </div>
+      <div>
+        <span className="font-medium">Type:</span> {bookingType || "—"}
+      </div>
 
-{expanded ? (
-<div className="mt-4 border-t pt-4">
-  <div className="mb-3 text-sm font-semibold text-slate-900">
-    Compliance / Job details
-  </div>
+      {(() => {
+        const hasDriver = !!driver;
+        const whenMs = new Date(when).getTime();
+        const diff = whenMs - nowMs;
 
-  <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
-    <div>
-      <span className="font-medium">Status:</span> {booking.status || "—"}
-    </div>
-    <div>
-      <span className="font-medium">Payment:</span> {booking.payment_status || "—"}
-    </div>
+        if (hasDriver) {
+          return (
+            <div className="mt-2 rounded-xl border border-green-300 bg-green-50 p-2 text-sm font-semibold text-green-700">
+              Driver assigned
+            </div>
+          );
+        }
 
-    <div>
- <span className="font-medium">Driver:</span>{" "}
-<span className="font-semibold text-blue-700">
-  {driver || "—"}
-</span>
-    </div>
-    <div>
+        if (!Number.isNaN(whenMs) && diff <= 2 * 60 * 60 * 1000) {
+          return (
+            <div className="mt-2 rounded-xl border border-red-300 bg-red-50 p-2 text-sm font-semibold text-red-700 animate-pulse">
+              URGENT — driver not assigned
+            </div>
+          );
+        }
 
-<span className="font-medium">Vehicle:</span>{" "}
-<span className="font-semibold text-purple-700">
-  {vehicle || "—"}
-</span>
-    </div>
-
-    <div>
-      <span className="font-medium">Passengers:</span>{" "}
-      {passengers === null ? "—" : passengers}
-    </div>
-    <div>
-      <span className="font-medium">Distance:</span>{" "}
-      {distanceMiles === null ? "—" : `${distanceMiles} miles`}
-    </div>
-
-    <div>
-      <span className="font-medium">Via:</span> {via || "—"}
-    </div>
-<div>
-  <span className="font-medium">Journey type:</span>{" "}
-  {(booking as any).journey_type || (booking as any).type || "—"}
-</div>
-
-    <div>
-      <span className="font-medium">Large bags:</span>{" "}
-      {bagsLarge === null ? "—" : bagsLarge}
-    </div>
-    <div>
-      <span className="font-medium">Small bags:</span>{" "}
-      {bagsSmall === null ? "—" : bagsSmall}
+        return (
+          <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-2 text-sm font-semibold text-amber-700">
+            Driver not yet assigned
+          </div>
+        );
+      })()}
     </div>
 
-    <div>
-      <span className="font-medium">Local authority:</span>{" "}
-      {localAuthority || "—"}
-    </div>
-    <div>
-      <span className="font-medium">Created:</span>{" "}
-      {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
-    </div>
+    <div className="mt-4 border-t pt-4">
+      <div className="mb-3 text-sm font-semibold text-slate-900">
+        Compliance / Job details
+      </div>
 
-    <div className="sm:col-span-2">
-      <span className="font-medium">Booking ID:</span> {booking.id}
-    </div>
+      <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
+        <div>
+          <span className="font-medium">Status:</span> {booking.status || "—"}
+        </div>
+        <div>
+          <span className="font-medium">Payment:</span> {booking.payment_status || "—"}
+        </div>
 
-    <div className="sm:col-span-2">
-      <span className="font-medium">Notes:</span> {notes || "—"}
+        <div>
+          <span className="font-medium">Driver:</span>{" "}
+          <span className="font-semibold text-blue-700">
+            {driver || "—"}
+          </span>
+        </div>
+        <div>
+          <span className="font-medium">Vehicle:</span>{" "}
+          <span className="font-semibold text-purple-700">
+            {vehicle || "—"}
+          </span>
+        </div>
+
+        <div>
+          <span className="font-medium">Passengers:</span>{" "}
+          {passengers === null ? "—" : passengers}
+        </div>
+        <div>
+          <span className="font-medium">Distance:</span>{" "}
+          {distanceMiles === null ? "—" : `${distanceMiles} miles`}
+        </div>
+
+        <div>
+          <span className="font-medium">Via:</span> {via || "—"}
+        </div>
+        <div>
+          <span className="font-medium">Journey type:</span>{" "}
+          {(booking as any).journey_type || (booking as any).type || "—"}
+        </div>
+
+        <div>
+          <span className="font-medium">Large bags:</span>{" "}
+          {bagsLarge === null ? "—" : bagsLarge}
+        </div>
+        <div>
+          <span className="font-medium">Small bags:</span>{" "}
+          {bagsSmall === null ? "—" : bagsSmall}
+        </div>
+
+        <div>
+          <span className="font-medium">Local authority:</span>{" "}
+          {localAuthority || "—"}
+        </div>
+        <div>
+          <span className="font-medium">Created:</span>{" "}
+          {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
+        </div>
+
+        <div className="sm:col-span-2">
+          <span className="font-medium">Booking ID:</span> {booking.id}
+        </div>
+
+        <div className="sm:col-span-2">
+          <span className="font-medium">Notes:</span> {notes || "—"}
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-) : notes ? (
-  <div className="mt-3 text-sm text-slate-700">
-    <span className="font-medium">Notes:</span> {notes}
-  </div>
-) : null}
+  </>
+)}
 
         <div
           className="mt-4 flex flex-wrap gap-2"
