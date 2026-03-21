@@ -33,6 +33,8 @@ type DriverRow = {
   name: string;
   default_vehicle?: string | null;
   default_authority?: string | null;
+  current_vehicle?: string | null;
+  current_authority?: string | null;
   active?: boolean | null;
 };
 function localDateFromIso(value: string | null | undefined) {
@@ -110,7 +112,7 @@ if (error) throw error;
 
 const { data: driverData, error: driverError } = await supabase
   .from("drivers")
-  .select("id, name, default_vehicle, default_authority, active")
+  .select("id, name, default_vehicle, default_authority, current_vehicle, current_authority, active")
   .eq("active", true)
   .order("name", { ascending: true });
 
@@ -414,36 +416,42 @@ const row = data as BookingRow;
         (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
       );
 
-      if (selectedDriver) {
-        if (selectedDriver.default_vehicle) {
-          const vehicleName = selectedDriver.default_vehicle;
 
-          const { data: vehicleData } = await supabase
-            .from("vehicles")
-            .select("*")
-            .eq("name", vehicleName)
-            .single();
 
-          if (vehicleData) {
-            const fullVehicle = [
-              `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
-              vehicleData.registration ? `Reg: ${vehicleData.registration}` : null,
-              vehicleData.plate_number ? `Plate: ${vehicleData.plate_number}` : null,
-              vehicleData.council ? `Authority: ${vehicleData.council}` : null,
-            ]
-              .filter(Boolean)
-              .join(" | ");
+if (selectedDriver) {
+  const vehicleName =
+    selectedDriver.current_vehicle || selectedDriver.default_vehicle || "";
 
-            setVehicle(fullVehicle);
-          } else {
-            setVehicle(vehicleName);
-          }
-        }
+  const authorityName =
+    selectedDriver.current_authority || selectedDriver.default_authority || "";
 
-        if (selectedDriver.default_authority) {
-          setLocalAuthority(selectedDriver.default_authority);
-        }
-      }
+  if (vehicleName) {
+    const { data: vehicleData } = await supabase
+      .from("vehicles")
+      .select("*")
+      .eq("name", vehicleName)
+      .single();
+
+    if (vehicleData) {
+      const fullVehicle = [
+        `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
+        vehicleData.registration ? `Reg: ${vehicleData.registration}` : null,
+        vehicleData.plate_number ? `Plate: ${vehicleData.plate_number}` : null,
+        vehicleData.council ? `Authority: ${vehicleData.council}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
+      setVehicle(fullVehicle);
+    } else {
+      setVehicle(vehicleName);
+    }
+  } else {
+    setVehicle("");
+  }
+
+  setLocalAuthority(authorityName);
+}
     }}
   >
     <option value="">Select driver</option>
