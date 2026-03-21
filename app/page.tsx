@@ -557,10 +557,10 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
     {fare === null ? "—" : `£${fare.toFixed(2)}`}
   </div>
   <div>
-<span className="font-medium">Driver:</span>{" "}
-<span className="font-semibold text-blue-700">
-  {driver || "Unassigned"}
-</span>
+    <span className="font-medium">Driver:</span>{" "}
+    <span className="font-semibold text-blue-700">
+      {driver || "Unassigned"}
+    </span>
   </div>
   <div>
     <span className="font-medium">Vehicle:</span> {vehicle || "Unassigned"}
@@ -568,6 +568,34 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
   <div>
     <span className="font-medium">Type:</span> {bookingType || "—"}
   </div>
+
+  {(() => {
+    const hasDriver = !!driver;
+    const whenMs = new Date(when).getTime();
+    const diff = whenMs - nowMs;
+
+    if (hasDriver) {
+      return (
+        <div className="mt-2 rounded-xl border border-green-300 bg-green-50 p-2 text-sm font-semibold text-green-700">
+          Driver assigned
+        </div>
+      );
+    }
+
+    if (!Number.isNaN(whenMs) && diff <= 2 * 60 * 60 * 1000) {
+      return (
+        <div className="mt-2 rounded-xl border border-red-300 bg-red-50 p-2 text-sm font-semibold text-red-700 animate-pulse">
+          URGENT — driver not assigned
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-2 text-sm font-semibold text-amber-700">
+        Driver not yet assigned
+      </div>
+    );
+  })()}
 </div>
 
 {expanded ? (
