@@ -28,6 +28,7 @@ type BookingRow = {
   vehicle?: string | null;
   booking_type?: string | null;
 };
+
 type DriverRow = {
   id: string;
   name: string;
@@ -37,6 +38,36 @@ type DriverRow = {
   current_authority?: string | null;
   active?: boolean | null;
 };
+
+type VehicleRow = {
+  id: string;
+  name?: string | null;
+  make?: string | null;
+  model?: string | null;
+  registration?: string | null;
+  plate_number?: string | null;
+  council?: string | null;
+  active?: boolean | null;
+};
+
+function buildVehicleDisplay(vehicle: VehicleRow): string {
+  return [
+    `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim(),
+    vehicle.registration ? `Reg: ${vehicle.registration}` : null,
+    vehicle.plate_number ? `Plate: ${vehicle.plate_number}` : null,
+    vehicle.council ? `Authority: ${vehicle.council}` : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function getVehicleMatchName(vehicle: VehicleRow): string {
+  return (
+    vehicle.name?.trim() ||
+    `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim()
+  );
+}
+
 function localDateFromIso(value: string | null | undefined) {
   if (!value) return "";
   const d = new Date(value);
@@ -87,8 +118,9 @@ export default function EditBookingPage() {
   const [notes, setNotes] = useState("");
   const [localAuthority, setLocalAuthority] = useState("");
   const [drivers, setDrivers] = useState<DriverRow[]>([]);
-const [driverName, setDriverName] = useState("");
-  
+  const [vehicles, setVehicles] = useState<VehicleRow[]>([]);
+  const [driverName, setDriverName] = useState("");
+
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
   const [status, setStatus] = useState("Scheduled");
@@ -102,25 +134,36 @@ const [driverName, setDriverName] = useState("");
         setLoading(true);
         setErrorMessage("");
 
-const { data, error } = await supabase
-  .from("bookings")
-  .select("*")
-  .eq("id", id)
-  .single();
+        const { data, error } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-if (error) throw error;
+        if (error) throw error;
 
-const { data: driverData, error: driverError } = await supabase
-  .from("drivers")
-  .select("id, name, default_vehicle, default_authority, current_vehicle, current_authority, active")
-  .eq("active", true)
-  .order("name", { ascending: true });
+        const { data: driverData, error: driverError } = await supabase
+          .from("drivers")
+          .select(
+            "id, name, default_vehicle, default_authority, current_vehicle, current_authority, active"
+          )
+          .eq("active", true)
+          .order("name", { ascending: true });
 
-if (driverError) throw driverError;
+        if (driverError) throw driverError;
 
-setDrivers((driverData as DriverRow[]) ?? []);
+        setDrivers((driverData as DriverRow[]) ?? []);
 
-const row = data as BookingRow;
+        const { data: vehicleData, error: vehicleError } = await supabase
+          .from("vehicles")
+          .select("*")
+          .order("make", { ascending: true });
+
+        if (vehicleError) throw vehicleError;
+
+        setVehicles((vehicleData as VehicleRow[]) ?? []);
+
+        const row = data as BookingRow;
 
         setPassengerName(row.passenger_name ?? "");
         setPassengerPhone(row.passenger_phone ?? "");
@@ -220,12 +263,14 @@ const row = data as BookingRow;
         bags_large: bagsLarge,
         bags_small: bagsSmall,
         local_authority: localAuthority.trim() || null,
-        
         vehicle: vehicle.trim() || null,
         booking_type: bookingType.trim() || null,
       };
 
-      const { error } = await supabase.from("bookings").update(payload).eq("id", id);
+      const { error } = await supabase
+        .from("bookings")
+        .update(payload)
+        .eq("id", id);
 
       if (error) throw error;
 
@@ -260,7 +305,6 @@ const row = data as BookingRow;
           <p className="text-sm text-gray-600">
             Update the booking details and save changes.
           </p>
-          
         </div>
 
         <form
@@ -353,7 +397,9 @@ const row = data as BookingRow;
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => {
                   const cleaned = e.target.value.replace(/\D/g, "");
-                  setPax(cleaned === "" ? "" : String(Math.max(1, Number(cleaned))));
+                  setPax(
+                    cleaned === "" ? "" : String(Math.max(1, Number(cleaned)))
+                  );
                 }}
               />
             </div>
@@ -398,93 +444,113 @@ const row = data as BookingRow;
               inputMode="decimal"
             />
           </div>
-  <div className="border-t border-gray-200 pt-4">
-  <h2 className="text-sm font-semibold text-gray-700">
-    Assignment & compliance
-  </h2>
-</div>        
-<div>
-  <label className="text-sm font-medium">Driver</label>
-  <select
-    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-    value={driverName}
-    onChange={async (e) => {
-      const selectedName = e.target.value;
-      setDriverName(selectedName);
 
-      const selectedDriver = drivers.find(
-        (d) => d.name?.trim().toLowerCase() === selectedName.trim().toLowerCase()
-      );
+          <div className="border-t border-gray-200 pt-4">
+            <h2 className="text-sm font-semibold text-gray-700">
+              Assignment & compliance
+            </h2>
+          </div>
 
+          <div>
+            <label className="text-sm font-medium">Driver</label>
+            <select
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={driverName}
+              onChange={(e) => {
+                const selectedName = e.target.value;
+                setDriverName(selectedName);
 
+                const selectedDriver = drivers.find(
+                  (d) =>
+                    d.name?.trim().toLowerCase() ===
+                    selectedName.trim().toLowerCase()
+                );
 
-if (selectedDriver) {
-  const vehicleName =
-    selectedDriver.current_vehicle || selectedDriver.default_vehicle || "";
+                if (!selectedDriver) {
+                  setVehicle("");
+                  setLocalAuthority("");
+                  return;
+                }
 
-  const authorityName =
-    selectedDriver.current_authority || selectedDriver.default_authority || "";
+                const preferredVehicleName =
+                  selectedDriver.current_vehicle ||
+                  selectedDriver.default_vehicle ||
+                  "";
 
-  if (vehicleName) {
-    const { data: vehicleData } = await supabase
-      .from("vehicles")
-      .select("*")
-      .eq("name", vehicleName)
-      .single();
+                const preferredAuthority =
+                  selectedDriver.current_authority ||
+                  selectedDriver.default_authority ||
+                  "";
 
-    if (vehicleData) {
-      const fullVehicle = [
-        `${vehicleData.make ?? ""} ${vehicleData.model ?? ""}`.trim(),
-        vehicleData.registration ? `Reg: ${vehicleData.registration}` : null,
-        vehicleData.plate_number ? `Plate: ${vehicleData.plate_number}` : null,
-        vehicleData.council ? `Authority: ${vehicleData.council}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | ");
+                const matchedVehicle = vehicles.find((v) => {
+                  const matchName = getVehicleMatchName(v).toLowerCase();
+                  return (
+                    matchName === preferredVehicleName.trim().toLowerCase()
+                  );
+                });
 
-      setVehicle(fullVehicle);
-    } else {
-      setVehicle(vehicleName);
-    }
-  } else {
-    setVehicle("");
-  }
+                if (matchedVehicle) {
+                  setVehicle(buildVehicleDisplay(matchedVehicle));
+                  setLocalAuthority(
+                    matchedVehicle.council || preferredAuthority || ""
+                  );
+                } else {
+                  setVehicle(preferredVehicleName);
+                  setLocalAuthority(preferredAuthority);
+                }
+              }}
+            >
+              <option value="">Select driver</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.name}>
+                  {driver.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-  setLocalAuthority(authorityName);
-}
-    }}
-  >
-    <option value="">Select driver</option>
-    {drivers.map((driver) => (
-      <option key={driver.id} value={driver.name}>
-        {driver.name}
-      </option>
-    ))}
-  </select>
-</div>
+          <div>
+            <label className="text-sm font-medium">
+              Vehicle (auto-filled, overrideable)
+            </label>
+            <select
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={vehicle}
+              onChange={(e) => {
+                const selectedValue = e.target.value;
+                setVehicle(selectedValue);
 
-<div>
-  <label className="text-sm font-medium">
-    Vehicle (auto-filled, editable)
-  </label>
-  <input
-    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-    value={vehicle}
-    onChange={(e) => setVehicle(e.target.value)}
-  />
-</div>
+                const matchedVehicle = vehicles.find(
+                  (v) => buildVehicleDisplay(v) === selectedValue
+                );
 
-<div>
-  <label className="text-sm font-medium">
-    Licensing authority (auto-filled, editable)
-  </label>
-  <input
-    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-    value={localAuthority}
-    onChange={(e) => setLocalAuthority(e.target.value)}
-  />
-</div>
+                if (matchedVehicle) {
+                  setLocalAuthority(matchedVehicle.council || "");
+                }
+              }}
+            >
+              <option value="">Select vehicle</option>
+              {vehicles.map((v) => {
+                const display = buildVehicleDisplay(v);
+                return (
+                  <option key={v.id} value={display}>
+                    {display}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
 
+          <div>
+            <label className="text-sm font-medium">
+              Licensing authority (auto-filled, editable)
+            </label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={localAuthority}
+              onChange={(e) => setLocalAuthority(e.target.value)}
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
