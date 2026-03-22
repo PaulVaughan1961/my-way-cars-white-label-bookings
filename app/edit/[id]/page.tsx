@@ -88,10 +88,8 @@ function localTimeFromIso(value: string | null | undefined) {
 }
 
 function isoFromDateTime(dateStr: string, timeStr: string) {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const [hh, mm] = timeStr.split(":").map(Number);
-  const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
-  return dt.toISOString();
+  if (!dateStr || !timeStr) return "";
+  return `${dateStr}T${timeStr}:00`;
 }
 
 export default function EditBookingPage() {
