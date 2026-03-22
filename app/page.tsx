@@ -1030,6 +1030,30 @@ id="next-job"
     </button>
   </div>
 )}
+
+{filteredOverride && detectedClashes.length > 0 && (
+  <div className="mb-4">
+    <button
+      onClick={() => {
+        const keysToReview = detectedClashes
+          .filter((c) =>
+            c.bookingIds.some((id) => filteredOverride.includes(id))
+          )
+          .map((c) => c.key);
+
+        setReviewedClashKeys((current) => [
+          ...current,
+          ...keysToReview.filter((key) => !current.includes(key)),
+        ]);
+
+        setFilteredOverride(null);
+      }}
+      className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white"
+    >
+      ✔ Mark reviewed
+    </button>
+  </div>
+)}
   {unpaidTotal > 0 ? (
     <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-medium text-amber-800">
       Unpaid total: £{unpaidTotal.toFixed(2)}
