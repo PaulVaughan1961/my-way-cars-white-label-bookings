@@ -294,26 +294,37 @@ const sorted = [...bookings].sort((a, b) => {
   );
 }
 
-    if (!needle) return result;
+if (!needle) {
+  if (filteredOverride) {
+    return result.filter((row) => filteredOverride.includes(row.id));
+  }
+  return result;
+}
 
-    return result.filter((row) => {
-      const haystack = [
-        getName(row),
-        getPhone(row),
-        getPickup(row),
-        getDropoff(row),
-        pickString(row, ["notes"]),
-        pickString(row, ["via"]),
-        pickString(row, ["local_authority"]),
-        (row.status ?? "Scheduled").toString(),
-        (row.payment_status ?? "Unpaid").toString(),
-      ]
-        .join(" ")
-        .toLowerCase();
+const searched = result.filter((row) => {
+  const haystack = [
+    getName(row),
+    getPhone(row),
+    getPickup(row),
+    getDropoff(row),
+    pickString(row, ["notes"]),
+    pickString(row, ["via"]),
+    pickString(row, ["local_authority"]),
+    (row.status ?? "Scheduled").toString(),
+    (row.payment_status ?? "Unpaid").toString(),
+  ]
+    .join(" ")
+    .toLowerCase();
 
-      return haystack.includes(needle);
-    });
-  }, [bookings, statusFilter, searchTerm]);
+  return haystack.includes(needle);
+});
+
+if (filteredOverride) {
+  return searched.filter((row) => filteredOverride.includes(row.id));
+}
+
+return searched;
+  }, [bookings, statusFilter, searchTerm, filteredOverride]);
 
 const unpaidTotal = useMemo(() => {
   return bookings.reduce((sum, row) => {
@@ -969,12 +980,11 @@ id="next-job"
     </div>
 
     <button
-      onClick={() => {
-        const clashIds = detectedClashes.flatMap(c => c.bookingIds);
-        setSearchTerm("");
-        setStatusFilter("All");
-        setFilteredOverride(clashIds);
-      }}
+    onClick={() => {
+  const clashIds = detectedClashes.flatMap(c => c.bookingIds);
+  setSearchTerm("");
+  setFilteredOverride(clashIds);
+}}
       className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
     >
       View
