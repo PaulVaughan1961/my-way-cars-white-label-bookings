@@ -961,6 +961,12 @@ id="next-job"
 
 <section className="rounded-3xl bg-white p-5 shadow-sm">
 
+  {detectedClashes.length > 0 && (
+    <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+      ⚠ {detectedClashes.length} potential scheduling clash{detectedClashes.length > 1 ? "es" : ""} detected
+    </div>
+  )}
+
   {unpaidTotal > 0 ? (
     <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-medium text-amber-800">
       Unpaid total: £{unpaidTotal.toFixed(2)}
