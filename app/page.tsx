@@ -488,8 +488,31 @@ const detectedClashes = useMemo(() => {
     }
   }
 
-  return clashes;
+return clashes;
 }, [bookings]);
+
+const clashSummaryText = useMemo(() => {
+  if (detectedClashes.length === 0) return "";
+
+  return detectedClashes
+    .map((c) => {
+      const label = c.strong ? "clash" : "cluster";
+      let reason = "";
+
+      if (c.sameDriver && c.unassigned) {
+        reason = "same driver + unassigned";
+      } else if (c.sameDriver) {
+        reason = "same driver";
+      } else if (c.unassigned) {
+        reason = "unassigned driver";
+      } else {
+        reason = "jobs close together";
+      }
+
+      return `${c.type} ${label}${c.count > 2 ? ` (${c.count} jobs)` : ""} — ${reason}`;
+    })
+    .join(" • ");
+}, [detectedClashes]);
 
 console.log("detectedClashes", detectedClashes);
 
@@ -976,12 +999,12 @@ id="next-job"
 {detectedClashes.length > 0 && (
   <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
     <div>
-      ⚠ {detectedClashes.length} potential scheduling clash{detectedClashes.length > 1 ? "es" : ""} detected
+      ⚠ {detectedClashes.length} scheduling issue{detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
     </div>
 
     <button
       onClick={() => {
-        const clashIds = detectedClashes.flatMap(c => c.bookingIds);
+        const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
         setSearchTerm("");
         setFilteredOverride(clashIds);
       }}
