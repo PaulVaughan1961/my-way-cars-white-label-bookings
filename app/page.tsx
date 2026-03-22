@@ -176,6 +176,7 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(Date.now());
+  const [filteredOverride, setFilteredOverride] = useState<string[] | null>(null);
 
 async function loadBookings() {
   try {
@@ -961,12 +962,25 @@ id="next-job"
 
 <section className="rounded-3xl bg-white p-5 shadow-sm">
 
-  {detectedClashes.length > 0 && (
-    <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+{detectedClashes.length > 0 && (
+  <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+    <div>
       ⚠ {detectedClashes.length} potential scheduling clash{detectedClashes.length > 1 ? "es" : ""} detected
     </div>
-  )}
 
+    <button
+      onClick={() => {
+        const clashIds = detectedClashes.flatMap(c => c.bookingIds);
+        setSearchTerm("");
+        setStatusFilter("All");
+        setFilteredOverride(clashIds);
+      }}
+      className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+    >
+      View
+    </button>
+  </div>
+)}
   {unpaidTotal > 0 ? (
     <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-medium text-amber-800">
       Unpaid total: £{unpaidTotal.toFixed(2)}
