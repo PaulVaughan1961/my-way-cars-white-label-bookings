@@ -980,14 +980,25 @@ id="next-job"
     </div>
 
     <button
-    onClick={() => {
-  const clashIds = detectedClashes.flatMap(c => c.bookingIds);
-  setSearchTerm("");
-  setFilteredOverride(clashIds);
-}}
+      onClick={() => {
+        const clashIds = detectedClashes.flatMap(c => c.bookingIds);
+        setSearchTerm("");
+        setFilteredOverride(clashIds);
+      }}
       className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
     >
       View
+    </button>
+  </div>
+)}
+
+{filteredOverride && (
+  <div className="mb-4">
+    <button
+      onClick={() => setFilteredOverride(null)}
+      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+    >
+      ← Back to all bookings
     </button>
   </div>
 )}
