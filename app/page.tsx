@@ -383,6 +383,103 @@ const dashboardStats = useMemo(() => {
 
   return { jobs, revenue, unpaid };
 }, [bookings]);
+const clashRules = {
+  Airport: { windowMinutes: 120, minJobs: 2 },
+  "Long Distance": { windowMinutes: 120, minJobs: 2 },
+  Local: { windowMinutes: 30, minJobs: 2 },
+} as const;
+
+const detectedClashes = useMemo(() => {
+  const relevant = bookings
+    .map((row) => {
+      const whenMs = new Date(getWhen(row)).getTime();
+      const type = getBookingType(row);
+      const driver = getDriver(row);
+      const status = (row.status ?? "Scheduled").toString();
+
+      return {
+        id: row.id,
+        whenMs,
+        type,
+        driver,
+        status,
+      };
+    })
+    .filter(
+      (row) =>
+        !Number.isNaN(row.whenMs) &&
+        row.status !== "Cancelled" &&
+        row.status !== "Completed" &&
+        (row.type === "Airport" ||
+          row.type === "Long Distance" ||
+          row.type === "Local")
+    )
+    .sort((a, b) => a.whenMs - b.whenMs);
+
+  const clashes: {
+    type: string;
+    start: number;
+    end: number;
+    bookingIds: string[];
+    count: number;
+    sameDriver: boolean;
+    unassigned: boolean;
+    strong: boolean;
+  }[] = [];
+
+  const seen = new Set<string>();
+
+  for (const [ruleType, rule] of Object.entries(clashRules)) {
+    const jobs = relevant.filter((row) => row.type === ruleType);
+
+    for (let i = 0; i < jobs.length; i++) {
+      const cluster = [jobs[i]];
+
+      for (let j = i + 1; j < jobs.length; j++) {
+        const diffMinutes = (jobs[j].whenMs - cluster[0].whenMs) / 60000;
+
+        if (diffMinutes <= rule.windowMinutes) {
+          cluster.push(jobs[j]);
+        } else {
+          break;
+        }
+      }
+
+      if (cluster.length >= rule.minJobs) {
+        const bookingIds = cluster.map((c) => c.id);
+        const key = bookingIds.join("|");
+
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const assignedDrivers = cluster
+          .map((c) => c.driver.trim())
+          .filter(Boolean);
+
+        const sameDriver =
+          assignedDrivers.length > 1 &&
+          new Set(assignedDrivers.map((d) => d.toLowerCase())).size < assignedDrivers.length;
+
+        const unassigned = cluster.some((c) => !c.driver.trim());
+
+        clashes.push({
+          type: ruleType,
+          start: cluster[0].whenMs,
+          end: cluster[cluster.length - 1].whenMs,
+          bookingIds,
+          count: cluster.length,
+          sameDriver,
+          unassigned,
+          strong: sameDriver || unassigned,
+        });
+      }
+    }
+  }
+
+  return clashes;
+}, [bookings]);
+
+console.log("detectedClashes", detectedClashes);
 
 const nextJob = useMemo(() => {
   const now = Date.now();
