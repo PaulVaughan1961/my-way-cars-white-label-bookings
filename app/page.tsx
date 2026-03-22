@@ -177,6 +177,7 @@ export default function HomePage() {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(Date.now());
   const [filteredOverride, setFilteredOverride] = useState<string[] | null>(null);
+ const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
 
 async function loadBookings() {
   try {
@@ -428,16 +429,17 @@ const detectedClashes = useMemo(() => {
     )
     .sort((a, b) => a.whenMs - b.whenMs);
 
-  const clashes: {
-    type: string;
-    start: number;
-    end: number;
-    bookingIds: string[];
-    count: number;
-    sameDriver: boolean;
-    unassigned: boolean;
-    strong: boolean;
-  }[] = [];
+const clashes: {
+  key: string;
+  type: string;
+  start: number;
+  end: number;
+  bookingIds: string[];
+  count: number;
+  sameDriver: boolean;
+  unassigned: boolean;
+  strong: boolean;
+}[] = [];
 
   const seen = new Set<string>();
 
@@ -474,22 +476,25 @@ const detectedClashes = useMemo(() => {
 
         const unassigned = cluster.some((c) => !c.driver.trim());
 
-        clashes.push({
-          type: ruleType,
-          start: cluster[0].whenMs,
-          end: cluster[cluster.length - 1].whenMs,
-          bookingIds,
-          count: cluster.length,
-          sameDriver,
-          unassigned,
-          strong: sameDriver || unassigned,
-        });
+if (reviewedClashKeys.includes(key)) continue;
+
+clashes.push({
+  key,
+  type: ruleType,
+  start: cluster[0].whenMs,
+  end: cluster[cluster.length - 1].whenMs,
+  bookingIds,
+  count: cluster.length,
+  sameDriver,
+  unassigned,
+  strong: sameDriver || unassigned,
+});
       }
     }
   }
 
 return clashes;
-}, [bookings]);
+}, [bookings, reviewedClashKeys]);
 
 const clashSummaryText = useMemo(() => {
   if (detectedClashes.length === 0) return "";
