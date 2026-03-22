@@ -913,15 +913,23 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
   </button>
 ) : null}
 
-          {status !== "Cancelled" ? (
-            <button
-              onClick={() => void onCancel(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Cancel
-            </button>
-          ) : null}
+{status !== "Cancelled" ? (
+  <button
+    onClick={() => void onCancel(booking.id)}
+    disabled={isBusy}
+    className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Cancel
+  </button>
+) : (
+  <button
+    onClick={() => void updateBooking(booking.id, { status: "Scheduled" })}
+    disabled={isBusy}
+    className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Restore booking
+  </button>
+)}
         </div>
       </div>
     );
