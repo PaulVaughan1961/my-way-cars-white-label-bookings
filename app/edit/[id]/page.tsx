@@ -333,6 +333,16 @@ export default function EditBookingPage() {
               inputMode="tel"
             />
           </div>
+          <div>
+  <label className="text-sm font-medium">Notes (optional)</label>
+  <textarea
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={notes}
+    onChange={(e) => setNotes(e.target.value)}
+    rows={4}
+    placeholder="Anything the driver needs to know..."
+  />
+</div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
