@@ -1180,6 +1180,30 @@ export default function HomePage() {
             </div>
           )}
 
+         {selectedClashBookingIds.length > 0 && (
+  <div className="mb-6">
+    <div className="mb-3 text-base font-semibold text-slate-900">
+      Offending bookings
+    </div>
+
+    <div className="space-y-4">
+      {bookings
+        .filter((booking) => selectedClashBookingIds.includes(booking.id))
+        .sort(
+          (a, b) =>
+            new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
+        )
+        .map((booking) => (
+          <BookingCard
+            key={`clash-top-${booking.id}`}
+            booking={booking}
+            highlightClash
+          />
+        ))}
+    </div>
+  </div>
+)} 
+
           {unpaidTotal > 0 ? (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
               Unpaid total: £{unpaidTotal.toFixed(2)}
