@@ -176,7 +176,7 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(Date.now());
-  const [filteredOverride, setFilteredOverride] = useState<string[] | null>(null);
+ 
  const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
  const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<string[]>([]);
 
@@ -313,9 +313,6 @@ const sorted = [...bookings].sort((a, b) => {
 }
 
 if (!needle) {
-  if (filteredOverride) {
-    return result.filter((row) => filteredOverride.includes(row.id));
-  }
   return result;
 }
 
@@ -337,12 +334,10 @@ const searched = result.filter((row) => {
   return haystack.includes(needle);
 });
 
-if (filteredOverride) {
-  return searched.filter((row) => filteredOverride.includes(row.id));
-}
+
 
 return searched;
-  }, [bookings, statusFilter, searchTerm, filteredOverride]);
+}, [bookings, statusFilter, searchTerm]);
 
 const unpaidTotal = useMemo(() => {
   return bookings.reduce((sum, row) => {
@@ -1058,13 +1053,11 @@ id="next-job"
       ⚠ {detectedClashes.length} scheduling issue{detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
     </div>
 
-<button
-  onClick={() => {
-    const clashIds = [...new Set(detectedClashes.flatMap((c) => c.bookingIds))];
-    setSearchTerm("");
-    setFilteredOverride(clashIds);
-    setSelectedClashBookingIds(clashIds);
-  }}
+    <button
+      onClick={() => {
+        const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
+        setSelectedClashBookingIds([...new Set(clashIds)]);
+      }}
       className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
     >
       View
@@ -1072,13 +1065,12 @@ id="next-job"
   </div>
 )}
 
-{filteredOverride && (
+{selectedClashBookingIds.length > 0 && (
   <div className="mb-4">
-<button
-  onClick={() => {
-    setFilteredOverride(null);
-    setSelectedClashBookingIds([]);
-  }}
+    <button
+      onClick={() => {
+        setSelectedClashBookingIds([]);
+      }}
       className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
     >
       ← Back to all bookings
@@ -1086,30 +1078,32 @@ id="next-job"
   </div>
 )}
 
-{filteredOverride && detectedClashes.length > 0 && (
+{selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
   <div className="mb-4 space-y-3">
     {detectedClashes
-      .filter((c) => c.bookingIds.some((id) => filteredOverride.includes(id)))
+      .filter((c) =>
+        c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
+      )
       .map((clash) => (
         <div
           key={clash.key}
           className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
         >
           <div className="mb-2 font-medium">
-{`Potential clash: ${clash.key}`}
+            {`Potential clash`}
           </div>
 
           <div className="flex gap-2">
             <button
-onClick={async () => {
-  await markClashResolved(clash.key, clash.bookingIds);
+              onClick={async () => {
+                await markClashResolved(clash.key, clash.bookingIds);
 
-  const remainingIds = detectedClashes
-    .filter((c) => c.key !== clash.key)
-    .flatMap((c) => c.bookingIds);
+                const remainingIds = detectedClashes
+                  .filter((c) => c.key !== clash.key)
+                  .flatMap((c) => c.bookingIds);
 
-  setSelectedClashBookingIds([...new Set(remainingIds)]);
-}}
+                setSelectedClashBookingIds([...new Set(remainingIds)]);
+              }}
               className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
             >
               ✔ Mark resolved
