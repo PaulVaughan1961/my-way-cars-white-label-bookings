@@ -22,6 +22,9 @@ type BookingRow = {
   bags_large?: number | string | null;
   bags_small?: number | string | null;
   local_authority?: string | null;
+  driver_name?: string | null;
+  vehicle?: string | null;
+  booking_type?: string | null;
 
   lead_passenger?: string | null;
   customer_name?: string | null;
@@ -39,6 +42,18 @@ type BookingRow = {
   date_time?: string | null;
 
   [key: string]: unknown;
+};
+
+type ClashRow = {
+  key: string;
+  type: string;
+  start: number;
+  end: number;
+  bookingIds: string[];
+  count: number;
+  sameDriver: boolean;
+  unassigned: boolean;
+  strong: boolean;
 };
 
 function pickString(row: BookingRow, keys: string[]): string {
@@ -141,7 +156,9 @@ function smsHref(phone: string): string {
 }
 
 function mapHref(address: string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    address
+  )}`;
 }
 
 function getCountdownLabel(value: string, nowMs: number): string {
@@ -166,6 +183,21 @@ function getCountdownLabel(value: string, nowMs: number): string {
   return `${minutes}m`;
 }
 
+function normalizeBookingType(rawType: string): "Airport" | "Long Distance" | "Local" | "" {
+  const value = rawType.trim().toLowerCase();
+
+  if (!value) return "";
+  if (value.includes("airport")) return "Airport";
+  if (value.includes("long")) return "Long Distance";
+  if (value.includes("local")) return "Local";
+
+  return "";
+}
+
+function makeClashKey(a: string, b: string): string {
+  return [a, b].sort().join("__");
+}
+
 export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,62 +208,68 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(Date.now());
- 
- const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
- const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<string[]>([]);
+  const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
+  const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<string[]>(
+    []
+  );
 
- async function loadReviewedClashes() {
-  const supabase = getSupabase();
+  async function loadReviewedClashes() {
+    try {
+      const supabase = getSupabase();
 
-  const { data, error } = await supabase
-    .from("clash_reviews")
-    .select("clash_key");
+      const { data, error } = await supabase
+        .from("clash_reviews")
+        .select("clash_key");
 
-  if (error) throw error;
+      if (error) throw error;
 
-setReviewedClashKeys(
-  ((data ?? []) as { clash_key: string }[]).map((row) => row.clash_key)
-);
-}
-
-async function loadBookings() {
-  try {
-    setLoading(true);
-    setErrorMessage("");
-
-    const supabase = getSupabase();
-
-    const { data, error } = await supabase
-      .from("bookings")
-      .select("*")
-      .order("pickup_datetime", { ascending: true });
-
-    if (error) throw error;
-
-    setBookings((data as BookingRow[]) ?? []);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load bookings";
-    setErrorMessage(message);
-  } finally {
-    setLoading(false);
+      setReviewedClashKeys(
+        ((data ?? []) as { clash_key: string }[]).map((row) => row.clash_key)
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load clash reviews";
+      setErrorMessage(message);
+    }
   }
-}
 
-async function onRefresh() {
-  try {
-    setRefreshing(true);
-    await loadBookings();
-    await loadReviewedClashes();
-  } finally {
-    setRefreshing(false);
+  async function loadBookings() {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+
+      const supabase = getSupabase();
+
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .order("pickup_datetime", { ascending: true });
+
+      if (error) throw error;
+
+      setBookings((data as BookingRow[]) ?? []);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load bookings";
+      setErrorMessage(message);
+    } finally {
+      setLoading(false);
+    }
   }
-}
+
+  async function onRefresh() {
+    try {
+      setRefreshing(true);
+      await loadBookings();
+      await loadReviewedClashes();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
     void loadBookings();
     void loadReviewedClashes();
-
 
     const supabase = getSupabase();
 
@@ -246,6 +284,7 @@ async function onRefresh() {
         },
         () => {
           void loadBookings();
+          void loadReviewedClashes();
         }
       )
       .subscribe();
@@ -254,7 +293,6 @@ async function onRefresh() {
       supabase.removeChannel(channel);
     };
   }, []);
-  
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -268,24 +306,21 @@ async function onRefresh() {
     const now = Date.now();
     const needle = searchTerm.trim().toLowerCase();
 
-const sorted = [...bookings].sort((a, b) => {
-  const aTime = new Date(getWhen(a)).getTime();
-  const bTime = new Date(getWhen(b)).getTime();
+    const sorted = [...bookings].sort((a, b) => {
+      const aTime = new Date(getWhen(a)).getTime();
+      const bTime = new Date(getWhen(b)).getTime();
 
-  const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
-  const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+      const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
+      const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
 
-  const aStatus = (a.status ?? "Scheduled").toString();
-  const bStatus = (b.status ?? "Scheduled").toString();
+      const aStatus = (a.status ?? "Scheduled").toString();
 
-  // Completed and Cancelled should show newest first
-  if (aStatus === "Completed" || aStatus === "Cancelled") {
-    return safeB - safeA;
-  }
+      if (aStatus === "Completed" || aStatus === "Cancelled") {
+        return safeB - safeA;
+      }
 
-  // Scheduled / Upcoming show earliest first
-  return safeA - safeB;
-});
+      return safeA - safeB;
+    });
 
     let result = sorted;
 
@@ -300,267 +335,256 @@ const sorted = [...bookings].sort((a, b) => {
           status !== "Completed"
         );
       });
-} else if (statusFilter === "Unpaid") {
-  result = result.filter((row) => {
-    const payment = (row.payment_status ?? "Unpaid").toString();
-    const status = (row.status ?? "Scheduled").toString();
-    return payment === "Unpaid" && status === "Completed";
-  });
-} else if (statusFilter !== "All") {
-  result = result.filter(
-    (row) => (row.status ?? "Scheduled").toString() === statusFilter
-  );
-}
-
-if (!needle) {
-  return result;
-}
-
-const searched = result.filter((row) => {
-  const haystack = [
-    getName(row),
-    getPhone(row),
-    getPickup(row),
-    getDropoff(row),
-    pickString(row, ["notes"]),
-    pickString(row, ["via"]),
-    pickString(row, ["local_authority"]),
-    (row.status ?? "Scheduled").toString(),
-    (row.payment_status ?? "Unpaid").toString(),
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(needle);
-});
-
-
-
-return searched;
-}, [bookings, statusFilter, searchTerm]);
-
-const unpaidTotal = useMemo(() => {
-  return bookings.reduce((sum, row) => {
-    const payment = (row.payment_status ?? "Unpaid").toString();
-    const status = (row.status ?? "Scheduled").toString();
-
-    if (payment === "Unpaid" && status === "Completed") {
-      const fare = getFare(row);
-      return sum + (fare ?? 0);
+    } else if (statusFilter === "Unpaid") {
+      result = result.filter((row) => {
+        const payment = (row.payment_status ?? "Unpaid").toString();
+        const status = (row.status ?? "Scheduled").toString();
+        return payment === "Unpaid" && status === "Completed";
+      });
+    } else if (statusFilter !== "All") {
+      result = result.filter(
+        (row) => (row.status ?? "Scheduled").toString() === statusFilter
+      );
     }
 
-    return sum;
-  }, 0);
-}, [bookings]);
-
-const todayStats = useMemo(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  let jobs = 0;
-  let revenue = 0;
-  let unpaid = 0;
-
-  bookings.forEach((row) => {
-    const when = new Date(getWhen(row));
-    const status = (row.status ?? "Scheduled").toString();
-    const payment = (row.payment_status ?? "Unpaid").toString();
-    const fare = getFare(row) ?? 0;
-
-    if (!Number.isNaN(when.getTime()) && when >= today && status === "Completed") {
-      jobs += 1;
-      revenue += fare;
-
-      if (payment === "Unpaid") {
-        unpaid += fare;
-      }
+    if (!needle) {
+      return result;
     }
-  });
 
-  return { jobs, revenue, unpaid };
-}, [bookings]);
+    return result.filter((row) => {
+      const haystack = [
+        getName(row),
+        getPhone(row),
+        getPickup(row),
+        getDropoff(row),
+        pickString(row, ["notes"]),
+        pickString(row, ["via"]),
+        pickString(row, ["local_authority"]),
+        (row.status ?? "Scheduled").toString(),
+        (row.payment_status ?? "Unpaid").toString(),
+      ]
+        .join(" ")
+        .toLowerCase();
 
-const dashboardStats = useMemo(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+      return haystack.includes(needle);
+    });
+  }, [bookings, statusFilter, searchTerm]);
 
-  let jobs = 0;
-  let revenue = 0;
-  let unpaid = 0;
-
-  bookings.forEach((row) => {
-    const when = new Date(getWhen(row));
-    if (Number.isNaN(when.getTime()) || when < today) return;
-
-    const status = (row.status ?? "Scheduled").toString();
-    const payment = (row.payment_status ?? "Unpaid").toString();
-    const fare = getFare(row) ?? 0;
-
-    if (status === "Completed") {
-      jobs += 1;
-      revenue += fare;
-
-      if (payment === "Unpaid") {
-        unpaid += fare;
-      }
-    }
-  });
-
-  return { jobs, revenue, unpaid };
-}, [bookings]);
-const clashRules = {
-  Airport: { windowMinutes: 120, minJobs: 2 },
-  "Long Distance": { windowMinutes: 120, minJobs: 2 },
-  Local: { windowMinutes: 30, minJobs: 2 },
-} as const;
-
-const detectedClashes = useMemo(() => {
-  const relevant = bookings
-    .map((row) => {
-      const whenMs = new Date(getWhen(row)).getTime();
-      const type = getBookingType(row);
-      const driver = getDriver(row);
+  const unpaidTotal = useMemo(() => {
+    return bookings.reduce((sum, row) => {
+      const payment = (row.payment_status ?? "Unpaid").toString();
       const status = (row.status ?? "Scheduled").toString();
 
-      return {
-        id: row.id,
-        whenMs,
-        type,
-        driver,
-        status,
-      };
-    })
-    .filter(
-      (row) =>
-        !Number.isNaN(row.whenMs) &&
-        row.status !== "Cancelled" &&
-        row.status !== "Completed" &&
-        (row.type === "Airport" ||
-          row.type === "Long Distance" ||
-          row.type === "Local")
-    )
-    .sort((a, b) => a.whenMs - b.whenMs);
+      if (payment === "Unpaid" && status === "Completed") {
+        const fare = getFare(row);
+        return sum + (fare ?? 0);
+      }
 
-  const clashes: {
-    key: string;
-    type: string;
-    start: number;
-    end: number;
-    bookingIds: string[];
-    count: number;
-    sameDriver: boolean;
-    unassigned: boolean;
-    strong: boolean;
-  }[] = [];
+      return sum;
+    }, 0);
+  }, [bookings]);
 
-  const seen = new Set<string>();
+  const todayStats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  for (const [ruleType, rule] of Object.entries(clashRules)) {
-    const jobs = relevant.filter((row) => row.type === ruleType);
+    let jobs = 0;
+    let revenue = 0;
+    let unpaid = 0;
 
-    for (let i = 0; i < jobs.length; i++) {
-      for (let j = i + 1; j < jobs.length; j++) {
-        const first = jobs[i];
-        const second = jobs[j];
+    bookings.forEach((row) => {
+      const when = new Date(getWhen(row));
+      const status = (row.status ?? "Scheduled").toString();
+      const payment = (row.payment_status ?? "Unpaid").toString();
+      const fare = getFare(row) ?? 0;
 
-        const diffMinutes = Math.abs(second.whenMs - first.whenMs) / 60000;
+      if (
+        !Number.isNaN(when.getTime()) &&
+        when >= today &&
+        status === "Completed"
+      ) {
+        jobs += 1;
+        revenue += fare;
 
-        if (diffMinutes > rule.windowMinutes) {
-          break;
+        if (payment === "Unpaid") {
+          unpaid += fare;
         }
-
-        const bookingIds = [first.id, second.id].sort();
-        const key = bookingIds.join("__");
-
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        const firstDriver = first.driver.trim();
-        const secondDriver = second.driver.trim();
-
-        const sameDriver =
-          !!firstDriver &&
-          !!secondDriver &&
-          firstDriver.toLowerCase() === secondDriver.toLowerCase();
-
-        const unassigned = !firstDriver || !secondDriver;
-
-        if (reviewedClashKeys.includes(key)) continue;
-
-        clashes.push({
-          key,
-          type: ruleType,
-          start: first.whenMs,
-          end: second.whenMs,
-          bookingIds,
-          count: 2,
-          sameDriver,
-          unassigned,
-          strong: sameDriver || unassigned,
-        });
       }
-    }
-  }
+    });
 
-  return clashes;
-}, [bookings, reviewedClashKeys]);
+    return { jobs, revenue, unpaid };
+  }, [bookings]);
 
-const clashSummaryText = useMemo(() => {
-  if (detectedClashes.length === 0) return "";
+  const dashboardStats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  return detectedClashes
-    .map((c) => {
-      const label = c.strong ? "clash" : "cluster";
-      let reason = "";
+    let jobs = 0;
+    let revenue = 0;
+    let unpaid = 0;
 
-      if (c.sameDriver && c.unassigned) {
-        reason = "same driver + unassigned";
-      } else if (c.sameDriver) {
-        reason = "same driver";
-      } else if (c.unassigned) {
-        reason = "unassigned driver";
-      } else {
-        reason = "jobs close together";
+    bookings.forEach((row) => {
+      const when = new Date(getWhen(row));
+      if (Number.isNaN(when.getTime()) || when < today) return;
+
+      const status = (row.status ?? "Scheduled").toString();
+      const payment = (row.payment_status ?? "Unpaid").toString();
+      const fare = getFare(row) ?? 0;
+
+      if (status === "Completed") {
+        jobs += 1;
+        revenue += fare;
+
+        if (payment === "Unpaid") {
+          unpaid += fare;
+        }
       }
+    });
 
-      return `${c.type} ${label}${c.count > 2 ? ` (${c.count} jobs)` : ""} — ${reason}`;
-    })
-    .join(" • ");
-}, [detectedClashes]);
+    return { jobs, revenue, unpaid };
+  }, [bookings]);
 
-console.log("detectedClashes", detectedClashes);
+  const clashRules = {
+    Airport: { windowMinutes: 120, minJobs: 2 },
+    "Long Distance": { windowMinutes: 120, minJobs: 2 },
+    Local: { windowMinutes: 30, minJobs: 2 },
+  } as const;
 
-const nextJob = useMemo(() => {
-  const now = Date.now();
-
-  const pobJob =
-    [...bookings]
-      .filter((row) => (row.status ?? "Scheduled").toString() === "POB")
-      .sort(
-        (a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
-      )[0] ?? null;
-
-  if (pobJob) return pobJob;
-
-  return (
-    [...bookings]
-      .filter((row) => {
-        const when = new Date(getWhen(row)).getTime();
+  const detectedClashes = useMemo(() => {
+    const relevant = bookings
+      .map((row) => {
+        const whenMs = new Date(getWhen(row)).getTime();
+        const type = normalizeBookingType(getBookingType(row));
+        const driver = getDriver(row);
         const status = (row.status ?? "Scheduled").toString();
 
-        return (
-          !Number.isNaN(when) &&
-          when >= now &&
-          status !== "Cancelled" &&
-          status !== "Completed" &&
-          status !== "POB"
-        );
+        return {
+          id: row.id,
+          whenMs,
+          type,
+          driver,
+          status,
+        };
       })
-      .sort(
-        (a, b) => new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
-      )[0] ?? null
-  );
-}, [bookings]);
+      .filter(
+        (row) =>
+          !Number.isNaN(row.whenMs) &&
+          row.status !== "Cancelled" &&
+          row.status !== "Completed" &&
+          !!row.type
+      )
+      .sort((a, b) => a.whenMs - b.whenMs);
+
+    const clashes: ClashRow[] = [];
+    const seen = new Set<string>();
+
+    for (const [ruleType, rule] of Object.entries(clashRules)) {
+      const jobs = relevant.filter((row) => row.type === ruleType);
+
+      for (let i = 0; i < jobs.length; i++) {
+        for (let j = i + 1; j < jobs.length; j++) {
+          const first = jobs[i];
+          const second = jobs[j];
+          const diffMinutes = Math.abs(second.whenMs - first.whenMs) / 60000;
+
+          if (diffMinutes > rule.windowMinutes) {
+            break;
+          }
+
+          const bookingIds = [first.id, second.id].sort();
+          const key = makeClashKey(bookingIds[0], bookingIds[1]);
+
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          const firstDriver = first.driver.trim();
+          const secondDriver = second.driver.trim();
+
+          const sameDriver =
+            !!firstDriver &&
+            !!secondDriver &&
+            firstDriver.toLowerCase() === secondDriver.toLowerCase();
+
+          const unassigned = !firstDriver || !secondDriver;
+
+          if (reviewedClashKeys.includes(key)) continue;
+
+          clashes.push({
+            key,
+            type: ruleType,
+            start: first.whenMs,
+            end: second.whenMs,
+            bookingIds,
+            count: 2,
+            sameDriver,
+            unassigned,
+            strong: sameDriver || unassigned,
+          });
+        }
+      }
+    }
+
+    return clashes;
+  }, [bookings, reviewedClashKeys]);
+
+  const clashSummaryText = useMemo(() => {
+    if (detectedClashes.length === 0) return "";
+
+    return detectedClashes
+      .map((c) => {
+        const label = c.strong ? "clash" : "cluster";
+        let reason = "";
+
+        if (c.sameDriver && c.unassigned) {
+          reason = "same driver + unassigned";
+        } else if (c.sameDriver) {
+          reason = "same driver";
+        } else if (c.unassigned) {
+          reason = "unassigned driver";
+        } else {
+          reason = "jobs close together";
+        }
+
+        return `${c.type} ${label}${
+          c.count > 2 ? ` (${c.count} jobs)` : ""
+        } — ${reason}`;
+      })
+      .join(" • ");
+  }, [detectedClashes]);
+
+  const nextJob = useMemo(() => {
+    const now = Date.now();
+
+    const pobJob =
+      [...bookings]
+        .filter((row) => (row.status ?? "Scheduled").toString() === "POB")
+        .sort(
+          (a, b) =>
+            new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
+        )[0] ?? null;
+
+    if (pobJob) return pobJob;
+
+    return (
+      [...bookings]
+        .filter((row) => {
+          const when = new Date(getWhen(row)).getTime();
+          const status = (row.status ?? "Scheduled").toString();
+
+          return (
+            !Number.isNaN(when) &&
+            when >= now &&
+            status !== "Cancelled" &&
+            status !== "Completed" &&
+            status !== "POB"
+          );
+        })
+        .sort(
+          (a, b) =>
+            new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
+        )[0] ?? null
+    );
+  }, [bookings]);
 
   async function updateBooking(id: string, patch: Record<string, unknown>) {
     try {
@@ -568,7 +592,10 @@ const nextJob = useMemo(() => {
       setErrorMessage("");
 
       const supabase = getSupabase();
-      const { error } = await supabase.from("bookings").update(patch).eq("id", id);
+      const { error } = await supabase
+        .from("bookings")
+        .update(patch)
+        .eq("id", id);
 
       if (error) throw error;
 
@@ -585,25 +612,27 @@ const nextJob = useMemo(() => {
   }
 
   async function markClashResolved(clashKey: string, bookingIds: string[]) {
-  const supabase = getSupabase();
+    try {
+      setErrorMessage("");
+      const supabase = getSupabase();
+      const sortedIds = [...bookingIds].sort();
 
-  const sortedIds = [...bookingIds].sort();
+      const { error } = await supabase.from("clash_reviews").upsert({
+        clash_key: clashKey,
+        booking_a_id: sortedIds[0],
+        booking_b_id: sortedIds[1],
+      });
 
-  const { error } = await supabase.from("clash_reviews").upsert({
-    clash_key: clashKey,
-    booking_a_id: sortedIds[0],
-    booking_b_id: sortedIds[1],
-  });
+      if (error) throw error;
 
-  if (error) throw error;
-
-  setReviewedClashKeys((current) =>
-    current.includes(clashKey) ? current : [...current, clashKey]
-  );
-}
-
-  async function onMarkCompleted(id: string) {
-    await updateBooking(id, { status: "Completed" });
+      setReviewedClashKeys((current) =>
+        current.includes(clashKey) ? current : [...current, clashKey]
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to resolve clash";
+      setErrorMessage(message);
+    }
   }
 
   async function onMarkPaid(id: string) {
@@ -627,85 +656,87 @@ const nextJob = useMemo(() => {
     e.stopPropagation();
   }
 
-function BookingCard({
-  booking,
-  forceExpanded = false,
-  highlightClash = false,
-}: {
-  booking: BookingRow;
-  forceExpanded?: boolean;
-  highlightClash?: boolean;
-}) {
-  const driver = getDriver(booking);
-  const vehicle = getVehicle(booking);
-  const bookingType = getBookingType(booking);
-  const when = getWhen(booking);
-  const name = getName(booking);
-  const phone = getPhone(booking);
-  const pickup = getPickup(booking);
-  const dropoff = getDropoff(booking);
-  const fare = getFare(booking);
-  const status = (booking.status ?? "Scheduled").toString();
-  const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
-  const notes = pickString(booking, ["notes"]);
-  const via = pickString(booking, ["via"]);
-  const localAuthority = pickString(booking, ["local_authority"]);
-  const passengers = pickNumber(booking, ["passengers"]);
-  const bagsLarge = pickNumber(booking, ["bags_large"]);
-  const bagsSmall = pickNumber(booking, ["bags_small"]);
-  const distanceMiles = pickNumber(booking, ["distance_miles"]);
-  const isBusy = busyId === booking.id;
-  const expanded = forceExpanded || !!expandedIds[booking.id];
-  const countdown = getCountdownLabel(when, nowMs);
+  function BookingCard({
+    booking,
+    forceExpanded = false,
+    highlightClash = false,
+  }: {
+    booking: BookingRow;
+    forceExpanded?: boolean;
+    highlightClash?: boolean;
+  }) {
+    const driver = getDriver(booking);
+    const vehicle = getVehicle(booking);
+    const bookingType = getBookingType(booking);
+    const when = getWhen(booking);
+    const name = getName(booking);
+    const phone = getPhone(booking);
+    const pickup = getPickup(booking);
+    const dropoff = getDropoff(booking);
+    const fare = getFare(booking);
+    const status = (booking.status ?? "Scheduled").toString();
+    const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
+    const notes = pickString(booking, ["notes"]);
+    const via = pickString(booking, ["via"]);
+    const localAuthority = pickString(booking, ["local_authority"]);
+    const passengers = pickNumber(booking, ["passengers"]);
+    const bagsLarge = pickNumber(booking, ["bags_large"]);
+    const bagsSmall = pickNumber(booking, ["bags_small"]);
+    const distanceMiles = pickNumber(booking, ["distance_miles"]);
+    const isBusy = busyId === booking.id;
+    const expanded = forceExpanded || !!expandedIds[booking.id];
+    const countdown = getCountdownLabel(when, nowMs);
 
     return (
       <div
         onClick={() => toggleExpanded(booking.id)}
-className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
-  highlightClash
-    ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
-    : status === "POB"
-    ? "border-amber-300 bg-amber-50 shadow-md"
-    : (() => {
-        const whenMs = new Date(when).getTime();
-        const diff = whenMs - nowMs;
+        className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
+          highlightClash
+            ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
+            : status === "POB"
+            ? "border-amber-300 bg-amber-50 shadow-md"
+            : (() => {
+                const whenMs = new Date(when).getTime();
+                const diff = whenMs - nowMs;
 
-        if (diff <= 15 * 60 * 1000) {
-          return "border-red-300 bg-red-50 shadow-sm";
-        }
+                if (diff <= 15 * 60 * 1000) {
+                  return "border-red-300 bg-red-50 shadow-sm";
+                }
 
-        if (diff <= 60 * 60 * 1000) {
-          return "border-blue-300 bg-blue-50 shadow-sm";
-        }
+                if (diff <= 60 * 60 * 1000) {
+                  return "border-blue-300 bg-blue-50 shadow-sm";
+                }
 
-        return "bg-white shadow-sm";
-      })()
-}`}
+                return "bg-white shadow-sm";
+              })()
+        }`}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
-          {highlightClash ? (
-  <div className="mb-2">
-    <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
-      CLASH
-    </span>
-  </div>
-) : null}
           <div>
+            {highlightClash ? (
+              <div className="mb-2">
+                <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
+                  CLASH
+                </span>
+              </div>
+            ) : null}
+
             <div className="text-lg font-semibold">{name}</div>
             <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
-<div
-  className={`mt-1 text-xs font-medium ${
-    countdown.includes("d")
-      ? "text-slate-500"
-      : countdown.includes("h")
-      ? "text-amber-600"
-      : countdown.includes("m")
-      ? "text-red-600"
-      : "text-red-700 font-bold"
-  }`}
->
-  Countdown: {countdown}
-</div>
+
+            <div
+              className={`mt-1 text-xs font-medium ${
+                countdown.includes("d")
+                  ? "text-slate-500"
+                  : countdown.includes("h")
+                  ? "text-amber-600"
+                  : countdown.includes("m")
+                  ? "text-red-600"
+                  : "text-red-700 font-bold"
+              }`}
+            >
+              Countdown: {countdown}
+            </div>
           </div>
 
           <div className="text-right text-sm">
@@ -717,141 +748,141 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           </div>
         </div>
 
-{expanded && (
-  <>
-    <div className="space-y-1 text-sm text-slate-700">
-      <div>
-        <span className="font-medium">From:</span> {pickup || "—"}
-      </div>
-      <div>
-        <span className="font-medium">To:</span> {dropoff || "—"}
-      </div>
-      <div>
-        <span className="font-medium">Phone:</span> {phone || "—"}
-      </div>
-      <div>
-        <span className="font-medium">Fare:</span>{" "}
-        {fare === null ? "—" : `£${fare.toFixed(2)}`}
-      </div>
-      <div>
-        <span className="font-medium">Driver:</span>{" "}
-        <span className="font-semibold text-blue-700">
-          {driver || "Unassigned"}
-        </span>
-      </div>
-      <div>
-        <span className="font-medium">Vehicle:</span> {vehicle || "Unassigned"}
-      </div>
-      <div>
-        <span className="font-medium">Type:</span> {bookingType || "—"}
-      </div>
+        {expanded && (
+          <>
+            <div className="space-y-1 text-sm text-slate-700">
+              <div>
+                <span className="font-medium">From:</span> {pickup || "—"}
+              </div>
+              <div>
+                <span className="font-medium">To:</span> {dropoff || "—"}
+              </div>
+              <div>
+                <span className="font-medium">Phone:</span> {phone || "—"}
+              </div>
+              <div>
+                <span className="font-medium">Fare:</span>{" "}
+                {fare === null ? "—" : `£${fare.toFixed(2)}`}
+              </div>
+              <div>
+                <span className="font-medium">Driver:</span>{" "}
+                <span className="font-semibold text-blue-700">
+                  {driver || "Unassigned"}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium">Vehicle:</span>{" "}
+                {vehicle || "Unassigned"}
+              </div>
+              <div>
+                <span className="font-medium">Type:</span> {bookingType || "—"}
+              </div>
 
-      {(() => {
-        const hasDriver = !!driver;
-        const whenMs = new Date(when).getTime();
-        const diff = whenMs - nowMs;
+              {(() => {
+                const hasDriver = !!driver;
+                const whenMs = new Date(when).getTime();
+                const diff = whenMs - nowMs;
 
-        if (hasDriver) {
-          return (
-            <div className="mt-2 rounded-xl border border-green-300 bg-green-50 p-2 text-sm font-semibold text-green-700">
-              Driver assigned
+                if (hasDriver) {
+                  return (
+                    <div className="mt-2 rounded-xl border border-green-300 bg-green-50 p-2 text-sm font-semibold text-green-700">
+                      Driver assigned
+                    </div>
+                  );
+                }
+
+                if (!Number.isNaN(whenMs) && diff <= 2 * 60 * 60 * 1000) {
+                  return (
+                    <div className="mt-2 rounded-xl border border-red-300 bg-red-50 p-2 text-sm font-semibold text-red-700 animate-pulse">
+                      URGENT — driver not assigned
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-2 text-sm font-semibold text-amber-700">
+                    Driver not yet assigned
+                  </div>
+                );
+              })()}
             </div>
-          );
-        }
 
-        if (!Number.isNaN(whenMs) && diff <= 2 * 60 * 60 * 1000) {
-          return (
-            <div className="mt-2 rounded-xl border border-red-300 bg-red-50 p-2 text-sm font-semibold text-red-700 animate-pulse">
-              URGENT — driver not assigned
+            <div className="mt-4 border-t pt-4">
+              <div className="mb-3 text-sm font-semibold text-slate-900">
+                Compliance / Job details
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                <div>
+                  <span className="font-medium">Status:</span>{" "}
+                  {booking.status || "—"}
+                </div>
+                <div>
+                  <span className="font-medium">Payment:</span>{" "}
+                  {booking.payment_status || "—"}
+                </div>
+
+                <div>
+                  <span className="font-medium">Driver:</span>{" "}
+                  <span className="font-semibold text-blue-700">
+                    {driver || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">Vehicle:</span>{" "}
+                  <span className="font-semibold text-purple-700">
+                    {vehicle || "—"}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="font-medium">Passengers:</span>{" "}
+                  {passengers === null ? "—" : passengers}
+                </div>
+                <div>
+                  <span className="font-medium">Distance:</span>{" "}
+                  {distanceMiles === null ? "—" : `${distanceMiles} miles`}
+                </div>
+
+                <div>
+                  <span className="font-medium">Via:</span> {via || "—"}
+                </div>
+                <div>
+                  <span className="font-medium">Journey type:</span>{" "}
+                  {(booking as any).journey_type || (booking as any).type || "—"}
+                </div>
+
+                <div>
+                  <span className="font-medium">Large bags:</span>{" "}
+                  {bagsLarge === null ? "—" : bagsLarge}
+                </div>
+                <div>
+                  <span className="font-medium">Small bags:</span>{" "}
+                  {bagsSmall === null ? "—" : bagsSmall}
+                </div>
+
+                <div>
+                  <span className="font-medium">Local authority:</span>{" "}
+                  {localAuthority || "—"}
+                </div>
+                <div>
+                  <span className="font-medium">Created:</span>{" "}
+                  {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <span className="font-medium">Booking ID:</span> {booking.id}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <span className="font-medium">Notes:</span> {notes || "—"}
+                </div>
+              </div>
             </div>
-          );
-        }
+          </>
+        )}
 
-        return (
-          <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-2 text-sm font-semibold text-amber-700">
-            Driver not yet assigned
-          </div>
-        );
-      })()}
-    </div>
-
-    <div className="mt-4 border-t pt-4">
-      <div className="mb-3 text-sm font-semibold text-slate-900">
-        Compliance / Job details
-      </div>
-
-      <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
-        <div>
-          <span className="font-medium">Status:</span> {booking.status || "—"}
-        </div>
-        <div>
-          <span className="font-medium">Payment:</span> {booking.payment_status || "—"}
-        </div>
-
-        <div>
-          <span className="font-medium">Driver:</span>{" "}
-          <span className="font-semibold text-blue-700">
-            {driver || "—"}
-          </span>
-        </div>
-        <div>
-          <span className="font-medium">Vehicle:</span>{" "}
-          <span className="font-semibold text-purple-700">
-            {vehicle || "—"}
-          </span>
-        </div>
-
-        <div>
-          <span className="font-medium">Passengers:</span>{" "}
-          {passengers === null ? "—" : passengers}
-        </div>
-        <div>
-          <span className="font-medium">Distance:</span>{" "}
-          {distanceMiles === null ? "—" : `${distanceMiles} miles`}
-        </div>
-
-        <div>
-          <span className="font-medium">Via:</span> {via || "—"}
-        </div>
-        <div>
-          <span className="font-medium">Journey type:</span>{" "}
-          {(booking as any).journey_type || (booking as any).type || "—"}
-        </div>
-
-        <div>
-          <span className="font-medium">Large bags:</span>{" "}
-          {bagsLarge === null ? "—" : bagsLarge}
-        </div>
-        <div>
-          <span className="font-medium">Small bags:</span>{" "}
-          {bagsSmall === null ? "—" : bagsSmall}
-        </div>
-
-        <div>
-          <span className="font-medium">Local authority:</span>{" "}
-          {localAuthority || "—"}
-        </div>
-        <div>
-          <span className="font-medium">Created:</span>{" "}
-          {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
-        </div>
-
-        <div className="sm:col-span-2">
-          <span className="font-medium">Booking ID:</span> {booking.id}
-        </div>
-
-        <div className="sm:col-span-2">
-          <span className="font-medium">Notes:</span> {notes || "—"}
-        </div>
-      </div>
-    </div>
-  </>
-)}
-
-        <div
-          className="mt-4 flex flex-wrap gap-2"
-          onClick={stopCardToggle}
-        >
+        <div className="mt-4 flex flex-wrap gap-2" onClick={stopCardToggle}>
           <Link
             href={`/edit/${booking.id}`}
             className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
@@ -899,75 +930,75 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
             </a>
           ) : null}
 
+          {status === "Scheduled" ? (
+            <button
+              onClick={() => void updateBooking(booking.id, { status: "POB" })}
+              disabled={isBusy}
+              className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Mark POB
+            </button>
+          ) : null}
 
+          {status !== "Completed" ? (
+            <button
+              onClick={() =>
+                void updateBooking(booking.id, {
+                  status: "Completed",
+                  payment_status: "Unpaid",
+                })
+              }
+              disabled={isBusy}
+              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Complete (Unpaid)
+            </button>
+          ) : null}
 
-{status === "Scheduled" ? (
-  <button
-    onClick={() => void updateBooking(booking.id, { status: "POB" })}
-    disabled={isBusy}
-    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Mark POB
-  </button>
-) : null}
+          {status !== "Completed" ? (
+            <button
+              onClick={() =>
+                void updateBooking(booking.id, {
+                  status: "Completed",
+                  payment_status: "Paid",
+                })
+              }
+              disabled={isBusy}
+              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Complete & Paid
+            </button>
+          ) : null}
 
-{status !== "Completed" ? (
-  <button
-    onClick={() =>
-      void updateBooking(booking.id, {
-        status: "Completed",
-        payment_status: "Unpaid",
-      })
-    }
-    disabled={isBusy}
-    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Complete (Unpaid)
-  </button>
-) : null}
+          {status === "Completed" && paymentStatus !== "Paid" ? (
+            <button
+              onClick={() => void onMarkPaid(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Mark paid
+            </button>
+          ) : null}
 
-{status !== "Completed" ? (
-  <button
-    onClick={() =>
-      void updateBooking(booking.id, {
-        status: "Completed",
-        payment_status: "Paid",
-      })
-    }
-    disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Complete & Paid
-  </button>
-) : null}
-
-{status === "Completed" && paymentStatus !== "Paid" ? (
-  <button
-    onClick={() => void onMarkPaid(booking.id)}
-    disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Mark paid
-  </button>
-) : null}
-
-{status !== "Cancelled" ? (
-  <button
-    onClick={() => void onCancel(booking.id)}
-    disabled={isBusy}
-    className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Cancel
-  </button>
-) : (
-  <button
-    onClick={() => void updateBooking(booking.id, { status: "Scheduled" })}
-    disabled={isBusy}
-    className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Restore booking
-  </button>
-)}
+          {status !== "Cancelled" ? (
+            <button
+              onClick={() => void onCancel(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              onClick={() =>
+                void updateBooking(booking.id, { status: "Scheduled" })
+              }
+              disabled={isBusy}
+              className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Restore booking
+            </button>
+          )}
         </div>
       </div>
     );
@@ -979,7 +1010,9 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">My Way Cars</h1>
+              <h1 className="text-2xl font-bold text-slate-900">
+                My Way Cars
+              </h1>
               <p className="text-sm text-slate-600">Booking dashboard</p>
             </div>
 
@@ -991,221 +1024,238 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
                 Add booking
               </Link>
 
-<button
-  onClick={() => void onRefresh()}
-  disabled={refreshing}
-  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-60 active:scale-95 active:shadow-inner transition"
->
-  {refreshing ? "Refreshing..." : "Refresh"}
-</button>
+              <button
+                onClick={() => void onRefresh()}
+                disabled={refreshing}
+                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
             </div>
           </div>
         </div>
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
-  <div className="mb-2 text-lg font-semibold text-slate-900">Dashboard</div>
-  <div className="flex flex-wrap gap-3 text-sm">
-    <div className="rounded-xl bg-slate-100 px-4 py-3">
-      <div className="text-slate-500">Jobs today</div>
-      <div className="text-lg font-bold text-slate-900">{dashboardStats.jobs}</div>
-    </div>
+          <div className="mb-2 text-lg font-semibold text-slate-900">
+            Dashboard
+          </div>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <div className="rounded-xl bg-slate-100 px-4 py-3">
+              <div className="text-slate-500">Jobs today</div>
+              <div className="text-lg font-bold text-slate-900">
+                {dashboardStats.jobs}
+              </div>
+            </div>
 
-    <div className="rounded-xl bg-slate-100 px-4 py-3">
-      <div className="text-slate-500">Revenue</div>
-      <div className="text-lg font-bold text-slate-900">
-        £{dashboardStats.revenue.toFixed(2)}
-      </div>
-    </div>
+            <div className="rounded-xl bg-slate-100 px-4 py-3">
+              <div className="text-slate-500">Revenue</div>
+              <div className="text-lg font-bold text-slate-900">
+                £{dashboardStats.revenue.toFixed(2)}
+              </div>
+            </div>
 
-    <div className="rounded-xl bg-amber-50 px-4 py-3">
-      <div className="text-amber-700">Unpaid</div>
-      <div className="text-lg font-bold text-amber-800">
-        £{dashboardStats.unpaid.toFixed(2)}
-      </div>
-    </div>
-  </div>
-</section>
+            <div className="rounded-xl bg-amber-50 px-4 py-3">
+              <div className="text-amber-700">Unpaid</div>
+              <div className="text-lg font-bold text-amber-800">
+                £{dashboardStats.unpaid.toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </section>
 
-   
-{nextJob ? (
-  <section
-id="next-job"
-  >
-    <div className="mb-3 text-xl font-bold text-slate-900">
-      {(nextJob?.status ?? "Scheduled").toString() === "POB" ? "Current Job" : "Next Job"}
-    </div>
-    <BookingCard booking={nextJob} forceExpanded />
-  </section>
-) : (
-  <section className="rounded-3xl bg-slate-50 border border-slate-200 p-5 shadow-sm">
-    <div className="text-lg font-semibold text-slate-900">You’re clear</div>
-    <p className="mt-1 text-sm text-slate-600">
-      No upcoming scheduled jobs found.
-    </p>
-  </section>
-)}
+        {nextJob ? (
+          <section id="next-job">
+            <div className="mb-3 text-xl font-bold text-slate-900">
+              {(nextJob?.status ?? "Scheduled").toString() === "POB"
+                ? "Current Job"
+                : "Next Job"}
+            </div>
+            <BookingCard
+              booking={nextJob}
+              forceExpanded
+              highlightClash={selectedClashBookingIds.includes(nextJob.id)}
+            />
+          </section>
+        ) : (
+          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <div className="text-lg font-semibold text-slate-900">
+              You’re clear
+            </div>
+            <p className="mt-1 text-sm text-slate-600">
+              No upcoming scheduled jobs found.
+            </p>
+          </section>
+        )}
 
-<section className="rounded-3xl bg-white p-5 shadow-sm">
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+          {detectedClashes.length > 0 && (
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <div>
+                ⚠ {detectedClashes.length} scheduling issue
+                {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
+              </div>
 
-{detectedClashes.length > 0 && (
-  <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-    <div>
-      ⚠ {detectedClashes.length} scheduling issue{detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
-    </div>
+              <button
+                onClick={() => {
+                  const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
+                  setSelectedClashBookingIds([...new Set(clashIds)]);
+                }}
+                className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+              >
+                View
+              </button>
+            </div>
+          )}
 
-    <button
-      onClick={() => {
-        const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
-        setSelectedClashBookingIds([...new Set(clashIds)]);
-      }}
-      className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
-    >
-      View
-    </button>
-  </div>
-)}
+          {selectedClashBookingIds.length > 0 && (
+            <div className="mb-4">
+              <button
+                onClick={() => {
+                  setSelectedClashBookingIds([]);
+                }}
+                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+              >
+                ← Back to all bookings
+              </button>
+            </div>
+          )}
 
-{selectedClashBookingIds.length > 0 && (
-  <div className="mb-4">
-    <button
-      onClick={() => {
-        setSelectedClashBookingIds([]);
-      }}
-      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-    >
-      ← Back to all bookings
-    </button>
-  </div>
-)}
+          {selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
+            <div className="mb-4 space-y-3">
+              {detectedClashes
+                .filter((c) =>
+                  c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
+                )
+                .map((clash) => (
+                  <div
+                    key={clash.key}
+                    className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+                  >
+                    <div className="mb-2 font-medium">
+                      {clash.type} clash{" "}
+                      {clash.sameDriver
+                        ? "— same driver"
+                        : clash.unassigned
+                        ? "— unassigned driver"
+                        : "— jobs close together"}
+                    </div>
 
-{selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
-  <div className="mb-4 space-y-3">
-    {detectedClashes
-      .filter((c) =>
-        c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
-      )
-      .map((clash) => (
-        <div
-          key={clash.key}
-          className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-        >
-          <div className="mb-2 font-medium">
-            {`Potential clash`}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          await markClashResolved(clash.key, clash.bookingIds);
+
+                          const remainingIds = detectedClashes
+                            .filter((c) => c.key !== clash.key)
+                            .flatMap((c) => c.bookingIds);
+
+                          setSelectedClashBookingIds([...new Set(remainingIds)]);
+                        }}
+                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        ✔ Mark resolved
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {unpaidTotal > 0 ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
+              Unpaid total: £{unpaidTotal.toFixed(2)}
+            </div>
+          ) : null}
+
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <div className="mb-1 font-semibold text-slate-800">Today</div>
+            <div className="flex gap-4 text-slate-700">
+              <span>Jobs: {todayStats.jobs}</span>
+              <span>Revenue: £{todayStats.revenue.toFixed(2)}</span>
+              <span>Unpaid: £{todayStats.unpaid.toFixed(2)}</span>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                await markClashResolved(clash.key, clash.bookingIds);
+          <div className="mb-4">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Search bookings
+            </label>
 
-                const remainingIds = detectedClashes
-                  .filter((c) => c.key !== clash.key)
-                  .flatMap((c) => c.bookingIds);
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </span>
 
-                setSelectedClashBookingIds([...new Set(remainingIds)]);
-              }}
-              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
-            >
-              ✔ Mark resolved
-            </button>
+              <input
+                type="text"
+                placeholder="Search by name, phone, pickup, dropoff or notes"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-2xl border-2 border-slate-300 bg-white py-3 pl-10 pr-4 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
+              />
+            </div>
           </div>
-        </div>
-      ))}
-  </div>
-)}
-  {unpaidTotal > 0 ? (
-    <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-medium text-amber-800">
-      Unpaid total: £{unpaidTotal.toFixed(2)}
-    </div>
-  ) : null}
 
-  <div className="mb-4 rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm">
-    <div className="font-semibold text-slate-800 mb-1">Today</div>
-    <div className="flex gap-4 text-slate-700">
-      <span>Jobs: {todayStats.jobs}</span>
-      <span>Revenue: £{todayStats.revenue.toFixed(2)}</span>
-      <span>Unpaid: £{todayStats.unpaid.toFixed(2)}</span>
-    </div>
-  </div>
-  <div className="mb-4">
-    <label className="mb-2 block text-sm font-semibold text-slate-700">
-      Search bookings
-    </label>
+          <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
+            {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
+              (value) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value)}
+                  className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                    statusFilter === value
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-200 text-slate-900"
+                  }`}
+                >
+                  {value}
+                </button>
+              )
+            )}
+          </div>
 
-    <div className="relative">
-      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-5 w-5"
-        >
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-      </span>
+          {errorMessage ? (
+            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+              {errorMessage}
+            </div>
+          ) : null}
 
-      <input
-        type="text"
-        placeholder="Search by name, phone, pickup, dropoff or notes"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full rounded-2xl border-2 border-slate-300 bg-white pl-10 pr-4 py-3 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
-      />
-    </div>
-  </div>
+          {loading ? (
+            <div className="text-sm text-slate-600">Loading bookings…</div>
+          ) : filteredBookings.length === 0 ? (
+            <div className="text-sm text-slate-600">No bookings found.</div>
+          ) : (
+            <div className="space-y-4">
+              {filteredBookings.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  highlightClash={selectedClashBookingIds.includes(booking.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
-  <div className="mb-4 flex flex-wrap gap-2 sticky top-0 z-20 bg-white py-2">
-   {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map((value) => (
-      <button
-        key={value}
-        onClick={() => setStatusFilter(value)}
-        className={`rounded-xl px-3 py-2 text-sm font-medium ${
-          statusFilter === value
-            ? "bg-slate-900 text-white"
-            : "bg-slate-200 text-slate-900"
-        }`}
+      <Link
+        href="/add"
+        className="fixed bottom-6 right-6 z-50 rounded-full bg-slate-900 px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-slate-800 sm:hidden"
       >
-        {value}
-      </button>
-    ))}
-  </div>
-
-  {errorMessage ? (
-    <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-      {errorMessage}
-    </div>
-  ) : null}
-
-  {loading ? (
-    <div className="text-sm text-slate-600">Loading bookings…</div>
-  ) : filteredBookings.length === 0 ? (
-    <div className="text-sm text-slate-600">No bookings found.</div>
-  ) : (
-    <div className="space-y-4">
-      {filteredBookings.map((booking) => (
-  <BookingCard
-    key={booking.id}
-    booking={booking}
-    highlightClash={selectedClashBookingIds.includes(booking.id)}
-  />
-))}
-    </div>
-  )}
-</section>
-</div>
-
-<Link
-  href="/add"
-  className="fixed bottom-6 right-6 z-50 rounded-full bg-slate-900 px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-slate-800 sm:hidden"
->
-  + Add booking
-</Link>
-
-</main>
-);
+        + Add booking
+      </Link>
+    </main>
+  );
 }
