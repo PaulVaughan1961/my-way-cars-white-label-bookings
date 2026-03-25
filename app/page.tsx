@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "./lib/supabase";
 
 type BookingRow = {
@@ -202,6 +202,7 @@ function makeClashKey(a: string, b: string): string {
 
 export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const clashSectionRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -1044,10 +1045,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="mb-2 text-lg font-semibold text-slate-900">
-            Dashboard
-          </div>
+<section className="rounded-3xl bg-white p-5 shadow-sm">
+  <div className="mb-2 text-lg font-semibold text-slate-900">
+    Dashboard
+  </div>
           <div className="flex flex-wrap gap-3 text-sm">
             <div className="rounded-xl bg-slate-100 px-4 py-3">
               <div className="text-slate-500">Jobs today</div>
@@ -1104,17 +1105,24 @@ export default function HomePage() {
                 {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
               </div>
 
-              <button
-                onClick={() => {
-                  const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
-                  setSearchTerm("");
-                  setStatusFilter("All");
-                  setSelectedClashBookingIds([...new Set(clashIds)]);
-                }}
-                className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
-              >
-                View
-              </button>
+<button
+  onClick={() => {
+    const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
+    setSearchTerm("");
+    setStatusFilter("All");
+    setSelectedClashBookingIds([...new Set(clashIds)]);
+
+    requestAnimationFrame(() => {
+      clashSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }}
+  className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+>
+  View
+</button>
             </div>
           )}
 
