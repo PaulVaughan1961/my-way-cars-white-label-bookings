@@ -27,6 +27,8 @@ type BookingRow = {
   driver_name?: string | null;
   vehicle?: string | null;
   booking_type?: string | null;
+  return_datetime?: string | null;
+return_notes?: string | null;
 };
 
 type DriverRow = {
@@ -100,6 +102,11 @@ export default function EditBookingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [hasReturn, setHasReturn] = useState(false);
+const [returnDate, setReturnDate] = useState("");
+const [returnTime, setReturnTime] = useState("");
+const [returnNotes, setReturnNotes] = useState("");
 
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
@@ -192,6 +199,10 @@ export default function EditBookingPage() {
         setBookingType(row.booking_type ?? "");
         setStatus((row.status ?? "Scheduled").toString());
         setPaymentStatus((row.payment_status ?? "Unpaid").toString());
+setHasReturn(!!row.return_datetime);
+setReturnDate(localDateFromIso(row.return_datetime));
+setReturnTime(localTimeFromIso(row.return_datetime));
+setReturnNotes(row.return_notes ?? "");
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Failed to load booking"
@@ -244,26 +255,30 @@ export default function EditBookingPage() {
           ? Number(distanceMiles.replace(/[^\d.]/g, ""))
           : null;
 
-      const payload = {
-        passenger_name: passengerName.trim(),
-        passenger_phone: passengerPhone.trim(),
-        pickup_address: pickupAddress.trim(),
-        dropoff_address: dropoffAddress.trim(),
-        pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
-        distance_miles: distanceValue,
-        fare: fareValue,
-        driver_name: driverName.trim() || null,
-        notes: notes.trim() || null,
-        status,
-        payment_status: paymentStatus,
-        passengers: pax === "" ? 1 : Number(pax),
-        via: via.trim() || null,
-        bags_large: bagsLarge,
-        bags_small: bagsSmall,
-        local_authority: localAuthority.trim() || null,
-        vehicle: vehicle.trim() || null,
-        booking_type: bookingType.trim() || null,
-      };
+const payload = {
+  passenger_name: passengerName.trim(),
+  passenger_phone: passengerPhone.trim(),
+  pickup_address: pickupAddress.trim(),
+  dropoff_address: dropoffAddress.trim(),
+  pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
+  distance_miles: distanceValue,
+  fare: fareValue,
+  driver_name: driverName.trim() || null,
+  notes: notes.trim() || null,
+  status,
+  payment_status: paymentStatus,
+  passengers: pax === "" ? 1 : Number(pax),
+  via: via.trim() || null,
+  bags_large: bagsLarge,
+  bags_small: bagsSmall,
+  local_authority: localAuthority.trim() || null,
+  vehicle: vehicle.trim() || null,
+  booking_type: bookingType.trim() || null,
+  return_datetime: hasReturn
+    ? isoFromDateTime(returnDate, returnTime)
+    : null,
+  return_notes: hasReturn ? returnNotes.trim() || null : null,
+};
 
       const { error } = await supabase
         .from("bookings")
@@ -354,6 +369,7 @@ export default function EditBookingPage() {
                 onChange={(e) => setPickupDate(e.target.value)}
               />
             </div>
+
             <div>
               <label className="text-sm font-medium">Pickup time</label>
               <input
@@ -587,6 +603,55 @@ export default function EditBookingPage() {
               </select>
             </div>
           </div>
+
+          <div className="border-t border-gray-200 pt-4">
+  <label className="flex items-center gap-2 text-sm font-medium">
+    <input
+      type="checkbox"
+      checked={hasReturn}
+      onChange={(e) => setHasReturn(e.target.checked)}
+    />
+    Return journey
+  </label>
+
+  {hasReturn && (
+    <div className="mt-3 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-sm font-medium">Return date</label>
+          <input
+            type="date"
+            className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3"
+            value={returnDate}
+            onChange={(e) => setReturnDate(e.target.value)}
+          />
+        </div>
+        
+
+        <div>
+          <label className="text-sm font-medium">Return time</label>
+          <input
+            type="time"
+            className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3"
+            value={returnTime}
+            onChange={(e) => setReturnTime(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium">Return notes</label>
+        <textarea
+          className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3"
+          value={returnNotes}
+          onChange={(e) => setReturnNotes(e.target.value)}
+          rows={3}
+          placeholder="Flight number / return info"
+        />
+      </div>
+    </div>
+  )}
+</div>
 
           <button
             type="submit"
