@@ -289,11 +289,16 @@ const payload = {
 
       router.push("/");
       router.refresh();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to update booking"
-      );
-    } finally {
+} catch (error: any) {
+  console.error("Update booking error:", error);
+  setErrorMessage(
+    error?.message ||
+      error?.error_description ||
+      error?.details ||
+      JSON.stringify(error) ||
+      "Failed to update booking"
+  );
+} finally {
       setSaving(false);
     }
   }
