@@ -178,6 +178,7 @@ export default function HomePage() {
   const [nowMs, setNowMs] = useState(Date.now());
   const [filteredOverride, setFilteredOverride] = useState<string[] | null>(null);
  const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
+ const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<string[]>([]);
 
  async function loadReviewedClashes() {
   const supabase = getSupabase();
@@ -631,12 +632,14 @@ const nextJob = useMemo(() => {
     e.stopPropagation();
   }
 
-  function BookingCard({
+function BookingCard({
   booking,
   forceExpanded = false,
+  highlightClash = false,
 }: {
   booking: BookingRow;
   forceExpanded?: boolean;
+  highlightClash?: boolean;
 }) {
   const driver = getDriver(booking);
   const vehicle = getVehicle(booking);
@@ -664,7 +667,9 @@ const nextJob = useMemo(() => {
       <div
         onClick={() => toggleExpanded(booking.id)}
 className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
-  status === "POB"
+  highlightClash
+    ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
+    : status === "POB"
     ? "border-amber-300 bg-amber-50 shadow-md"
     : (() => {
         const whenMs = new Date(when).getTime();
@@ -683,6 +688,13 @@ className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
 }`}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
+          {highlightClash ? (
+  <div className="mb-2">
+    <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
+      CLASH
+    </span>
+  </div>
+) : null}
           <div>
             <div className="text-lg font-semibold">{name}</div>
             <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
@@ -1046,12 +1058,13 @@ id="next-job"
       ⚠ {detectedClashes.length} scheduling issue{detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
     </div>
 
-    <button
-      onClick={() => {
-        const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
-        setSearchTerm("");
-        setFilteredOverride(clashIds);
-      }}
+<button
+  onClick={() => {
+    const clashIds = [...new Set(detectedClashes.flatMap((c) => c.bookingIds))];
+    setSearchTerm("");
+    setFilteredOverride(clashIds);
+    setSelectedClashBookingIds(clashIds);
+  }}
       className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
     >
       View
@@ -1061,8 +1074,11 @@ id="next-job"
 
 {filteredOverride && (
   <div className="mb-4">
-    <button
-      onClick={() => setFilteredOverride(null)}
+<button
+  onClick={() => {
+    setFilteredOverride(null);
+    setSelectedClashBookingIds([]);
+  }}
       className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
     >
       ← Back to all bookings
@@ -1085,7 +1101,15 @@ id="next-job"
 
           <div className="flex gap-2">
             <button
-onClick={() => void markClashResolved(clash.key, clash.bookingIds)}
+onClick={async () => {
+  await markClashResolved(clash.key, clash.bookingIds);
+
+  const remainingIds = detectedClashes
+    .filter((c) => c.key !== clash.key)
+    .flatMap((c) => c.bookingIds);
+
+  setSelectedClashBookingIds([...new Set(remainingIds)]);
+}}
               className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
             >
               ✔ Mark resolved
@@ -1170,8 +1194,12 @@ onClick={() => void markClashResolved(clash.key, clash.bookingIds)}
   ) : (
     <div className="space-y-4">
       {filteredBookings.map((booking) => (
-        <BookingCard key={booking.id} booking={booking} />
-      ))}
+  <BookingCard
+    key={booking.id}
+    booking={booking}
+    highlightClash={selectedClashBookingIds.includes(booking.id)}
+  />
+))}
     </div>
   )}
 </section>
