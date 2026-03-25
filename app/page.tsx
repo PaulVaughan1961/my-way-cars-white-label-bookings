@@ -183,7 +183,9 @@ function getCountdownLabel(value: string, nowMs: number): string {
   return `${minutes}m`;
 }
 
-function normalizeBookingType(rawType: string): "Airport" | "Long Distance" | "Local" | "" {
+function normalizeBookingType(
+  rawType: string
+): "Airport" | "Long Distance" | "Local" | "" {
   const value = rawType.trim().toLowerCase();
 
   if (!value) return "";
@@ -209,9 +211,9 @@ export default function HomePage() {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(Date.now());
   const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
-  const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<string[]>(
-    []
-  );
+  const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<
+    string[]
+  >([]);
 
   async function loadReviewedClashes() {
     try {
@@ -444,101 +446,95 @@ export default function HomePage() {
     return { jobs, revenue, unpaid };
   }, [bookings]);
 
-  const clashRules = {
-    Airport: { windowMinutes: 120, minJobs: 2 },
-    "Long Distance": { windowMinutes: 120, minJobs: 2 },
-    Local: { windowMinutes: 30, minJobs: 2 },
-  } as const;
+  const detectedClashes = useMemo(() => {
+    const relevant = bookings
+      .map((row) => {
+        const whenMs = new Date(getWhen(row)).getTime();
+        const type = normalizeBookingType(getBookingType(row));
+        const driver = getDriver(row);
+        const status = (row.status ?? "Scheduled").toString();
 
-const detectedClashes = useMemo(() => {
-  const relevant = bookings
-    .map((row) => {
-      const whenMs = new Date(getWhen(row)).getTime();
-      const type = normalizeBookingType(getBookingType(row));
-      const driver = getDriver(row);
-      const status = (row.status ?? "Scheduled").toString();
+        return {
+          id: row.id,
+          whenMs,
+          type,
+          driver,
+          status,
+        };
+      })
+      .filter(
+        (row) =>
+          !Number.isNaN(row.whenMs) &&
+          row.status !== "Cancelled" &&
+          row.status !== "Completed"
+      )
+      .sort((a, b) => a.whenMs - b.whenMs);
 
-      return {
-        id: row.id,
-        whenMs,
-        type,
-        driver,
-        status,
-      };
-    })
-    .filter(
-      (row) =>
-        !Number.isNaN(row.whenMs) &&
-        row.status !== "Cancelled" &&
-        row.status !== "Completed"
-    )
-    .sort((a, b) => a.whenMs - b.whenMs);
+    const clashes: ClashRow[] = [];
+    const seen = new Set<string>();
 
-  const clashes: ClashRow[] = [];
-  const seen = new Set<string>();
-
-  function getWindowMinutes(
-    aType: "Airport" | "Long Distance" | "Local" | "",
-    bType: "Airport" | "Long Distance" | "Local" | ""
-  ) {
-    const longWindowTypes = new Set(["Airport", "Long Distance"]);
-    if (longWindowTypes.has(aType) || longWindowTypes.has(bType)) {
-      return 120;
-    }
-    return 30;
-  }
-
-  for (let i = 0; i < relevant.length; i++) {
-    for (let j = i + 1; j < relevant.length; j++) {
-      const first = relevant[i];
-      const second = relevant[j];
-
-      const diffMinutes = Math.abs(second.whenMs - first.whenMs) / 60000;
-      const windowMinutes = getWindowMinutes(first.type, second.type);
-
-      if (diffMinutes > windowMinutes) {
-        continue;
+    function getWindowMinutes(
+      aType: "Airport" | "Long Distance" | "Local" | "",
+      bType: "Airport" | "Long Distance" | "Local" | ""
+    ) {
+      const longWindowTypes = new Set(["Airport", "Long Distance"]);
+      if (longWindowTypes.has(aType) || longWindowTypes.has(bType)) {
+        return 120;
       }
-
-      const bookingIds = [first.id, second.id].sort();
-      const key = makeClashKey(bookingIds[0], bookingIds[1]);
-
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const firstDriver = first.driver.trim();
-      const secondDriver = second.driver.trim();
-
-      const sameDriver =
-        !!firstDriver &&
-        !!secondDriver &&
-        firstDriver.toLowerCase() === secondDriver.toLowerCase();
-
-      const unassigned = !firstDriver || !secondDriver;
-
-      if (reviewedClashKeys.includes(key)) continue;
-
-      const clashType =
-        first.type === second.type
-          ? first.type || "General"
-          : `${first.type || "General"} / ${second.type || "General"}`;
-
-      clashes.push({
-        key,
-        type: clashType,
-        start: first.whenMs,
-        end: second.whenMs,
-        bookingIds,
-        count: 2,
-        sameDriver,
-        unassigned,
-        strong: sameDriver || unassigned,
-      });
+      return 30;
     }
-  }
 
-  return clashes;
-}, [bookings, reviewedClashKeys]);
+    for (let i = 0; i < relevant.length; i++) {
+      for (let j = i + 1; j < relevant.length; j++) {
+        const first = relevant[i];
+        const second = relevant[j];
+
+        const diffMinutes = Math.abs(second.whenMs - first.whenMs) / 60000;
+        const windowMinutes = getWindowMinutes(first.type, second.type);
+
+        if (diffMinutes > windowMinutes) {
+          continue;
+        }
+
+        const bookingIds = [first.id, second.id].sort();
+        const key = makeClashKey(bookingIds[0], bookingIds[1]);
+
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const firstDriver = first.driver.trim();
+        const secondDriver = second.driver.trim();
+
+        const sameDriver =
+          !!firstDriver &&
+          !!secondDriver &&
+          firstDriver.toLowerCase() === secondDriver.toLowerCase();
+
+        const unassigned = !firstDriver || !secondDriver;
+
+        if (reviewedClashKeys.includes(key)) continue;
+
+        const clashType =
+          first.type === second.type
+            ? first.type || "General"
+            : `${first.type || "General"} / ${second.type || "General"}`;
+
+        clashes.push({
+          key,
+          type: clashType,
+          start: first.whenMs,
+          end: second.whenMs,
+          bookingIds,
+          count: 2,
+          sameDriver,
+          unassigned,
+          strong: sameDriver || unassigned,
+        });
+      }
+    }
+
+    return clashes;
+  }, [bookings, reviewedClashKeys]);
 
   const clashSummaryText = useMemo(() => {
     if (detectedClashes.length === 0) return "";
@@ -1111,6 +1107,8 @@ const detectedClashes = useMemo(() => {
               <button
                 onClick={() => {
                   const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
+                  setSearchTerm("");
+                  setStatusFilter("All");
                   setSelectedClashBookingIds([...new Set(clashIds)]);
                 }}
                 className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
