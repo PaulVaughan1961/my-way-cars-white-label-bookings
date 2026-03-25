@@ -179,6 +179,20 @@ export default function HomePage() {
   const [filteredOverride, setFilteredOverride] = useState<string[] | null>(null);
  const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
 
+ async function loadReviewedClashes() {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from("clash_reviews")
+    .select("clash_key");
+
+  if (error) throw error;
+
+setReviewedClashKeys(
+  ((data ?? []) as { clash_key: string }[]).map((row) => row.clash_key)
+);
+}
+
 async function loadBookings() {
   try {
     setLoading(true);
@@ -207,6 +221,7 @@ async function onRefresh() {
   try {
     setRefreshing(true);
     await loadBookings();
+    await loadReviewedClashes();
   } finally {
     setRefreshing(false);
   }
@@ -214,6 +229,7 @@ async function onRefresh() {
 
   useEffect(() => {
     void loadBookings();
+    void loadReviewedClashes();
 
 
     const supabase = getSupabase();
@@ -429,17 +445,17 @@ const detectedClashes = useMemo(() => {
     )
     .sort((a, b) => a.whenMs - b.whenMs);
 
-const clashes: {
-  key: string;
-  type: string;
-  start: number;
-  end: number;
-  bookingIds: string[];
-  count: number;
-  sameDriver: boolean;
-  unassigned: boolean;
-  strong: boolean;
-}[] = [];
+  const clashes: {
+    key: string;
+    type: string;
+    start: number;
+    end: number;
+    bookingIds: string[];
+    count: number;
+    sameDriver: boolean;
+    unassigned: boolean;
+    strong: boolean;
+  }[] = [];
 
   const seen = new Set<string>();
 
@@ -447,53 +463,50 @@ const clashes: {
     const jobs = relevant.filter((row) => row.type === ruleType);
 
     for (let i = 0; i < jobs.length; i++) {
-      const cluster = [jobs[i]];
-
       for (let j = i + 1; j < jobs.length; j++) {
-        const diffMinutes = (jobs[j].whenMs - cluster[0].whenMs) / 60000;
+        const first = jobs[i];
+        const second = jobs[j];
 
-        if (diffMinutes <= rule.windowMinutes) {
-          cluster.push(jobs[j]);
-        } else {
+        const diffMinutes = Math.abs(second.whenMs - first.whenMs) / 60000;
+
+        if (diffMinutes > rule.windowMinutes) {
           break;
         }
-      }
 
-      if (cluster.length >= rule.minJobs) {
-        const bookingIds = cluster.map((c) => c.id);
-        const key = bookingIds.join("|");
+        const bookingIds = [first.id, second.id].sort();
+        const key = bookingIds.join("__");
 
         if (seen.has(key)) continue;
         seen.add(key);
 
-        const assignedDrivers = cluster
-          .map((c) => c.driver.trim())
-          .filter(Boolean);
+        const firstDriver = first.driver.trim();
+        const secondDriver = second.driver.trim();
 
         const sameDriver =
-          assignedDrivers.length > 1 &&
-          new Set(assignedDrivers.map((d) => d.toLowerCase())).size < assignedDrivers.length;
+          !!firstDriver &&
+          !!secondDriver &&
+          firstDriver.toLowerCase() === secondDriver.toLowerCase();
 
-        const unassigned = cluster.some((c) => !c.driver.trim());
+        const unassigned = !firstDriver || !secondDriver;
 
-if (reviewedClashKeys.includes(key)) continue;
+        if (reviewedClashKeys.includes(key)) continue;
 
-clashes.push({
-  key,
-  type: ruleType,
-  start: cluster[0].whenMs,
-  end: cluster[cluster.length - 1].whenMs,
-  bookingIds,
-  count: cluster.length,
-  sameDriver,
-  unassigned,
-  strong: sameDriver || unassigned,
-});
+        clashes.push({
+          key,
+          type: ruleType,
+          start: first.whenMs,
+          end: second.whenMs,
+          bookingIds,
+          count: 2,
+          sameDriver,
+          unassigned,
+          strong: sameDriver || unassigned,
+        });
       }
     }
   }
 
-return clashes;
+  return clashes;
 }, [bookings, reviewedClashKeys]);
 
 const clashSummaryText = useMemo(() => {
@@ -574,6 +587,24 @@ const nextJob = useMemo(() => {
       setBusyId(null);
     }
   }
+
+  async function markClashResolved(clashKey: string, bookingIds: string[]) {
+  const supabase = getSupabase();
+
+  const sortedIds = [...bookingIds].sort();
+
+  const { error } = await supabase.from("clash_reviews").upsert({
+    clash_key: clashKey,
+    booking_a_id: sortedIds[0],
+    booking_b_id: sortedIds[1],
+  });
+
+  if (error) throw error;
+
+  setReviewedClashKeys((current) =>
+    current.includes(clashKey) ? current : [...current, clashKey]
+  );
+}
 
   async function onMarkCompleted(id: string) {
     await updateBooking(id, { status: "Completed" });
@@ -1040,26 +1071,28 @@ id="next-job"
 )}
 
 {filteredOverride && detectedClashes.length > 0 && (
-  <div className="mb-4">
-    <button
-      onClick={() => {
-        const keysToReview = detectedClashes
-          .filter((c) =>
-            c.bookingIds.some((id) => filteredOverride.includes(id))
-          )
-          .map((c) => c.key);
+  <div className="mb-4 space-y-3">
+    {detectedClashes
+      .filter((c) => c.bookingIds.some((id) => filteredOverride.includes(id)))
+      .map((clash) => (
+        <div
+          key={clash.key}
+          className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+        >
+          <div className="mb-2 font-medium">
+{`Potential clash: ${clash.key}`}
+          </div>
 
-        setReviewedClashKeys((current) => [
-          ...current,
-          ...keysToReview.filter((key) => !current.includes(key)),
-        ]);
-
-        setFilteredOverride(null);
-      }}
-      className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white"
-    >
-      ✔ Mark reviewed
-    </button>
+          <div className="flex gap-2">
+            <button
+onClick={() => void markClashResolved(clash.key, clash.bookingIds)}
+              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+            >
+              ✔ Mark resolved
+            </button>
+          </div>
+        </div>
+      ))}
   </div>
 )}
   {unpaidTotal > 0 ? (

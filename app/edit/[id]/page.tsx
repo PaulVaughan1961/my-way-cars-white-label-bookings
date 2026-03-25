@@ -284,7 +284,7 @@ const payload = {
         .from("bookings")
         .update(payload)
         .eq("id", id);
-
+ 
       if (error) throw error;
 
       router.push("/");
