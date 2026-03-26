@@ -131,11 +131,58 @@ function getBookingType(row: BookingRow): string {
   return pickString(row, ["booking_type", "journey_type"]);
 }
 
+function parseLocalDateTimeParts(value: string | null | undefined) {
+  if (!value) return null;
+
+  const text = String(value).trim();
+  const match = text.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/
+  );
+
+  if (!match) return null;
+
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+    second: Number(match[6] ?? "0"),
+  };
+}
+
+function localDateTimeToMs(value: string | null | undefined): number {
+  const parts = parseLocalDateTimeParts(value);
+  if (!parts) return Number.NaN;
+
+  return new Date(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  ).getTime();
+}
+
+function getWhenMs(row: BookingRow): number {
+  return localDateTimeToMs(getWhen(row));
+}
+
 function fmtDateTime(value: string): string {
   if (!value) return "No date set";
 
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
+  const parts = parseLocalDateTimeParts(value);
+  if (!parts) return value;
+
+  const d = new Date(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
 
   return d.toLocaleString(undefined, {
     weekday: "short",
@@ -146,7 +193,6 @@ function fmtDateTime(value: string): string {
     minute: "2-digit",
   });
 }
-
 function telHref(phone: string): string {
   return `tel:${phone.replace(/\s+/g, "")}`;
 }
@@ -160,11 +206,12 @@ function mapHref(address: string): string {
     address
   )}`;
 }
-
 function getCountdownLabel(value: string, nowMs: number): string {
+  
   if (!value) return "No date set";
+  
 
-  const targetMs = new Date(value).getTime();
+  const targetMs = localDateTimeToMs(value);
   if (Number.isNaN(targetMs)) return "Invalid date";
 
   const diff = targetMs - nowMs;
