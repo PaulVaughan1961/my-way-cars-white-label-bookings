@@ -218,7 +218,7 @@ export default function AddBookingPage() {
             dropoff_address: retDrop,
             pickup_datetime: isoFromDateTime(returnDate, returnTime),
             distance_miles: distanceMilesNumber,
-            fare: null,
+            fare: estFareGBP,
             notes: notes.trim() || null,
             status: "Scheduled",
             payment_status: "Unpaid",
