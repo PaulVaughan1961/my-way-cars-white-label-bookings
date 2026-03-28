@@ -236,6 +236,7 @@ try {
             driver_name: driverName.trim() || null,
             vehicle: vehicle.trim() || null,
             booking_type: bookingType.trim() || null,
+            return_group_id: returnGroupId,
           },
         ]);
 
