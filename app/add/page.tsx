@@ -160,39 +160,44 @@ export default function AddBookingPage() {
 
     setSaving(true);
 
-    try {
-      const estFareGBP =
-        estFare.trim().length > 0
-          ? Number(estFare.replace(/[^\d.]/g, ""))
-          : null;
+try {
+  const returnGroupId = isReturn
+    ? `RET-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    : null;
 
-      const distanceMilesNumber =
-        distanceMiles.trim().length > 0
-          ? Number(distanceMiles.replace(/[^\d.]/g, ""))
-          : null;
+  const estFareGBP =
+    estFare.trim().length > 0
+      ? Number(estFare.replace(/[^\d.]/g, ""))
+      : null;
+
+  const distanceMilesNumber =
+    distanceMiles.trim().length > 0
+      ? Number(distanceMiles.replace(/[^\d.]/g, ""))
+      : null;
 
       const outboundInsert = await supabase.from("bookings").insert([
-        {
-          passenger_name: passengerName.trim(),
-          passenger_phone: passengerPhone.trim(),
-          pickup_address: pickupAddress.trim(),
-          dropoff_address: dropoffAddress.trim(),
-          pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
-          distance_miles: distanceMilesNumber,
-          fare: estFareGBP,
-          notes: notes.trim() || null,
-          status: "Scheduled",
-          payment_status: "Unpaid",
-          created_at: new Date().toISOString(),
-          passengers: pax === "" ? 1 : Number(pax),
-          via: via.trim() || null,
-          bags_large: bagsLarge,
-          bags_small: bagsSmall,
-          local_authority: localAuthority.trim() || null,
-          driver_name: driverName.trim() || null,
-          vehicle: vehicle.trim() || null,
-          booking_type: bookingType.trim() || null,
-        },
+     {
+  passenger_name: passengerName.trim(),
+  passenger_phone: passengerPhone.trim(),
+  pickup_address: pickupAddress.trim(),
+  dropoff_address: dropoffAddress.trim(),
+  pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
+  distance_miles: distanceMilesNumber,
+  fare: estFareGBP,
+  notes: notes.trim() || null,
+  status: "Scheduled",
+  payment_status: "Unpaid",
+  created_at: new Date().toISOString(),
+  passengers: pax === "" ? 1 : Number(pax),
+  via: via.trim() || null,
+  bags_large: bagsLarge,
+  bags_small: bagsSmall,
+  local_authority: localAuthority.trim() || null,
+  driver_name: driverName.trim() || null,
+  vehicle: vehicle.trim() || null,
+  booking_type: bookingType.trim() || null,
+  return_group_id: returnGroupId,
+}
       ]);
 
       if (outboundInsert.error) {
