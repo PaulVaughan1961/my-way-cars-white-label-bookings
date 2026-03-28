@@ -779,6 +779,11 @@ export default function HomePage() {
             ) : null}
 
             <div className="text-lg font-semibold">{name}</div>
+            {(booking as any).return_group_id ? (
+  <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
+    Linked return booking
+  </div>
+) : null}
             <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
 
             <div
