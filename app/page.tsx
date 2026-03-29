@@ -25,6 +25,7 @@ type BookingRow = {
   driver_name?: string | null;
   vehicle?: string | null;
   booking_type?: string | null;
+  return_group_id?: string | null;
 
   lead_passenger?: string | null;
   customer_name?: string | null;
@@ -193,6 +194,7 @@ function fmtDateTime(value: string): string {
     minute: "2-digit",
   });
 }
+
 function telHref(phone: string): string {
   return `tel:${phone.replace(/\s+/g, "")}`;
 }
@@ -206,10 +208,9 @@ function mapHref(address: string): string {
     address
   )}`;
 }
+
 function getCountdownLabel(value: string, nowMs: number): string {
-  
   if (!value) return "No date set";
-  
 
   const targetMs = localDateTimeToMs(value);
   if (Number.isNaN(targetMs)) return "Invalid date";
@@ -262,6 +263,7 @@ export default function HomePage() {
   const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<
     string[]
   >([]);
+  const [selectedReturnGroupId, setSelectedReturnGroupId] = useState<string | null>(null);
 
   async function loadReviewedClashes() {
     try {
@@ -357,8 +359,8 @@ export default function HomePage() {
     const needle = searchTerm.trim().toLowerCase();
 
     const sorted = [...bookings].sort((a, b) => {
-      const aTime = new Date(getWhen(a)).getTime();
-      const bTime = new Date(getWhen(b)).getTime();
+      const aTime = getWhenMs(a);
+      const bTime = getWhenMs(b);
 
       const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
       const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
@@ -376,7 +378,7 @@ export default function HomePage() {
 
     if (statusFilter === "Upcoming") {
       result = result.filter((row) => {
-        const when = new Date(getWhen(row)).getTime();
+        const when = getWhenMs(row);
         const status = (row.status ?? "Scheduled").toString();
         return (
           !Number.isNaN(when) &&
@@ -443,14 +445,14 @@ export default function HomePage() {
     let unpaid = 0;
 
     bookings.forEach((row) => {
-      const when = new Date(getWhen(row));
+      const whenMs = getWhenMs(row);
       const status = (row.status ?? "Scheduled").toString();
       const payment = (row.payment_status ?? "Unpaid").toString();
       const fare = getFare(row) ?? 0;
 
       if (
-        !Number.isNaN(when.getTime()) &&
-        when >= today &&
+        !Number.isNaN(whenMs) &&
+        whenMs >= today.getTime() &&
         status === "Completed"
       ) {
         jobs += 1;
@@ -474,8 +476,8 @@ export default function HomePage() {
     let unpaid = 0;
 
     bookings.forEach((row) => {
-      const when = new Date(getWhen(row));
-      if (Number.isNaN(when.getTime()) || when < today) return;
+      const whenMs = getWhenMs(row);
+      if (Number.isNaN(whenMs) || whenMs < today.getTime()) return;
 
       const status = (row.status ?? "Scheduled").toString();
       const payment = (row.payment_status ?? "Unpaid").toString();
@@ -497,7 +499,7 @@ export default function HomePage() {
   const detectedClashes = useMemo(() => {
     const relevant = bookings
       .map((row) => {
-        const whenMs = new Date(getWhen(row)).getTime();
+        const whenMs = getWhenMs(row);
         const type = normalizeBookingType(getBookingType(row));
         const driver = getDriver(row);
         const status = (row.status ?? "Scheduled").toString();
@@ -584,6 +586,14 @@ export default function HomePage() {
     return clashes;
   }, [bookings, reviewedClashKeys]);
 
+  const linkedBookings = useMemo(() => {
+    if (!selectedReturnGroupId) return [];
+
+    return bookings.filter(
+      (b) => b.return_group_id === selectedReturnGroupId
+    );
+  }, [bookings, selectedReturnGroupId]);
+
   const clashSummaryText = useMemo(() => {
     if (detectedClashes.length === 0) return "";
 
@@ -615,17 +625,14 @@ export default function HomePage() {
     const pobJob =
       [...bookings]
         .filter((row) => (row.status ?? "Scheduled").toString() === "POB")
-        .sort(
-          (a, b) =>
-            new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
-        )[0] ?? null;
+        .sort((a, b) => getWhenMs(a) - getWhenMs(b))[0] ?? null;
 
     if (pobJob) return pobJob;
 
     return (
       [...bookings]
         .filter((row) => {
-          const when = new Date(getWhen(row)).getTime();
+          const when = getWhenMs(row);
           const status = (row.status ?? "Scheduled").toString();
 
           return (
@@ -636,10 +643,7 @@ export default function HomePage() {
             status !== "POB"
           );
         })
-        .sort(
-          (a, b) =>
-            new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
-        )[0] ?? null
+        .sort((a, b) => getWhenMs(a) - getWhenMs(b))[0] ?? null
     );
   }, [bookings]);
 
@@ -746,14 +750,21 @@ export default function HomePage() {
 
     return (
       <div
-        onClick={() => toggleExpanded(booking.id)}
+        onClick={() => {
+          toggleExpanded(booking.id);
+
+          const groupId = booking.return_group_id;
+          if (groupId) {
+            setSelectedReturnGroupId(groupId);
+          }
+        }}
         className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
             : status === "POB"
             ? "border-amber-300 bg-amber-50 shadow-md"
             : (() => {
-                const whenMs = new Date(when).getTime();
+                const whenMs = getWhenMs(booking);
                 const diff = whenMs - nowMs;
 
                 if (diff <= 15 * 60 * 1000) {
@@ -779,11 +790,11 @@ export default function HomePage() {
             ) : null}
 
             <div className="text-lg font-semibold">{name}</div>
-            {(booking as any).return_group_id ? (
-  <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
-    Linked return booking
-  </div>
-) : null}
+            {booking.return_group_id ? (
+              <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
+                Linked return booking
+              </div>
+            ) : null}
             <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
 
             <div
@@ -842,7 +853,7 @@ export default function HomePage() {
 
               {(() => {
                 const hasDriver = !!driver;
-                const whenMs = new Date(when).getTime();
+                const whenMs = getWhenMs(booking);
                 const diff = whenMs - nowMs;
 
                 if (hasDriver) {
@@ -1097,10 +1108,10 @@ export default function HomePage() {
           </div>
         </div>
 
-<section className="rounded-3xl bg-white p-5 shadow-sm">
-  <div className="mb-2 text-lg font-semibold text-slate-900">
-    Dashboard
-  </div>
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-2 text-lg font-semibold text-slate-900">
+            Dashboard
+          </div>
           <div className="flex flex-wrap gap-3 text-sm">
             <div className="rounded-xl bg-slate-100 px-4 py-3">
               <div className="text-slate-500">Jobs today</div>
@@ -1124,6 +1135,33 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {linkedBookings.length > 0 && (
+          <section className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-lg font-semibold text-indigo-900">
+                Linked return journey
+              </div>
+
+              <button
+                onClick={() => setSelectedReturnGroupId(null)}
+                className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {linkedBookings.map((booking) => (
+                <BookingCard
+                  key={`linked-${booking.id}`}
+                  booking={booking}
+                  forceExpanded
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {nextJob ? (
           <section id="next-job">
@@ -1149,7 +1187,7 @@ export default function HomePage() {
           </section>
         )}
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
+        <section ref={clashSectionRef} className="rounded-3xl bg-white p-5 shadow-sm">
           {detectedClashes.length > 0 && (
             <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
               <div>
@@ -1157,24 +1195,24 @@ export default function HomePage() {
                 {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
               </div>
 
-<button
-  onClick={() => {
-    const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
-    setSearchTerm("");
-    setStatusFilter("All");
-    setSelectedClashBookingIds([...new Set(clashIds)]);
+              <button
+                onClick={() => {
+                  const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
+                  setSearchTerm("");
+                  setStatusFilter("All");
+                  setSelectedClashBookingIds([...new Set(clashIds)]);
 
-    requestAnimationFrame(() => {
-      clashSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  }}
-  className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
->
-  View
-</button>
+                  requestAnimationFrame(() => {
+                    clashSectionRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  });
+                }}
+                className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+              >
+                View
+              </button>
             </div>
           )}
 
@@ -1232,29 +1270,37 @@ export default function HomePage() {
             </div>
           )}
 
-         {selectedClashBookingIds.length > 0 && (
-  <div className="mb-6">
-    <div className="mb-3 text-base font-semibold text-slate-900">
-      Offending bookings
-    </div>
+          {selectedClashBookingIds.length > 0 &&
+            bookings.some(
+              (booking) =>
+                selectedClashBookingIds.includes(booking.id) &&
+                (booking.status ?? "Scheduled").toString() !== "Cancelled" &&
+                (booking.status ?? "Scheduled").toString() !== "Completed"
+            ) && (
+              <div className="mb-6">
+                <div className="mb-3 text-base font-semibold text-slate-900">
+                  Offending bookings
+                </div>
 
-    <div className="space-y-4">
-      {bookings
-        .filter((booking) => selectedClashBookingIds.includes(booking.id))
-        .sort(
-          (a, b) =>
-            new Date(getWhen(a)).getTime() - new Date(getWhen(b)).getTime()
-        )
-        .map((booking) => (
-          <BookingCard
-            key={`clash-top-${booking.id}`}
-            booking={booking}
-            highlightClash
-          />
-        ))}
-    </div>
-  </div>
-)} 
+                <div className="space-y-4">
+                  {bookings
+                    .filter(
+                      (booking) =>
+                        selectedClashBookingIds.includes(booking.id) &&
+                        (booking.status ?? "Scheduled").toString() !== "Cancelled" &&
+                        (booking.status ?? "Scheduled").toString() !== "Completed"
+                    )
+                    .sort((a, b) => getWhenMs(a) - getWhenMs(b))
+                    .map((booking) => (
+                      <BookingCard
+                        key={`clash-top-${booking.id}`}
+                        booking={booking}
+                        highlightClash
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
 
           {unpaidTotal > 0 ? (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
