@@ -1137,7 +1137,7 @@ const returnNote = isOutboundLeg
 Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
   : "";
 
-    const customerMessage = `MY WAY CARS
+const customerMessage = `MY WAY CARS
 
 Your booking is confirmed.
 
@@ -1152,6 +1152,9 @@ ${dropoff || "—"}
 
 Driver:
 ${driver || "To be confirmed"}
+
+Driver Contact:
+${driverPhone || "Will be provided prior to pickup"}
 
 Vehicle:
 ${vehicle || "To be confirmed"}${returnNote}`;
