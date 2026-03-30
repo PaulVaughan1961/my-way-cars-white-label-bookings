@@ -814,6 +814,9 @@ export default function HomePage() {
     const isBusy = busyId === booking.id;
     const expanded = forceExpanded || !!expandedIds[booking.id];
     const countdown = getCountdownLabel(when, nowMs);
+    const driverPhone = pickString(booking, ["driver_phone"]);
+
+  
 
     return (
       <div
@@ -1071,176 +1074,195 @@ export default function HomePage() {
           ) : null}
 
           
-{booking.driver_phone ? (
-  <a
-    href={getSmsLink(booking)}
-    onClick={(e) => e.stopPropagation()}
-    className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+
+    if (!driverPhone) return;
+
+    const message = `My Way Cars
+
+Passenger: ${name}
+When: ${fmtDateTime(when)}
+
+Pickup:
+${pickup || "—"}
+
+Dropoff:
+${dropoff || "—"}
+
+Customer Phone:
+${phone || "—"}
+
+Notes:
+${notes || "None"}`;
+
+    window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
+  }}
+  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+>
+  Text details to driver
+</button>
+
+{status === "Scheduled" ? (
+  <button
+    onClick={() => void updateBooking(booking.id, { status: "POB" })}
+    disabled={isBusy}
+    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
   >
-    Text details to driver
-  </a>
+    Mark POB
+  </button>
 ) : null}
 
-          {status === "Scheduled" ? (
-            <button
-              onClick={() => void updateBooking(booking.id, { status: "POB" })}
-              disabled={isBusy}
-              className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Mark POB
-            </button>
-          ) : null}
+{status !== "Completed" ? (
+  <button
+    onClick={() =>
+      void updateBooking(booking.id, {
+        status: "Completed",
+        payment_status: "Unpaid",
+      })
+    }
+    disabled={isBusy}
+    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Complete (Unpaid)
+  </button>
+) : null}
 
-          {status !== "Completed" ? (
-            <button
-              onClick={() =>
-                void updateBooking(booking.id, {
-                  status: "Completed",
-                  payment_status: "Unpaid",
-                })
-              }
-              disabled={isBusy}
-              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Complete (Unpaid)
-            </button>
-          ) : null}
+{status !== "Completed" ? (
+  <button
+    onClick={() =>
+      void updateBooking(booking.id, {
+        status: "Completed",
+        payment_status: "Paid",
+      })
+    }
+    disabled={isBusy}
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Complete & Paid
+  </button>
+) : null}
 
-          {status !== "Completed" ? (
-            <button
-              onClick={() =>
-                void updateBooking(booking.id, {
-                  status: "Completed",
-                  payment_status: "Paid",
-                })
-              }
-              disabled={isBusy}
-              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Complete & Paid
-            </button>
-          ) : null}
+{status === "Completed" && paymentStatus !== "Paid" ? (
+  <button
+    onClick={() => void onMarkPaid(booking.id)}
+    disabled={isBusy}
+    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Mark paid
+  </button>
+) : null}
 
-          {status === "Completed" && paymentStatus !== "Paid" ? (
-            <button
-              onClick={() => void onMarkPaid(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Mark paid
-            </button>
-          ) : null}
+{status !== "Cancelled" ? (
+  <button
+    onClick={() => void onCancel(booking.id)}
+    disabled={isBusy}
+    className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Cancel
+  </button>
+) : (
+  <button
+    onClick={() =>
+      void updateBooking(booking.id, { status: "Scheduled" })
+    }
+    disabled={isBusy}
+    className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+  >
+    Restore booking
+  </button>
+)}
+      </div>
+    </div>
+  );
+}
 
-          {status !== "Cancelled" ? (
-            <button
-              onClick={() => void onCancel(booking.id)}
-              disabled={isBusy}
-              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+return (
+  <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className="rounded-3xl bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              My Way Cars
+            </h1>
+            <p className="text-sm text-slate-600">Booking dashboard</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/add"
+              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
             >
-              Cancel
-            </button>
-          ) : (
+              Add booking
+            </Link>
+
             <button
-              onClick={() =>
-                void updateBooking(booking.id, { status: "Scheduled" })
-              }
-              disabled={isBusy}
-              className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              onClick={() => void onRefresh()}
+              disabled={refreshing}
+              className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-60 active:scale-95 active:shadow-inner transition"
             >
-              Restore booking
+              {refreshing ? "Refreshing..." : "Refresh"}
             </button>
-          )}
+          </div>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">
-                My Way Cars
-              </h1>
-              <p className="text-sm text-slate-600">Booking dashboard</p>
+      <section className="rounded-3xl bg-white p-5 shadow-sm">
+        <div className="mb-2 text-lg font-semibold text-slate-900">
+          Dashboard
+        </div>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <div className="rounded-xl bg-slate-100 px-4 py-3">
+            <div className="text-slate-500">Jobs today</div>
+            <div className="text-lg font-bold text-slate-900">
+              {dashboardStats.jobs}
             </div>
+          </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/add"
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-              >
-                Add booking
-              </Link>
+          <div className="rounded-xl bg-slate-100 px-4 py-3">
+            <div className="text-slate-500">Revenue</div>
+            <div className="text-lg font-bold text-slate-900">
+              £{dashboardStats.revenue.toFixed(2)}
+            </div>
+          </div>
 
-              <button
-                onClick={() => void onRefresh()}
-                disabled={refreshing}
-                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-60 active:scale-95 active:shadow-inner transition"
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </button>
+          <div className="rounded-xl bg-amber-50 px-4 py-3">
+            <div className="text-amber-700">Unpaid</div>
+            <div className="text-lg font-bold text-amber-800">
+              £{dashboardStats.unpaid.toFixed(2)}
             </div>
           </div>
         </div>
+      </section>
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="mb-2 text-lg font-semibold text-slate-900">
-            Dashboard
+      {linkedBookings.length > 0 && (
+        <section className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-lg font-semibold text-indigo-900">
+              Linked return journey
+            </div>
+
+            <button
+              onClick={() => setSelectedReturnGroupId(null)}
+              className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
+            >
+              Clear
+            </button>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <div className="rounded-xl bg-slate-100 px-4 py-3">
-              <div className="text-slate-500">Jobs today</div>
-              <div className="text-lg font-bold text-slate-900">
-                {dashboardStats.jobs}
-              </div>
-            </div>
 
-            <div className="rounded-xl bg-slate-100 px-4 py-3">
-              <div className="text-slate-500">Revenue</div>
-              <div className="text-lg font-bold text-slate-900">
-                £{dashboardStats.revenue.toFixed(2)}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-amber-50 px-4 py-3">
-              <div className="text-amber-700">Unpaid</div>
-              <div className="text-lg font-bold text-amber-800">
-                £{dashboardStats.unpaid.toFixed(2)}
-              </div>
-            </div>
+          <div className="space-y-4">
+            {linkedBookings.map((booking) => (
+              <BookingCard
+                key={`linked-${booking.id}`}
+                booking={booking}
+                forceExpanded
+              />
+            ))}
           </div>
         </section>
-
-        {linkedBookings.length > 0 && (
-          <section className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-lg font-semibold text-indigo-900">
-                Linked return journey
-              </div>
-
-              <button
-                onClick={() => setSelectedReturnGroupId(null)}
-                className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
-              >
-                Clear
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {linkedBookings.map((booking) => (
-                <BookingCard
-                  key={`linked-${booking.id}`}
-                  booking={booking}
-                  forceExpanded
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
+      )}
         {nextJob ? (
           <section id="next-job">
             <div className="mb-3 text-xl font-bold text-slate-900">
