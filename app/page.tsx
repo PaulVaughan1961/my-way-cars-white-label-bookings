@@ -977,6 +977,10 @@ const driverPhone = getDriverPhone(booking);
                   </span>
                 </div>
                 <div>
+  <span className="font-medium">Driver phone test:</span>{" "}
+  {String(booking.driver_phone || "NONE")}
+</div>
+                <div>
                   <span className="font-medium">Vehicle:</span>{" "}
                   <span className="font-semibold text-purple-700">
                     {vehicle || "—"}
