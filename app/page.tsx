@@ -820,6 +820,20 @@ const expanded = forceExpanded || !!expandedIds[booking.id];
 const countdown = getCountdownLabel(when, nowMs);
 const driverPhone = getDriverPhone(booking);
 
+const linkedPair = booking.return_group_id
+  ? bookings
+      .filter((b) => b.return_group_id === booking.return_group_id)
+      .sort((a, b) => getWhenMs(a) - getWhenMs(b))
+  : [];
+
+const isOutboundLeg =
+  linkedPair.length > 1 ? linkedPair[0]?.id === booking.id : false;
+
+
+  
+
+
+
 
   
 
@@ -1117,11 +1131,11 @@ ${notes || "None"}`;
 
     if (!phone) return;
 
-    const returnNote = booking.return_group_id
-      ? `
+const returnNote = isOutboundLeg
+  ? `
 
 Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
-      : "";
+  : "";
 
     const customerMessage = `MY WAY CARS
 
