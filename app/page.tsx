@@ -58,27 +58,71 @@ type ClashRow = {
 };
 
 function buildDriverMessage(booking: any) {
+  const passenger =
+    booking.leadPassenger ??
+    booking.lead_passenger ??
+    booking.passenger_name ??
+    "—";
+
+  const date =
+    booking.when ??
+    booking.outbound_date ??
+    booking.date ??
+    "—";
+
+  const time =
+    booking.time ??
+    booking.outbound_time ??
+    "—";
+
+  const pickup =
+    booking.pickup ??
+    booking.outbound_pickup ??
+    "—";
+
+  const dropoff =
+    booking.dropoff ??
+    booking.outbound_dropoff ??
+    "—";
+
+  const customerPhone =
+    booking.booker_phone ??
+    booking.customer_phone ??
+    booking.passenger_phone ??
+    "—";
+
+  const notes =
+    booking.notes ??
+    booking.outbound_notes ??
+    "None";
+
   return `My Way Cars
 
-Passenger: ${booking.lead_passenger || "—"}
-Date: ${booking.outbound_date || "—"}
-Time: ${booking.outbound_time || "—"}
+Passenger: ${passenger}
+Date: ${date}
+Time: ${time}
 
 Pickup:
-${booking.outbound_pickup || "—"}
+${pickup}
 
 Dropoff:
-${booking.outbound_dropoff || "—"}
+${dropoff}
 
 Customer Phone:
-${booking.booker_phone || "—"}
+${customerPhone}
 
 Notes:
-${booking.outbound_notes || "None"}`;
+${notes}`;
 }
 
 function getSmsLink(booking: any) {
   const phone = booking.driver_phone || "";
+
+  if (!phone) {
+    alert("No driver phone number saved for this booking");
+    return "#";
+  }
+
   const message = encodeURIComponent(buildDriverMessage(booking));
   return `sms:${phone}?body=${message}`;
 }
