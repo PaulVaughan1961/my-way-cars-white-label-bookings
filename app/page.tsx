@@ -57,6 +57,32 @@ type ClashRow = {
   strong: boolean;
 };
 
+function buildDriverMessage(booking: any) {
+  return `My Way Cars
+
+Passenger: ${booking.lead_passenger || "—"}
+Date: ${booking.outbound_date || "—"}
+Time: ${booking.outbound_time || "—"}
+
+Pickup:
+${booking.outbound_pickup || "—"}
+
+Dropoff:
+${booking.outbound_dropoff || "—"}
+
+Customer Phone:
+${booking.booker_phone || "—"}
+
+Notes:
+${booking.outbound_notes || "None"}`;
+}
+
+function getSmsLink(booking: any) {
+  const phone = booking.driver_phone || "";
+  const message = encodeURIComponent(buildDriverMessage(booking));
+  return `sms:${phone}?body=${message}`;
+}
+
 function pickString(row: BookingRow, keys: string[]): string {
   for (const key of keys) {
     const value = row[key];
@@ -1002,6 +1028,14 @@ export default function HomePage() {
               Dropoff map
             </a>
           ) : null}
+
+          <a
+  href={getSmsLink(booking)}
+  onClick={(e) => e.stopPropagation()}
+  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+>
+  Text details to driver
+</a>
 
           {status === "Scheduled" ? (
             <button
