@@ -9,6 +9,7 @@ const supabase = getSupabase();
 type DriverRow = {
   id: string;
   name: string;
+  driver_phone?: string | null;
   default_vehicle?: string | null;
   default_authority?: string | null;
   current_vehicle?: string | null;
@@ -103,13 +104,13 @@ export default function AddBookingPage() {
 
   useEffect(() => {
     async function loadData() {
-      const { data: driverData, error: driverError } = await supabase
-        .from("drivers")
-        .select(
-          "id, name, default_vehicle, default_authority, current_vehicle, current_authority, active"
-        )
-        .eq("active", true)
-        .order("name", { ascending: true });
+const { data: driverData, error: driverError } = await supabase
+  .from("drivers")
+  .select(
+    "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
+  )
+  .eq("active", true)
+  .order("name", { ascending: true });
 
       if (!driverError) {
         setDrivers((driverData as DriverRow[]) ?? []);
@@ -174,6 +175,11 @@ try {
     distanceMiles.trim().length > 0
       ? Number(distanceMiles.replace(/[^\d.]/g, ""))
       : null;
+        const selectedDriver = drivers.find(
+    (d) => d.name?.trim().toLowerCase() === driverName.trim().toLowerCase()
+  );
+
+  const driverPhone = selectedDriver?.driver_phone?.trim() || null;
 
       const outboundInsert = await supabase.from("bookings").insert([
      {
@@ -194,6 +200,7 @@ try {
   bags_small: bagsSmall,
   local_authority: localAuthority.trim() || null,
   driver_name: driverName.trim() || null,
+  driver_phone: driverPhone,
   vehicle: vehicle.trim() || null,
   booking_type: bookingType.trim() || null,
   return_group_id: returnGroupId,
@@ -234,6 +241,7 @@ try {
             bags_small: bagsSmall,
             local_authority: localAuthority.trim() || null,
             driver_name: driverName.trim() || null,
+            driver_phone: driverPhone,
             vehicle: vehicle.trim() || null,
             booking_type: bookingType.trim() || null,
             return_group_id: returnGroupId,
