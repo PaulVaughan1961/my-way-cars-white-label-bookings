@@ -96,6 +96,12 @@ function buildDriverMessage(booking: any) {
     booking.outbound_notes ??
     "None";
 
+  const returnNote = booking.return_group_id
+    ? `
+
+Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
+    : "";
+
   return `My Way Cars
 
 Passenger: ${passenger}
@@ -112,7 +118,7 @@ Customer Phone:
 ${customerPhone}
 
 Notes:
-${notes}`;
+${notes}${returnNote}`;
 }
 
 function getDriverPhone(row: BookingRow): string {
@@ -1089,6 +1095,12 @@ const driverPhone = getDriverPhone(booking);
 
     if (!driverPhone) return;
 
+const returnNote = booking.return_group_id
+  ? `
+
+Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
+  : "";
+
 const message = `MY WAY CARS
 
 Passenger: ${name}
@@ -1104,7 +1116,7 @@ ${dropoff || "—"}
 Estimated Price: ${fare === null ? "—" : `£${fare.toFixed(2)}`}
 
 Notes:
-${notes || "None"}`;
+${notes || "None"}${returnNote}`;
 
     window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
   }}
