@@ -96,12 +96,6 @@ function buildDriverMessage(booking: any) {
     booking.outbound_notes ??
     "None";
 
-  const returnNote = booking.return_group_id
-    ? `
-
-Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
-    : "";
-
   return `My Way Cars
 
 Passenger: ${passenger}
@@ -118,7 +112,7 @@ Customer Phone:
 ${customerPhone}
 
 Notes:
-${notes}${returnNote}`;
+${notes}`;
 }
 
 function getDriverPhone(row: BookingRow): string {
@@ -982,10 +976,7 @@ const driverPhone = getDriverPhone(booking);
                     {driver || "—"}
                   </span>
                 </div>
-                <div>
-  <span className="font-medium">Driver phone test:</span>{" "}
-  {String(booking.driver_phone || "NONE")}
-</div>
+
                 <div>
                   <span className="font-medium">Vehicle:</span>{" "}
                   <span className="font-semibold text-purple-700">
@@ -1095,13 +1086,7 @@ const driverPhone = getDriverPhone(booking);
 
     if (!driverPhone) return;
 
-const returnNote = booking.return_group_id
-  ? `
-
-Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
-  : "";
-
-const message = `MY WAY CARS
+    const message = `MY WAY CARS
 
 Passenger: ${name}
 Passenger Phone: ${phone || "—"}
@@ -1116,7 +1101,7 @@ ${dropoff || "—"}
 Estimated Price: ${fare === null ? "—" : `£${fare.toFixed(2)}`}
 
 Notes:
-${notes || "None"}${returnNote}`;
+${notes || "None"}`;
 
     window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
   }}
@@ -1124,6 +1109,45 @@ ${notes || "None"}${returnNote}`;
   className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
 >
   Text details to driver
+</button>
+
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+
+    if (!phone) return;
+
+    const returnNote = booking.return_group_id
+      ? `
+
+Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
+      : "";
+
+    const customerMessage = `MY WAY CARS
+
+Your booking is confirmed.
+
+When:
+${fmtDateTime(when)}
+
+From:
+${pickup || "—"}
+
+To:
+${dropoff || "—"}
+
+Driver:
+${driver || "To be confirmed"}
+
+Vehicle:
+${vehicle || "To be confirmed"}${returnNote}`;
+
+    window.location.href = `sms:${phone.replace(/\s+/g, "")}?body=${encodeURIComponent(customerMessage)}`;
+  }}
+  disabled={!phone}
+  className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Text customer
 </button>
 
 {status === "Scheduled" ? (
