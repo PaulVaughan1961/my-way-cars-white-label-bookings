@@ -118,10 +118,7 @@ ${notes}`;
 function getSmsLink(booking: any) {
   const phone = booking.driver_phone || "";
 
-  if (!phone) {
-    alert("No driver phone number saved for this booking");
-    return "#";
-  }
+
 
   const message = encodeURIComponent(buildDriverMessage(booking));
   return `sms:${phone}?body=${message}`;
@@ -1073,13 +1070,16 @@ export default function HomePage() {
             </a>
           ) : null}
 
-          <a
-  href={getSmsLink(booking)}
-  onClick={(e) => e.stopPropagation()}
-  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
->
-  Text details to driver
-</a>
+          
+{booking.driver_phone ? (
+  <a
+    href={getSmsLink(booking)}
+    onClick={(e) => e.stopPropagation()}
+    className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+  >
+    Text details to driver
+  </a>
+) : null}
 
           {status === "Scheduled" ? (
             <button
