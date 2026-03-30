@@ -34,6 +34,7 @@ return_notes?: string | null;
 type DriverRow = {
   id: string;
   name: string;
+  driver_phone?: string | null;
   default_vehicle?: string | null;
   default_authority?: string | null;
   current_vehicle?: string | null;
@@ -147,13 +148,13 @@ const [returnNotes, setReturnNotes] = useState("");
 
         if (error) throw error;
 
-        const { data: driverData, error: driverError } = await supabase
-          .from("drivers")
-          .select(
-            "id, name, default_vehicle, default_authority, current_vehicle, current_authority, active"
-          )
-          .eq("active", true)
-          .order("name", { ascending: true });
+const { data: driverData, error: driverError } = await supabase
+  .from("drivers")
+  .select(
+    "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
+  )
+  .eq("active", true)
+  .order("name", { ascending: true });
 
         if (driverError) throw driverError;
 
@@ -245,15 +246,22 @@ setReturnNotes(row.return_notes ?? "");
     setErrorMessage("");
 
     try {
-      const fareValue =
-        estFare.trim().length > 0
-          ? Number(estFare.replace(/[^\d.]/g, ""))
-          : null;
+const fareValue =
+  estFare.trim().length > 0
+    ? Number(estFare.replace(/[^\d.]/g, ""))
+    : null;
 
-      const distanceValue =
-        distanceMiles.trim().length > 0
-          ? Number(distanceMiles.replace(/[^\d.]/g, ""))
-          : null;
+const distanceValue =
+  distanceMiles.trim().length > 0
+    ? Number(distanceMiles.replace(/[^\d.]/g, ""))
+    : null;
+
+const selectedDriver = drivers.find(
+  (d) =>
+    d.name?.trim().toLowerCase() === driverName.trim().toLowerCase()
+);
+
+const driverPhone = selectedDriver?.driver_phone?.trim() || null;
 
 const payload = {
   passenger_name: passengerName.trim(),
@@ -263,8 +271,9 @@ const payload = {
   pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
   distance_miles: distanceValue,
   fare: fareValue,
-  driver_name: driverName.trim() || null,
-  notes: notes.trim() || null,
+driver_name: driverName.trim() || null,
+driver_phone: driverPhone,
+notes: notes.trim() || null,
   status,
   payment_status: paymentStatus,
   passengers: pax === "" ? 1 : Number(pax),
