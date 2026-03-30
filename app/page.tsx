@@ -115,6 +115,10 @@ Notes:
 ${notes}`;
 }
 
+function getDriverPhone(row: BookingRow): string {
+  return pickString(row, ["driver_phone"]);
+}
+
 function getSmsLink(booking: any) {
   const phone = booking.driver_phone || "";
 
@@ -793,28 +797,29 @@ export default function HomePage() {
     forceExpanded?: boolean;
     highlightClash?: boolean;
   }) {
-    const driver = getDriver(booking);
-    const vehicle = getVehicle(booking);
-    const bookingType = getBookingType(booking);
-    const when = getWhen(booking);
-    const name = getName(booking);
-    const phone = getPhone(booking);
-    const pickup = getPickup(booking);
-    const dropoff = getDropoff(booking);
-    const fare = getFare(booking);
-    const status = (booking.status ?? "Scheduled").toString();
-    const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
-    const notes = pickString(booking, ["notes"]);
-    const via = pickString(booking, ["via"]);
-    const localAuthority = pickString(booking, ["local_authority"]);
-    const passengers = pickNumber(booking, ["passengers"]);
-    const bagsLarge = pickNumber(booking, ["bags_large"]);
-    const bagsSmall = pickNumber(booking, ["bags_small"]);
-    const distanceMiles = pickNumber(booking, ["distance_miles"]);
-    const isBusy = busyId === booking.id;
-    const expanded = forceExpanded || !!expandedIds[booking.id];
-    const countdown = getCountdownLabel(when, nowMs);
-    const driverPhone = pickString(booking, ["driver_phone"]);
+const driver = getDriver(booking);
+const vehicle = getVehicle(booking);
+const bookingType = getBookingType(booking);
+const when = getWhen(booking);
+const name = getName(booking);
+const phone = getPhone(booking);
+const pickup = getPickup(booking);
+const dropoff = getDropoff(booking);
+const fare = getFare(booking);
+const status = (booking.status ?? "Scheduled").toString();
+const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
+const notes = pickString(booking, ["notes"]);
+const via = pickString(booking, ["via"]);
+const localAuthority = pickString(booking, ["local_authority"]);
+const passengers = pickNumber(booking, ["passengers"]);
+const bagsLarge = pickNumber(booking, ["bags_large"]);
+const bagsSmall = pickNumber(booking, ["bags_small"]);
+const distanceMiles = pickNumber(booking, ["distance_miles"]);
+const isBusy = busyId === booking.id;
+const expanded = forceExpanded || !!expandedIds[booking.id];
+const countdown = getCountdownLabel(when, nowMs);
+const driverPhone = getDriverPhone(booking);
+
 
   
 
@@ -1085,10 +1090,10 @@ export default function HomePage() {
 Passenger: ${name}
 When: ${fmtDateTime(when)}
 
-Pickup:
+From:
 ${pickup || "—"}
 
-Dropoff:
+To:
 ${dropoff || "—"}
 
 Customer Phone:
@@ -1099,7 +1104,8 @@ ${notes || "None"}`;
 
     window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
   }}
-  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+  disabled={!driverPhone}
+  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
 >
   Text details to driver
 </button>
