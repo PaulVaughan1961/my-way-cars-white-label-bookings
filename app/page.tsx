@@ -1089,9 +1089,10 @@ const driverPhone = getDriverPhone(booking);
 
     if (!driverPhone) return;
 
-    const message = `My Way Cars
+const message = `MY WAY CARS
 
 Passenger: ${name}
+Passenger Phone: ${phone || "—"}
 When: ${fmtDateTime(when)}
 
 From:
@@ -1100,8 +1101,7 @@ ${pickup || "—"}
 To:
 ${dropoff || "—"}
 
-Customer Phone:
-${phone || "—"}
+Estimated Price: ${fare === null ? "—" : `£${fare.toFixed(2)}`}
 
 Notes:
 ${notes || "None"}`;
