@@ -447,18 +447,24 @@ export default function HomePage() {
 
     let result = sorted;
 
-    if (statusFilter === "Upcoming") {
-      result = result.filter((row) => {
-        const when = getWhenMs(row);
-        const status = (row.status ?? "Scheduled").toString();
-        return (
-          !Number.isNaN(when) &&
-          when >= now &&
-          status !== "Cancelled" &&
-          status !== "Completed"
-        );
-      });
-    } else if (statusFilter === "Unpaid") {
+if (statusFilter === "Upcoming") {
+  result = result.filter((row) => {
+    const when = getWhenMs(row);
+    const status = (row.status ?? "Scheduled").toString();
+    const graceMs = 30 * 60 * 1000;
+
+    if (status === "POB") {
+      return true;
+    }
+
+    return (
+      !Number.isNaN(when) &&
+      when >= now - graceMs &&
+      status !== "Cancelled" &&
+      status !== "Completed"
+    );
+  });
+} else if (statusFilter === "Unpaid") {
       result = result.filter((row) => {
         const payment = (row.payment_status ?? "Unpaid").toString();
         const status = (row.status ?? "Scheduled").toString();
