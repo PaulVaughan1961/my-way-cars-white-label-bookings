@@ -1051,62 +1051,30 @@ const isOutboundLeg =
           </>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-2" onClick={stopCardToggle}>
-          <Link
-            href={`/edit/${booking.id}`}
-            className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-          >
-            Edit
-          </Link>
+<div className="mt-4 flex flex-wrap gap-2" onClick={stopCardToggle}>
+  <Link
+    href={`/edit/${booking.id}`}
+    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+  >
+    Edit
+  </Link>
 
-          {phone ? (
-            <a
-              href={telHref(phone)}
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Call
-            </a>
-          ) : null}
+  {phone ? (
+    <a
+      href={telHref(phone)}
+      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+    >
+      Call
+    </a>
+  ) : null}
 
-          {phone ? (
-            <a
-              href={smsHref(phone)}
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Text
-            </a>
-          ) : null}
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
 
-          {pickup ? (
-            <a
-              href={mapHref(pickup)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Pickup map
-            </a>
-          ) : null}
+      if (!driverPhone) return;
 
-          {dropoff ? (
-            <a
-              href={mapHref(dropoff)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Dropoff map
-            </a>
-          ) : null}
-
-          
-<button
-  onClick={(e) => {
-    e.stopPropagation();
-
-    if (!driverPhone) return;
-
-    const message = `MY WAY CARS
+      const message = `MY WAY CARS
 
 Passenger: ${name}
 Passenger Phone: ${phone || "—"}
@@ -1123,27 +1091,27 @@ Estimated Price: ${fare === null ? "—" : `£${fare.toFixed(2)}`}
 Notes:
 ${notes || "None"}`;
 
-    window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
-  }}
-  disabled={!driverPhone}
-  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
->
-  Text details to driver
-</button>
+      window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
+    }}
+    disabled={!driverPhone}
+    className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    Text details to driver
+  </button>
 
-<button
-  onClick={(e) => {
-    e.stopPropagation();
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
 
-    if (!phone) return;
+      if (!phone) return;
 
-const returnNote = isOutboundLeg
-  ? `
+      const returnNote = isOutboundLeg
+        ? `
 
 Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
-  : "";
+        : "";
 
-const customerMessage = `MY WAY CARS
+      const customerMessage = `MY WAY CARS
 
 Your booking is confirmed.
 
@@ -1165,86 +1133,117 @@ ${driverPhone || "Will be provided prior to pickup"}
 Vehicle:
 ${vehicle || "To be confirmed"}${returnNote}`;
 
-    window.location.href = `sms:${phone.replace(/\s+/g, "")}?body=${encodeURIComponent(customerMessage)}`;
-  }}
-  disabled={!phone}
-  className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
->
-  Text customer
-</button>
+      window.location.href = `sms:${phone.replace(/\s+/g, "")}?body=${encodeURIComponent(customerMessage)}`;
+    }}
+    disabled={!phone}
+    className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    Text customer
+  </button>
 
-{status === "Scheduled" ? (
-  <button
-    onClick={() => void updateBooking(booking.id, { status: "POB" })}
-    disabled={isBusy}
-    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Mark POB
-  </button>
-) : null}
+  {status === "Scheduled" ? (
+    <button
+      onClick={() => void updateBooking(booking.id, { status: "POB" })}
+      disabled={isBusy}
+      className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    >
+      Mark POB
+    </button>
+  ) : null}
 
-{status !== "Completed" ? (
-  <button
-    onClick={() =>
-      void updateBooking(booking.id, {
-        status: "Completed",
-        payment_status: "Unpaid",
-      })
-    }
-    disabled={isBusy}
-    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Complete (Unpaid)
-  </button>
-) : null}
+  {expanded && phone ? (
+    <a
+      href={smsHref(phone)}
+      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+    >
+      Text
+    </a>
+  ) : null}
 
-{status !== "Completed" ? (
-  <button
-    onClick={() =>
-      void updateBooking(booking.id, {
-        status: "Completed",
-        payment_status: "Paid",
-      })
-    }
-    disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Complete & Paid
-  </button>
-) : null}
+  {expanded && pickup ? (
+    <a
+      href={mapHref(pickup)}
+      target="_blank"
+      rel="noreferrer"
+      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+    >
+      Pickup map
+    </a>
+  ) : null}
 
-{status === "Completed" && paymentStatus !== "Paid" ? (
-  <button
-    onClick={() => void onMarkPaid(booking.id)}
-    disabled={isBusy}
-    className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Mark paid
-  </button>
-) : null}
+  {expanded && dropoff ? (
+    <a
+      href={mapHref(dropoff)}
+      target="_blank"
+      rel="noreferrer"
+      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+    >
+      Dropoff map
+    </a>
+  ) : null}
 
-{status !== "Cancelled" ? (
-  <button
-    onClick={() => void onCancel(booking.id)}
-    disabled={isBusy}
-    className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Cancel
-  </button>
-) : (
-  <button
-    onClick={() =>
-      void updateBooking(booking.id, { status: "Scheduled" })
-    }
-    disabled={isBusy}
-    className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-  >
-    Restore booking
-  </button>
-)}
-      </div>
-    </div>
-  );
+  {expanded && status !== "Completed" ? (
+    <button
+      onClick={() =>
+        void updateBooking(booking.id, {
+          status: "Completed",
+          payment_status: "Unpaid",
+        })
+      }
+      disabled={isBusy}
+      className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    >
+      Complete (Unpaid)
+    </button>
+  ) : null}
+
+  {expanded && status !== "Completed" ? (
+    <button
+      onClick={() =>
+        void updateBooking(booking.id, {
+          status: "Completed",
+          payment_status: "Paid",
+        })
+      }
+      disabled={isBusy}
+      className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    >
+      Complete & Paid
+    </button>
+  ) : null}
+
+  {expanded && status === "Completed" && paymentStatus !== "Paid" ? (
+    <button
+      onClick={() => void onMarkPaid(booking.id)}
+      disabled={isBusy}
+      className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    >
+      Mark paid
+    </button>
+  ) : null}
+
+  {expanded && status !== "Cancelled" ? (
+    <button
+      onClick={() => void onCancel(booking.id)}
+      disabled={isBusy}
+      className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    >
+      Cancel
+    </button>
+  ) : expanded ? (
+    <button
+      onClick={() =>
+        void updateBooking(booking.id, { status: "Scheduled" })
+      }
+      disabled={isBusy}
+      className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+    >
+      Restore booking
+    </button>
+  ) : null}
+</div>
+</div>
+);
 }
 
 return (
