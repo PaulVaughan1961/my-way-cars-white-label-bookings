@@ -949,29 +949,27 @@ cycleCardMode(booking.id);
       ) : null}
       <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
 
-      {expanded ? (
-        <div
-          className={`mt-1 text-xs font-medium ${
-            countdown.includes("d")
-              ? "text-slate-500"
-              : countdown.includes("h")
-              ? "text-amber-600"
-              : countdown.includes("m")
-              ? "text-red-600"
-              : "text-red-700 font-bold"
-          }`}
-        >
-          Countdown: {countdown}
-        </div>
-      ) : null}
+      <div
+        className={`mt-1 text-xs font-medium ${
+          countdown.includes("d")
+            ? "text-slate-500"
+            : countdown.includes("h")
+            ? "text-amber-600"
+            : countdown.includes("m")
+            ? "text-red-600"
+            : "text-red-700 font-bold"
+        }`}
+      >
+        Countdown: {countdown}
+      </div>
     </div>
 
     <div className="text-right text-sm">
       <div className="font-medium">{status}</div>
       <div className="text-slate-500">{paymentStatus}</div>
-<div className="mt-1 text-xs text-slate-400">
-  {expanded ? "Tap to collapse" : "Tap to expand"}
-</div>
+      <div className="mt-1 text-xs text-slate-400">
+        {expanded ? "Tap to collapse" : "Tap to expand"}
+      </div>
     </div>
   </div>
 )}
