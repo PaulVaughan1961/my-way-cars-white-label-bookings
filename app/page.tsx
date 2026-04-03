@@ -1085,10 +1085,11 @@ const compact = viewMode === "compact" && !forceExpanded;
           </>
         )}
 
-       <div
-  className="mt-4 sticky bottom-0 z-10 bg-white pt-3 pb-2 border-t flex flex-wrap gap-2"
-  onClick={stopCardToggle}
->
+      {!compact && (
+  <div
+    className="mt-4 sticky bottom-0 z-10 border-t bg-white pt-3 pb-2 flex flex-wrap gap-2"
+    onClick={stopCardToggle}
+  >
           <Link
             href={`/edit/${booking.id}`}
             className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
@@ -1275,13 +1276,14 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               disabled={isBusy}
               className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              Restore booking
+            Restore booking
             </button>
           ) : null}
         </div>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
