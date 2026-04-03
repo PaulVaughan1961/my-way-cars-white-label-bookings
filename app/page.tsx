@@ -535,10 +535,13 @@ export default function HomePage() {
         status !== "Cancelled"
       ) {
         jobs += 1;
-        revenue += fare;
 
-        if (payment === "Unpaid") {
-          unpaid += fare;
+        if (status === "Completed") {
+          revenue += fare;
+
+          if (payment === "Unpaid") {
+            unpaid += fare;
+          }
         }
       }
     });
@@ -570,10 +573,13 @@ export default function HomePage() {
         status !== "Cancelled"
       ) {
         jobs += 1;
-        revenue += fare;
 
-        if (payment === "Unpaid") {
-          unpaid += fare;
+        if (status === "Completed") {
+          revenue += fare;
+
+          if (payment === "Unpaid") {
+            unpaid += fare;
+          }
         }
       }
     });
