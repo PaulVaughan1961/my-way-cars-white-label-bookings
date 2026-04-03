@@ -896,15 +896,38 @@ cycleCardMode(booking.id);
         }`}
       >
 {compact ? (
-  <div className="flex items-center justify-between gap-3 text-sm">
-    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-      <span className="font-semibold text-slate-900 whitespace-nowrap">
-        {fmtDateTime(when)}
-      </span>
+  <div className="overflow-hidden text-sm text-slate-900">
+    <div className="truncate">
+      {(() => {
+        const parts = parseLocalDateTimeParts(when);
 
-      <span className="truncate text-slate-800">{name}</span>
+        if (!parts) {
+          return `— | — | ${name} | ${pickup || "—"}`;
+        }
 
-      <span className="truncate text-slate-500">{pickup || "—"}</span>
+        const d = new Date(
+          parts.year,
+          parts.month - 1,
+          parts.day,
+          parts.hour,
+          parts.minute,
+          parts.second
+        );
+
+        const dateText = d.toLocaleDateString(undefined, {
+          day: "2-digit",
+          month: "2-digit",
+          year: "2-digit",
+        });
+
+        const timeText = d.toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+
+        return `${dateText} | ${timeText} | ${name} | ${pickup || "—"}`;
+      })()}
     </div>
   </div>
 ) : (
