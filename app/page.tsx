@@ -325,10 +325,11 @@ export default function HomePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState("Upcoming");
   const [errorMessage, setErrorMessage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
-  const [viewMode, setViewMode] = useState<"compact" | "normal">("normal");
-  const [nowMs, setNowMs] = useState(Date.now());
+const [searchTerm, setSearchTerm] = useState("");
+const [cardModes, setCardModes] = useState<
+  Record<string, "compact" | "normal" | "full">
+>({});
+const [nowMs, setNowMs] = useState(Date.now());
   const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
   const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<
     string[]
@@ -798,27 +799,36 @@ export default function HomePage() {
     await updateBooking(id, { status: "Cancelled" });
   }
 
-  function toggleExpanded(id: string) {
-    setExpandedIds((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
+function cycleCardMode(id: string) {
+  setCardModes((current) => {
+    const currentMode = current[id] ?? "compact";
 
-  function stopCardToggle(e: React.MouseEvent) {
-    e.stopPropagation();
-  }
+    const nextMode =
+      currentMode === "compact"
+        ? "normal"
+        : currentMode === "normal"
+        ? "full"
+        : "compact";
+
+    return {
+      ...current,
+      [id]: nextMode,
+    };
+  });
+}
+
+function stopCardToggle(e: React.MouseEvent) {
+  e.stopPropagation();
+}
 
 function BookingCard({
   booking,
   forceExpanded = false,
   highlightClash = false,
-  viewMode = "normal",
 }: {
   booking: BookingRow;
   forceExpanded?: boolean;
   highlightClash?: boolean;
-  viewMode?: "compact" | "normal";
 }) {
     const driver = getDriver(booking);
     const vehicle = getVehicle(booking);
@@ -838,13 +848,12 @@ function BookingCard({
     const bagsLarge = pickNumber(booking, ["bags_large"]);
     const bagsSmall = pickNumber(booking, ["bags_small"]);
     const distanceMiles = pickNumber(booking, ["distance_miles"]);
-    const isBusy = busyId === booking.id;
- const expanded =
-  forceExpanded || (!!expandedIds[booking.id] && viewMode !== "compact");
-
-const compact = viewMode === "compact" && !forceExpanded;
-    const countdown = getCountdownLabel(when, nowMs);
-    const driverPhone = getDriverPhone(booking);
+const isBusy = busyId === booking.id;
+const cardMode = forceExpanded ? "full" : cardModes[booking.id] ?? "compact";
+const compact = cardMode === "compact";
+const expanded = cardMode === "full";
+const countdown = getCountdownLabel(when, nowMs);
+const driverPhone = getDriverPhone(booking);
 
     const linkedPair = booking.return_group_id
       ? bookings
@@ -858,7 +867,7 @@ const compact = viewMode === "compact" && !forceExpanded;
     return (
       <div
         onClick={() => {
-          toggleExpanded(booking.id);
+cycleCardMode(booking.id);
 
           const groupId = booking.return_group_id;
           if (groupId) {
@@ -888,20 +897,14 @@ const compact = viewMode === "compact" && !forceExpanded;
       >
 {compact ? (
   <div className="flex items-center justify-between gap-3 text-sm">
-    <div className="min-w-0 flex-1">
-      <div className="truncate font-semibold text-slate-900">
-        {name}
-      </div>
-      <div className="truncate text-slate-600">
-        {fmtDateTime(when)} • {pickup || "—"} → {dropoff || "—"}
-      </div>
-    </div>
+    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+      <span className="font-semibold text-slate-900 whitespace-nowrap">
+        {fmtDateTime(when)}
+      </span>
 
-    <div className="shrink-0 text-right">
-      <div className="font-medium">{status}</div>
-      <div className="text-xs text-slate-500">
-        {fare === null ? "—" : `£${fare.toFixed(2)}`}
-      </div>
+      <span className="truncate text-slate-800">{name}</span>
+
+      <span className="truncate text-slate-500">{pickup || "—"}</span>
     </div>
   </div>
 ) : (
@@ -923,26 +926,28 @@ const compact = viewMode === "compact" && !forceExpanded;
       ) : null}
       <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
 
-      <div
-        className={`mt-1 text-xs font-medium ${
-          countdown.includes("d")
-            ? "text-slate-500"
-            : countdown.includes("h")
-            ? "text-amber-600"
-            : countdown.includes("m")
-            ? "text-red-600"
-            : "text-red-700 font-bold"
-        }`}
-      >
-        Countdown: {countdown}
-      </div>
+      {expanded ? (
+        <div
+          className={`mt-1 text-xs font-medium ${
+            countdown.includes("d")
+              ? "text-slate-500"
+              : countdown.includes("h")
+              ? "text-amber-600"
+              : countdown.includes("m")
+              ? "text-red-600"
+              : "text-red-700 font-bold"
+          }`}
+        >
+          Countdown: {countdown}
+        </div>
+      ) : null}
     </div>
 
     <div className="text-right text-sm">
       <div className="font-medium">{status}</div>
       <div className="text-slate-500">{paymentStatus}</div>
       <div className="mt-1 text-xs text-slate-400">
-        {expanded ? "Tap to collapse" : "Tap to expand"}
+        {expanded ? "Tap for one-line view" : "Tap for full details"}
       </div>
     </div>
   </div>
@@ -1085,7 +1090,7 @@ const compact = viewMode === "compact" && !forceExpanded;
           </>
         )}
 
-      {!compact && (
+{expanded && (
   <div
     className="mt-4 sticky bottom-0 z-10 border-t bg-white pt-3 pb-2 flex flex-wrap gap-2"
     onClick={stopCardToggle}
@@ -1381,7 +1386,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
 <BookingCard
   booking={nextJob}
   forceExpanded
-  viewMode={viewMode}
   highlightClash={selectedClashBookingIds.includes(nextJob.id)}
 />
           </section>
@@ -1559,17 +1563,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           </div>
 
 <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
-  <button
-    onClick={() =>
-      setViewMode((current) =>
-        current === "normal" ? "compact" : "normal"
-      )
-    }
-    className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
-  >
-    {viewMode === "normal" ? "Compact view" : "Normal view"}
-  </button>
-
   {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
     (value) => (
       <button
@@ -1603,7 +1596,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
 <BookingCard
   key={booking.id}
   booking={booking}
-  viewMode={viewMode}
   highlightClash={selectedClashBookingIds.includes(booking.id)}
 />
               ))}
