@@ -865,7 +865,7 @@ const compact = viewMode === "compact" && !forceExpanded;
             setSelectedReturnGroupId(groupId);
           }
         }}
-      className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ...
+        className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
             : status === "POB"
