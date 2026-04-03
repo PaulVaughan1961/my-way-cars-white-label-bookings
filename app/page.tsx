@@ -23,6 +23,7 @@ type BookingRow = {
   bags_small?: number | string | null;
   local_authority?: string | null;
   driver_name?: string | null;
+  driver_phone?: string | null;
   vehicle?: string | null;
   booking_type?: string | null;
   return_group_id?: string | null;
@@ -121,9 +122,6 @@ function getDriverPhone(row: BookingRow): string {
 
 function getSmsLink(booking: any) {
   const phone = booking.driver_phone || "";
-
-
-
   const message = encodeURIComponent(buildDriverMessage(booking));
   return `sms:${phone}?body=${message}`;
 }
@@ -447,24 +445,24 @@ export default function HomePage() {
 
     let result = sorted;
 
-if (statusFilter === "Upcoming") {
-  result = result.filter((row) => {
-    const when = getWhenMs(row);
-    const status = (row.status ?? "Scheduled").toString();
-    const graceMs = 30 * 60 * 1000;
+    if (statusFilter === "Upcoming") {
+      result = result.filter((row) => {
+        const when = getWhenMs(row);
+        const status = (row.status ?? "Scheduled").toString();
+        const graceMs = 30 * 60 * 1000;
 
-    if (status === "POB") {
-      return true;
-    }
+        if (status === "POB") {
+          return true;
+        }
 
-    return (
-      !Number.isNaN(when) &&
-      when >= now - graceMs &&
-      status !== "Cancelled" &&
-      status !== "Completed"
-    );
-  });
-} else if (statusFilter === "Unpaid") {
+        return (
+          !Number.isNaN(when) &&
+          when >= now - graceMs &&
+          status !== "Cancelled" &&
+          status !== "Completed"
+        );
+      });
+    } else if (statusFilter === "Unpaid") {
       result = result.filter((row) => {
         const payment = (row.payment_status ?? "Unpaid").toString();
         const status = (row.status ?? "Scheduled").toString();
@@ -517,6 +515,9 @@ if (statusFilter === "Upcoming") {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
     let jobs = 0;
     let revenue = 0;
     let unpaid = 0;
@@ -530,7 +531,8 @@ if (statusFilter === "Upcoming") {
       if (
         !Number.isNaN(whenMs) &&
         whenMs >= today.getTime() &&
-        status === "Completed"
+        whenMs < tomorrow.getTime() &&
+        status !== "Cancelled"
       ) {
         jobs += 1;
         revenue += fare;
@@ -548,19 +550,25 @@ if (statusFilter === "Upcoming") {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
     let jobs = 0;
     let revenue = 0;
     let unpaid = 0;
 
     bookings.forEach((row) => {
       const whenMs = getWhenMs(row);
-      if (Number.isNaN(whenMs) || whenMs < today.getTime()) return;
-
       const status = (row.status ?? "Scheduled").toString();
       const payment = (row.payment_status ?? "Unpaid").toString();
       const fare = getFare(row) ?? 0;
 
-      if (status === "Completed") {
+      if (
+        !Number.isNaN(whenMs) &&
+        whenMs >= today.getTime() &&
+        whenMs < tomorrow.getTime() &&
+        status !== "Cancelled"
+      ) {
         jobs += 1;
         revenue += fare;
 
@@ -803,45 +811,37 @@ if (statusFilter === "Upcoming") {
     forceExpanded?: boolean;
     highlightClash?: boolean;
   }) {
-const driver = getDriver(booking);
-const vehicle = getVehicle(booking);
-const bookingType = getBookingType(booking);
-const when = getWhen(booking);
-const name = getName(booking);
-const phone = getPhone(booking);
-const pickup = getPickup(booking);
-const dropoff = getDropoff(booking);
-const fare = getFare(booking);
-const status = (booking.status ?? "Scheduled").toString();
-const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
-const notes = pickString(booking, ["notes"]);
-const via = pickString(booking, ["via"]);
-const localAuthority = pickString(booking, ["local_authority"]);
-const passengers = pickNumber(booking, ["passengers"]);
-const bagsLarge = pickNumber(booking, ["bags_large"]);
-const bagsSmall = pickNumber(booking, ["bags_small"]);
-const distanceMiles = pickNumber(booking, ["distance_miles"]);
-const isBusy = busyId === booking.id;
-const expanded = forceExpanded || !!expandedIds[booking.id];
-const countdown = getCountdownLabel(when, nowMs);
-const driverPhone = getDriverPhone(booking);
+    const driver = getDriver(booking);
+    const vehicle = getVehicle(booking);
+    const bookingType = getBookingType(booking);
+    const when = getWhen(booking);
+    const name = getName(booking);
+    const phone = getPhone(booking);
+    const pickup = getPickup(booking);
+    const dropoff = getDropoff(booking);
+    const fare = getFare(booking);
+    const status = (booking.status ?? "Scheduled").toString();
+    const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
+    const notes = pickString(booking, ["notes"]);
+    const via = pickString(booking, ["via"]);
+    const localAuthority = pickString(booking, ["local_authority"]);
+    const passengers = pickNumber(booking, ["passengers"]);
+    const bagsLarge = pickNumber(booking, ["bags_large"]);
+    const bagsSmall = pickNumber(booking, ["bags_small"]);
+    const distanceMiles = pickNumber(booking, ["distance_miles"]);
+    const isBusy = busyId === booking.id;
+    const expanded = forceExpanded || !!expandedIds[booking.id];
+    const countdown = getCountdownLabel(when, nowMs);
+    const driverPhone = getDriverPhone(booking);
 
-const linkedPair = booking.return_group_id
-  ? bookings
-      .filter((b) => b.return_group_id === booking.return_group_id)
-      .sort((a, b) => getWhenMs(a) - getWhenMs(b))
-  : [];
+    const linkedPair = booking.return_group_id
+      ? bookings
+          .filter((b) => b.return_group_id === booking.return_group_id)
+          .sort((a, b) => getWhenMs(a) - getWhenMs(b))
+      : [];
 
-const isOutboundLeg =
-  linkedPair.length > 1 ? linkedPair[0]?.id === booking.id : false;
-
-
-  
-
-
-
-
-  
+    const isOutboundLeg =
+      linkedPair.length > 1 ? linkedPair[0]?.id === booking.id : false;
 
     return (
       <div
@@ -996,7 +996,10 @@ const isOutboundLeg =
                     {driver || "—"}
                   </span>
                 </div>
-
+                <div>
+                  <span className="font-medium">Driver phone test:</span>{" "}
+                  {String(booking.driver_phone || "NONE")}
+                </div>
                 <div>
                   <span className="font-medium">Vehicle:</span>{" "}
                   <span className="font-semibold text-purple-700">
@@ -1051,30 +1054,30 @@ const isOutboundLeg =
           </>
         )}
 
-<div className="mt-4 flex flex-wrap gap-2" onClick={stopCardToggle}>
-  <Link
-    href={`/edit/${booking.id}`}
-    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-  >
-    Edit
-  </Link>
+        <div className="mt-4 flex flex-wrap gap-2" onClick={stopCardToggle}>
+          <Link
+            href={`/edit/${booking.id}`}
+            className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+          >
+            Edit
+          </Link>
 
-  {phone ? (
-    <a
-      href={telHref(phone)}
-      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-    >
-      Call
-    </a>
-  ) : null}
+          {phone ? (
+            <a
+              href={telHref(phone)}
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Call
+            </a>
+          ) : null}
 
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
 
-      if (!driverPhone) return;
+              if (!driverPhone) return;
 
-      const message = `MY WAY CARS
+              const message = `MY WAY CARS
 
 Passenger: ${name}
 Passenger Phone: ${phone || "—"}
@@ -1091,27 +1094,27 @@ Estimated Price: ${fare === null ? "—" : `£${fare.toFixed(2)}`}
 Notes:
 ${notes || "None"}`;
 
-      window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
-    }}
-    disabled={!driverPhone}
-    className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-  >
-    Text details to driver
-  </button>
+              window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
+            }}
+            disabled={!driverPhone}
+            className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Text details to driver
+          </button>
 
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
 
-      if (!phone) return;
+              if (!phone) return;
 
-      const returnNote = isOutboundLeg
-        ? `
+              const returnNote = isOutboundLeg
+                ? `
 
 Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
-        : "";
+                : "";
 
-      const customerMessage = `MY WAY CARS
+              const customerMessage = `MY WAY CARS
 
 Your booking is confirmed.
 
@@ -1133,204 +1136,205 @@ ${driverPhone || "Will be provided prior to pickup"}
 Vehicle:
 ${vehicle || "To be confirmed"}${returnNote}`;
 
-      window.location.href = `sms:${phone.replace(/\s+/g, "")}?body=${encodeURIComponent(customerMessage)}`;
-    }}
-    disabled={!phone}
-    className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-  >
-    Text customer
-  </button>
+              window.location.href = `sms:${phone.replace(/\s+/g, "")}?body=${encodeURIComponent(customerMessage)}`;
+            }}
+            disabled={!phone}
+            className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Text customer
+          </button>
 
-  {status === "Scheduled" ? (
-    <button
-      onClick={() => void updateBooking(booking.id, { status: "POB" })}
-      disabled={isBusy}
-      className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-    >
-      Mark POB
-    </button>
-  ) : null}
-
-  {expanded && phone ? (
-    <a
-      href={smsHref(phone)}
-      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-    >
-      Text
-    </a>
-  ) : null}
-
-  {expanded && pickup ? (
-    <a
-      href={mapHref(pickup)}
-      target="_blank"
-      rel="noreferrer"
-      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-    >
-      Pickup map
-    </a>
-  ) : null}
-
-  {expanded && dropoff ? (
-    <a
-      href={mapHref(dropoff)}
-      target="_blank"
-      rel="noreferrer"
-      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-    >
-      Dropoff map
-    </a>
-  ) : null}
-
-  {expanded && status !== "Completed" ? (
-    <button
-      onClick={() =>
-        void updateBooking(booking.id, {
-          status: "Completed",
-          payment_status: "Unpaid",
-        })
-      }
-      disabled={isBusy}
-      className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-    >
-      Complete (Unpaid)
-    </button>
-  ) : null}
-
-  {expanded && status !== "Completed" ? (
-    <button
-      onClick={() =>
-        void updateBooking(booking.id, {
-          status: "Completed",
-          payment_status: "Paid",
-        })
-      }
-      disabled={isBusy}
-      className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-    >
-      Complete & Paid
-    </button>
-  ) : null}
-
-  {expanded && status === "Completed" && paymentStatus !== "Paid" ? (
-    <button
-      onClick={() => void onMarkPaid(booking.id)}
-      disabled={isBusy}
-      className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-    >
-      Mark paid
-    </button>
-  ) : null}
-
-  {expanded && status !== "Cancelled" ? (
-    <button
-      onClick={() => void onCancel(booking.id)}
-      disabled={isBusy}
-      className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-    >
-      Cancel
-    </button>
-  ) : expanded ? (
-    <button
-      onClick={() =>
-        void updateBooking(booking.id, { status: "Scheduled" })
-      }
-      disabled={isBusy}
-      className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-    >
-      Restore booking
-    </button>
-  ) : null}
-</div>
-</div>
-);
-}
-
-return (
-  <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="rounded-3xl bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              My Way Cars
-            </h1>
-            <p className="text-sm text-slate-600">Booking dashboard</p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/add"
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-            >
-              Add booking
-            </Link>
-
+          {status === "Scheduled" ? (
             <button
-              onClick={() => void onRefresh()}
-              disabled={refreshing}
-              className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+              onClick={() => void updateBooking(booking.id, { status: "POB" })}
+              disabled={isBusy}
+              className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              {refreshing ? "Refreshing..." : "Refresh"}
+              Mark POB
             </button>
-          </div>
+          ) : null}
+
+          {expanded && phone ? (
+            <a
+              href={smsHref(phone)}
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Text
+            </a>
+          ) : null}
+
+          {expanded && pickup ? (
+            <a
+              href={mapHref(pickup)}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Pickup map
+            </a>
+          ) : null}
+
+          {expanded && dropoff ? (
+            <a
+              href={mapHref(dropoff)}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Dropoff map
+            </a>
+          ) : null}
+
+          {expanded && status !== "Completed" ? (
+            <button
+              onClick={() =>
+                void updateBooking(booking.id, {
+                  status: "Completed",
+                  payment_status: "Unpaid",
+                })
+              }
+              disabled={isBusy}
+              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Complete (Unpaid)
+            </button>
+          ) : null}
+
+          {expanded && status !== "Completed" ? (
+            <button
+              onClick={() =>
+                void updateBooking(booking.id, {
+                  status: "Completed",
+                  payment_status: "Paid",
+                })
+              }
+              disabled={isBusy}
+              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Complete & Paid
+            </button>
+          ) : null}
+
+          {expanded && status === "Completed" && paymentStatus !== "Paid" ? (
+            <button
+              onClick={() => void onMarkPaid(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Mark paid
+            </button>
+          ) : null}
+
+          {expanded && status !== "Cancelled" ? (
+            <button
+              onClick={() => void onCancel(booking.id)}
+              disabled={isBusy}
+              className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          ) : expanded ? (
+            <button
+              onClick={() =>
+                void updateBooking(booking.id, { status: "Scheduled" })
+              }
+              disabled={isBusy}
+              className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Restore booking
+            </button>
+          ) : null}
         </div>
       </div>
+    );
+  }
 
-      <section className="rounded-3xl bg-white p-5 shadow-sm">
-        <div className="mb-2 text-lg font-semibold text-slate-900">
-          Dashboard
+  return (
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                My Way Cars
+              </h1>
+              <p className="text-sm text-slate-600">Booking dashboard</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/add"
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+              >
+                Add booking
+              </Link>
+
+              <button
+                onClick={() => void onRefresh()}
+                disabled={refreshing}
+                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-60 active:scale-95 active:shadow-inner transition"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <div className="rounded-xl bg-slate-100 px-4 py-3">
-            <div className="text-slate-500">Jobs today</div>
-            <div className="text-lg font-bold text-slate-900">
-              {dashboardStats.jobs}
-            </div>
-          </div>
 
-          <div className="rounded-xl bg-slate-100 px-4 py-3">
-            <div className="text-slate-500">Revenue</div>
-            <div className="text-lg font-bold text-slate-900">
-              £{dashboardStats.revenue.toFixed(2)}
-            </div>
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-2 text-lg font-semibold text-slate-900">
+            Dashboard
           </div>
-
-          <div className="rounded-xl bg-amber-50 px-4 py-3">
-            <div className="text-amber-700">Unpaid</div>
-            <div className="text-lg font-bold text-amber-800">
-              £{dashboardStats.unpaid.toFixed(2)}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {linkedBookings.length > 0 && (
-        <section className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="text-lg font-semibold text-indigo-900">
-              Linked return journey
+          <div className="flex flex-wrap gap-3 text-sm">
+            <div className="rounded-xl bg-slate-100 px-4 py-3">
+              <div className="text-slate-500">Jobs today</div>
+              <div className="text-lg font-bold text-slate-900">
+                {dashboardStats.jobs}
+              </div>
             </div>
 
-            <button
-              onClick={() => setSelectedReturnGroupId(null)}
-              className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
-            >
-              Clear
-            </button>
-          </div>
+            <div className="rounded-xl bg-slate-100 px-4 py-3">
+              <div className="text-slate-500">Revenue</div>
+              <div className="text-lg font-bold text-slate-900">
+                £{dashboardStats.revenue.toFixed(2)}
+              </div>
+            </div>
 
-          <div className="space-y-4">
-            {linkedBookings.map((booking) => (
-              <BookingCard
-                key={`linked-${booking.id}`}
-                booking={booking}
-                forceExpanded
-              />
-            ))}
+            <div className="rounded-xl bg-amber-50 px-4 py-3">
+              <div className="text-amber-700">Unpaid</div>
+              <div className="text-lg font-bold text-amber-800">
+                £{dashboardStats.unpaid.toFixed(2)}
+              </div>
+            </div>
           </div>
         </section>
-      )}
+
+        {linkedBookings.length > 0 && (
+          <section className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-lg font-semibold text-indigo-900">
+                Linked return journey
+              </div>
+
+              <button
+                onClick={() => setSelectedReturnGroupId(null)}
+                className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {linkedBookings.map((booking) => (
+                <BookingCard
+                  key={`linked-${booking.id}`}
+                  booking={booking}
+                  forceExpanded
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {nextJob ? (
           <section id="next-job">
             <div className="mb-3 text-xl font-bold text-slate-900">
