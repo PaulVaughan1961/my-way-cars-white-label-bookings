@@ -859,7 +859,7 @@ export default function HomePage() {
             setSelectedReturnGroupId(groupId);
           }
         }}
-        className={`cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
+      className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ...
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
             : status === "POB"
@@ -1060,7 +1060,10 @@ export default function HomePage() {
           </>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-2" onClick={stopCardToggle}>
+       <div
+  className="mt-4 sticky bottom-0 z-10 bg-white pt-3 pb-2 border-t flex flex-wrap gap-2"
+  onClick={stopCardToggle}
+>
           <Link
             href={`/edit/${booking.id}`}
             className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
