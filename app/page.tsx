@@ -327,6 +327,7 @@ export default function HomePage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [viewMode, setViewMode] = useState<"compact" | "normal">("normal");
   const [nowMs, setNowMs] = useState(Date.now());
   const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
   const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<
@@ -808,15 +809,17 @@ export default function HomePage() {
     e.stopPropagation();
   }
 
-  function BookingCard({
-    booking,
-    forceExpanded = false,
-    highlightClash = false,
-  }: {
-    booking: BookingRow;
-    forceExpanded?: boolean;
-    highlightClash?: boolean;
-  }) {
+function BookingCard({
+  booking,
+  forceExpanded = false,
+  highlightClash = false,
+  viewMode = "normal",
+}: {
+  booking: BookingRow;
+  forceExpanded?: boolean;
+  highlightClash?: boolean;
+  viewMode?: "compact" | "normal";
+}) {
     const driver = getDriver(booking);
     const vehicle = getVehicle(booking);
     const bookingType = getBookingType(booking);
@@ -836,7 +839,10 @@ export default function HomePage() {
     const bagsSmall = pickNumber(booking, ["bags_small"]);
     const distanceMiles = pickNumber(booking, ["distance_miles"]);
     const isBusy = busyId === booking.id;
-    const expanded = forceExpanded || !!expandedIds[booking.id];
+ const expanded =
+  forceExpanded || (!!expandedIds[booking.id] && viewMode !== "compact");
+
+const compact = viewMode === "compact" && !forceExpanded;
     const countdown = getCountdownLabel(when, nowMs);
     const driverPhone = getDriverPhone(booking);
 
@@ -880,48 +886,67 @@ export default function HomePage() {
               })()
         }`}
       >
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            {highlightClash ? (
-              <div className="mb-2">
-                <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
-                  CLASH
-                </span>
-              </div>
-            ) : null}
+{compact ? (
+  <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="min-w-0 flex-1">
+      <div className="truncate font-semibold text-slate-900">
+        {name}
+      </div>
+      <div className="truncate text-slate-600">
+        {fmtDateTime(when)} • {pickup || "—"} → {dropoff || "—"}
+      </div>
+    </div>
 
-            <div className="text-lg font-semibold">{name}</div>
-            {booking.return_group_id ? (
-              <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
-                Linked return booking
-              </div>
-            ) : null}
-            <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
-
-            <div
-              className={`mt-1 text-xs font-medium ${
-                countdown.includes("d")
-                  ? "text-slate-500"
-                  : countdown.includes("h")
-                  ? "text-amber-600"
-                  : countdown.includes("m")
-                  ? "text-red-600"
-                  : "text-red-700 font-bold"
-              }`}
-            >
-              Countdown: {countdown}
-            </div>
-          </div>
-
-          <div className="text-right text-sm">
-            <div className="font-medium">{status}</div>
-            <div className="text-slate-500">{paymentStatus}</div>
-            <div className="mt-1 text-xs text-slate-400">
-              {expanded ? "Tap to collapse" : "Tap to expand"}
-            </div>
-          </div>
+    <div className="shrink-0 text-right">
+      <div className="font-medium">{status}</div>
+      <div className="text-xs text-slate-500">
+        {fare === null ? "—" : `£${fare.toFixed(2)}`}
+      </div>
+    </div>
+  </div>
+) : (
+  <div className="mb-3 flex items-start justify-between gap-3">
+    <div>
+      {highlightClash ? (
+        <div className="mb-2">
+          <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
+            CLASH
+          </span>
         </div>
+      ) : null}
 
+      <div className="text-lg font-semibold">{name}</div>
+      {booking.return_group_id ? (
+        <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
+          Linked return booking
+        </div>
+      ) : null}
+      <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
+
+      <div
+        className={`mt-1 text-xs font-medium ${
+          countdown.includes("d")
+            ? "text-slate-500"
+            : countdown.includes("h")
+            ? "text-amber-600"
+            : countdown.includes("m")
+            ? "text-red-600"
+            : "text-red-700 font-bold"
+        }`}
+      >
+        Countdown: {countdown}
+      </div>
+    </div>
+
+    <div className="text-right text-sm">
+      <div className="font-medium">{status}</div>
+      <div className="text-slate-500">{paymentStatus}</div>
+      <div className="mt-1 text-xs text-slate-400">
+        {expanded ? "Tap to collapse" : "Tap to expand"}
+      </div>
+    </div>
+  </div>
+)}
         {expanded && (
           <>
             <div className="space-y-1 text-sm text-slate-700">
@@ -1351,11 +1376,12 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 ? "Current Job"
                 : "Next Job"}
             </div>
-            <BookingCard
-              booking={nextJob}
-              forceExpanded
-              highlightClash={selectedClashBookingIds.includes(nextJob.id)}
-            />
+<BookingCard
+  booking={nextJob}
+  forceExpanded
+  viewMode={viewMode}
+  highlightClash={selectedClashBookingIds.includes(nextJob.id)}
+/>
           </section>
         ) : (
           <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
@@ -1530,23 +1556,34 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             </div>
           </div>
 
-          <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
-            {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
-              (value) => (
-                <button
-                  key={value}
-                  onClick={() => setStatusFilter(value)}
-                  className={`rounded-xl px-3 py-2 text-sm font-medium ${
-                    statusFilter === value
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-200 text-slate-900"
-                  }`}
-                >
-                  {value}
-                </button>
-              )
-            )}
-          </div>
+<div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
+  <button
+    onClick={() =>
+      setViewMode((current) =>
+        current === "normal" ? "compact" : "normal"
+      )
+    }
+    className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+  >
+    {viewMode === "normal" ? "Compact view" : "Normal view"}
+  </button>
+
+  {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
+    (value) => (
+      <button
+        key={value}
+        onClick={() => setStatusFilter(value)}
+        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+          statusFilter === value
+            ? "bg-slate-900 text-white"
+            : "bg-slate-200 text-slate-900"
+        }`}
+      >
+        {value}
+      </button>
+    )
+  )}
+</div>
 
           {errorMessage ? (
             <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
@@ -1561,11 +1598,12 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           ) : (
             <div className="space-y-4">
               {filteredBookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  highlightClash={selectedClashBookingIds.includes(booking.id)}
-                />
+<BookingCard
+  key={booking.id}
+  booking={booking}
+  viewMode={viewMode}
+  highlightClash={selectedClashBookingIds.includes(booking.id)}
+/>
               ))}
             </div>
           )}
