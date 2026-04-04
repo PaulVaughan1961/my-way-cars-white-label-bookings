@@ -159,6 +159,19 @@ const { data: driverData, error: driverError } = await supabase
     e.preventDefault();
     if (!canSave || saving) return;
 
+    if (isReturn) {
+      const outwardDateTime = isoFromDateTime(pickupDate, pickupTime);
+      const returnDateTime = isoFromDateTime(returnDate, returnTime);
+
+      const outwardMs = new Date(outwardDateTime).getTime();
+      const returnMs = new Date(returnDateTime).getTime();
+
+      if (!Number.isNaN(outwardMs) && !Number.isNaN(returnMs) && returnMs <= outwardMs) {
+        alert("Return journey must be after the outward journey.");
+        return;
+      }
+    }
+
     setSaving(true);
 
 try {
