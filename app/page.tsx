@@ -1396,12 +1396,24 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 Linked return journey
               </div>
 
-              <button
-                onClick={() => setSelectedReturnGroupId(null)}
-                className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
-              >
-                Clear
-              </button>
+<button
+  onClick={() => {
+    setCardModes((current) => {
+      const next = { ...current };
+
+      linkedBookings.forEach((booking) => {
+        next[booking.id] = "compact";
+      });
+
+      return next;
+    });
+
+    setSelectedReturnGroupId(null);
+  }}
+  className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
+>
+  Clear
+</button>
             </div>
 
             <div className="space-y-4">
