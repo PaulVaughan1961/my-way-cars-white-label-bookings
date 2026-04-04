@@ -896,7 +896,13 @@ cycleCardMode(booking.id);
         }`}
       >
 {compact ? (
-  <div className="overflow-hidden text-sm text-slate-900">
+  <div className="flex items-center gap-2 overflow-hidden text-sm text-slate-900">
+    {booking.return_group_id ? (
+      <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+        Linked
+      </span>
+    ) : null}
+
     <div className="truncate">
       {(() => {
         const parts = parseLocalDateTimeParts(when);
