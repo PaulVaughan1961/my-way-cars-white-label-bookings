@@ -320,6 +320,7 @@ function makeClashKey(a: string, b: string): string {
 export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const clashSectionRef = useRef<HTMLDivElement | null>(null);
+  const linkedSectionRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -866,14 +867,21 @@ const driverPhone = getDriverPhone(booking);
 
     return (
       <div
-        onClick={() => {
-cycleCardMode(booking.id);
+onClick={() => {
+  cycleCardMode(booking.id);
 
-          const groupId = booking.return_group_id;
-          if (groupId) {
-            setSelectedReturnGroupId(groupId);
-          }
-        }}
+  const groupId = booking.return_group_id;
+  if (groupId) {
+    setSelectedReturnGroupId(groupId);
+
+    requestAnimationFrame(() => {
+      linkedSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+}}
         className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
@@ -937,6 +945,7 @@ cycleCardMode(booking.id);
     </div>
   </div>
 ) : (
+
   <div className="mb-3 flex items-start justify-between gap-3">
     <div>
       {highlightClash ? (
@@ -1377,8 +1386,11 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             </div>
           </div>
         </section>
-        {linkedBookings.length > 0 && (
-          <section className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm">
+{linkedBookings.length > 0 && (
+  <section
+    ref={linkedSectionRef}
+    className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm"
+  >
             <div className="mb-3 flex items-center justify-between">
               <div className="text-lg font-semibold text-indigo-900">
                 Linked return journey
