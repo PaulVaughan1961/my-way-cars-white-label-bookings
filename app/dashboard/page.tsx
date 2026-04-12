@@ -126,11 +126,39 @@ function getSmsLink(booking: any) {
   return `sms:${phone}?body=${message}`;
 }
 
+function cleanDisplayText(value: unknown): string {
+  if (typeof value !== "string") return "";
+
+  const text = value.trim();
+
+  if (!text) return "";
+
+  const junkValues = new Set([
+    "ÔÇö",
+    "ÔÇò",
+    "â€”",
+    "â€“",
+    "—",
+    "–",
+    "-",
+    "null",
+    "undefined",
+    "N/A",
+    "n/a",
+    "none",
+    "NONE",
+  ]);
+
+  if (junkValues.has(text)) return "";
+
+  return text;
+}
+
 function pickString(row: BookingRow, keys: string[]): string {
   for (const key of keys) {
-    const value = row[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
+    const value = cleanDisplayText(row[key]);
+    if (value) {
+      return value;
     }
   }
   return "";
@@ -199,6 +227,10 @@ function getVehicle(row: BookingRow): string {
 
 function getBookingType(row: BookingRow): string {
   return pickString(row, ["booking_type", "journey_type"]);
+}
+
+function getJourneyType(row: BookingRow): string {
+  return pickString(row, ["journey_type", "type", "booking_type"]);
 }
 
 function parseLocalDateTimeParts(value: string | null | undefined) {
@@ -326,11 +358,11 @@ export default function HomePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState("Upcoming");
   const [errorMessage, setErrorMessage] = useState("");
-const [searchTerm, setSearchTerm] = useState("");
-const [cardModes, setCardModes] = useState<
-  Record<string, "compact" | "normal" | "full">
->({});
-const [nowMs, setNowMs] = useState(Date.now());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [cardModes, setCardModes] = useState<
+    Record<string, "compact" | "normal" | "full">
+  >({});
+  const [nowMs, setNowMs] = useState(Date.now());
   const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
   const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<
     string[]
@@ -800,40 +832,41 @@ const [nowMs, setNowMs] = useState(Date.now());
     await updateBooking(id, { status: "Cancelled" });
   }
 
-function cycleCardMode(id: string) {
-  setCardModes((current) => {
-    const currentMode = current[id] ?? "compact";
+  function cycleCardMode(id: string) {
+    setCardModes((current) => {
+      const currentMode = current[id] ?? "compact";
 
-    const nextMode =
-      currentMode === "compact"
-        ? "normal"
-        : currentMode === "normal"
-        ? "full"
-        : "compact";
+      const nextMode =
+        currentMode === "compact"
+          ? "normal"
+          : currentMode === "normal"
+          ? "full"
+          : "compact";
 
-    return {
-      ...current,
-      [id]: nextMode,
-    };
-  });
-}
+      return {
+        ...current,
+        [id]: nextMode,
+      };
+    });
+  }
 
-function stopCardToggle(e: React.MouseEvent) {
-  e.stopPropagation();
-}
+  function stopCardToggle(e: React.MouseEvent) {
+    e.stopPropagation();
+  }
 
-function BookingCard({
-  booking,
-  forceExpanded = false,
-  highlightClash = false,
-}: {
-  booking: BookingRow;
-  forceExpanded?: boolean;
-  highlightClash?: boolean;
-}) {
+  function BookingCard({
+    booking,
+    forceExpanded = false,
+    highlightClash = false,
+  }: {
+    booking: BookingRow;
+    forceExpanded?: boolean;
+    highlightClash?: boolean;
+  }) {
     const driver = getDriver(booking);
     const vehicle = getVehicle(booking);
     const bookingType = getBookingType(booking);
+    const journeyType = getJourneyType(booking);
     const when = getWhen(booking);
     const name = getName(booking);
     const phone = getPhone(booking);
@@ -849,12 +882,12 @@ function BookingCard({
     const bagsLarge = pickNumber(booking, ["bags_large"]);
     const bagsSmall = pickNumber(booking, ["bags_small"]);
     const distanceMiles = pickNumber(booking, ["distance_miles"]);
-const isBusy = busyId === booking.id;
-const cardMode = forceExpanded ? "full" : cardModes[booking.id] ?? "compact";
-const compact = cardMode === "compact";
-const expanded = cardMode === "full";
-const countdown = getCountdownLabel(when, nowMs);
-const driverPhone = getDriverPhone(booking);
+    const isBusy = busyId === booking.id;
+    const cardMode = forceExpanded ? "full" : cardModes[booking.id] ?? "compact";
+    const compact = cardMode === "compact";
+    const expanded = cardMode === "full";
+    const countdown = getCountdownLabel(when, nowMs);
+    const driverPhone = getDriverPhone(booking);
 
     const linkedPair = booking.return_group_id
       ? bookings
@@ -867,21 +900,21 @@ const driverPhone = getDriverPhone(booking);
 
     return (
       <div
-onClick={() => {
-  cycleCardMode(booking.id);
+        onClick={() => {
+          cycleCardMode(booking.id);
 
-  const groupId = booking.return_group_id;
-  if (groupId) {
-    setSelectedReturnGroupId(groupId);
+          const groupId = booking.return_group_id;
+          if (groupId) {
+            setSelectedReturnGroupId(groupId);
 
-    requestAnimationFrame(() => {
-      linkedSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  }
-}}
+            requestAnimationFrame(() => {
+              linkedSectionRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            });
+          }
+        }}
         className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
@@ -903,94 +936,94 @@ onClick={() => {
               })()
         }`}
       >
-{compact ? (
-  <div className="flex items-center gap-2 overflow-hidden text-sm text-slate-900">
-    {booking.return_group_id ? (
-      <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-        Linked
-      </span>
-    ) : null}
+        {compact ? (
+          <div className="flex items-center gap-2 overflow-hidden text-sm text-slate-900">
+            {booking.return_group_id ? (
+              <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                Linked
+              </span>
+            ) : null}
 
-    <div className="truncate">
-      {(() => {
-        const parts = parseLocalDateTimeParts(when);
+            <div className="truncate">
+              {(() => {
+                const parts = parseLocalDateTimeParts(when);
 
-        if (!parts) {
-          return `ÔÇö | ÔÇö | ${name} | ${pickup || "ÔÇö"}`;
-        }
+                if (!parts) {
+                  return `ÔÇö | ÔÇö | ${name} | ${pickup || "ÔÇö"}`;
+                }
 
-        const d = new Date(
-          parts.year,
-          parts.month - 1,
-          parts.day,
-          parts.hour,
-          parts.minute,
-          parts.second
-        );
+                const d = new Date(
+                  parts.year,
+                  parts.month - 1,
+                  parts.day,
+                  parts.hour,
+                  parts.minute,
+                  parts.second
+                );
 
-        const dateText = d.toLocaleDateString(undefined, {
-          day: "2-digit",
-          month: "2-digit",
-          year: "2-digit",
-        });
+                const dateText = d.toLocaleDateString(undefined, {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "2-digit",
+                });
 
-        const timeText = d.toLocaleTimeString(undefined, {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        });
+                const timeText = d.toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                });
 
-        return `${dateText} | ${timeText} | ${name} | ${pickup || "ÔÇö"}`;
-      })()}
-    </div>
-  </div>
-) : (
+                return `${dateText} | ${timeText} | ${name} | ${pickup || "ÔÇö"}`;
+              })()}
+            </div>
+          </div>
+        ) : (
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              {highlightClash ? (
+                <div className="mb-2">
+                  <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
+                    CLASH
+                  </span>
+                </div>
+              ) : null}
 
-  <div className="mb-3 flex items-start justify-between gap-3">
-    <div>
-      {highlightClash ? (
-        <div className="mb-2">
-          <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
-            CLASH
-          </span>
-        </div>
-      ) : null}
+              <div className="text-lg font-semibold">{name}</div>
+              {booking.return_group_id ? (
+                <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
+                  Linked return booking
+                </div>
+              ) : null}
+              <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
 
-      <div className="text-lg font-semibold">{name}</div>
-      {booking.return_group_id ? (
-        <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
-          Linked return booking
-        </div>
-      ) : null}
-      <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
+              <div
+                className={`mt-1 text-xs font-medium ${
+                  countdown.includes("d")
+                    ? "text-slate-500"
+                    : countdown.includes("h")
+                    ? "text-amber-600"
+                    : countdown.includes("m")
+                    ? "text-red-600"
+                    : "text-red-700 font-bold"
+                }`}
+              >
+                Countdown: {countdown}
+              </div>
+            </div>
 
-      <div
-        className={`mt-1 text-xs font-medium ${
-          countdown.includes("d")
-            ? "text-slate-500"
-            : countdown.includes("h")
-            ? "text-amber-600"
-            : countdown.includes("m")
-            ? "text-red-600"
-            : "text-red-700 font-bold"
-        }`}
-      >
-        Countdown: {countdown}
-      </div>
-    </div>
+            <div className="text-right text-sm">
+              <div className="font-medium">{status}</div>
+              <div className="text-slate-500">{paymentStatus}</div>
+              <div className="mt-1 text-xs text-slate-400">
+                {expanded ? "Tap to collapse" : "Tap to expand"}
+              </div>
+            </div>
+          </div>
+        )}
 
-    <div className="text-right text-sm">
-      <div className="font-medium">{status}</div>
-      <div className="text-slate-500">{paymentStatus}</div>
-      <div className="mt-1 text-xs text-slate-400">
-        {expanded ? "Tap to collapse" : "Tap to expand"}
-      </div>
-    </div>
-  </div>
-)}
-{!compact && (
-  <>
-    <div className="space-y-1 text-sm text-slate-700">
+        {!compact && (
+          <>
+            <div className="space-y-1 text-sm text-slate-700">
               <div>
                 <span className="font-medium">From:</span> {pickup || "ÔÇö"}
               </div>
@@ -1049,113 +1082,118 @@ onClick={() => {
 
             {expanded && (
               <div className="mt-4 border-t pt-4">
-              <div className="mb-3 text-sm font-semibold text-slate-900">
-                Compliance / Job details
+                <div className="mb-3 text-sm font-semibold text-slate-900">
+                  Compliance / Job details
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                  <div>
+                    <span className="font-medium">Status:</span>{" "}
+                    {booking.status || "ÔÇö"}
+                  </div>
+                  <div>
+                    <span className="font-medium">Payment:</span>{" "}
+                    {booking.payment_status || "ÔÇö"}
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Driver:</span>{" "}
+                    <span className="font-semibold text-blue-700">
+                      {driver || "ÔÇö"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">Driver phone test:</span>{" "}
+                    {String(booking.driver_phone || "NONE")}
+                  </div>
+                  <div>
+                    <span className="font-medium">Vehicle:</span>{" "}
+                    <span className="font-semibold text-purple-700">
+                      {vehicle || "ÔÇö"}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Passengers:</span>{" "}
+                    {passengers === null ? "ÔÇö" : passengers}
+                  </div>
+                  <div>
+                    <span className="font-medium">Distance:</span>{" "}
+                    {distanceMiles === null ? "ÔÇö" : `${distanceMiles} miles`}
+                  </div>
+
+                  {via ? (
+                    <div>
+                      <span className="font-medium">Via:</span> {via}
+                    </div>
+                  ) : null}
+
+                  {journeyType ? (
+                    <div>
+                      <span className="font-medium">Journey type:</span>{" "}
+                      {journeyType}
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <span className="font-medium">Large bags:</span>{" "}
+                    {bagsLarge === null ? "ÔÇö" : bagsLarge}
+                  </div>
+                  <div>
+                    <span className="font-medium">Small bags:</span>{" "}
+                    {bagsSmall === null ? "ÔÇö" : bagsSmall}
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Local authority:</span>{" "}
+                    {localAuthority || "ÔÇö"}
+                  </div>
+                  <div>
+                    <span className="font-medium">Created:</span>{" "}
+                    {booking.created_at ? fmtDateTime(booking.created_at) : "ÔÇö"}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <span className="font-medium">Booking ID:</span> {booking.id}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <span className="font-medium">Notes:</span> {notes || "ÔÇö"}
+                  </div>
+                </div>
               </div>
-
-              <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                <div>
-                  <span className="font-medium">Status:</span>{" "}
-                  {booking.status || "ÔÇö"}
-                </div>
-                <div>
-                  <span className="font-medium">Payment:</span>{" "}
-                  {booking.payment_status || "ÔÇö"}
-                </div>
-
-                <div>
-                  <span className="font-medium">Driver:</span>{" "}
-                  <span className="font-semibold text-blue-700">
-                    {driver || "ÔÇö"}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Driver phone test:</span>{" "}
-                  {String(booking.driver_phone || "NONE")}
-                </div>
-                <div>
-                  <span className="font-medium">Vehicle:</span>{" "}
-                  <span className="font-semibold text-purple-700">
-                    {vehicle || "ÔÇö"}
-                  </span>
-                </div>
-
-                 <div>
-                  <span className="font-medium">Passengers:</span>{" "}
-                  {passengers === null ? "ÔÇö" : passengers}
-                </div>
-                <div>
-                  <span className="font-medium">Distance:</span>{" "}
-                  {distanceMiles === null ? "ÔÇö" : `${distanceMiles} miles`}
-                </div>
-
-                <div>
-                  <span className="font-medium">Via:</span> {via || "ÔÇö"}
-                </div>
-                <div>
-                  <span className="font-medium">Journey type:</span>{" "}
-                  {(booking as any).journey_type || (booking as any).type || "ÔÇö"}
-                </div>
-
-                <div>
-                  <span className="font-medium">Large bags:</span>{" "}
-                  {bagsLarge === null ? "ÔÇö" : bagsLarge}
-                </div>
-                <div>
-                  <span className="font-medium">Small bags:</span>{" "}
-                  {bagsSmall === null ? "ÔÇö" : bagsSmall}
-                </div>
-
-                <div>
-                  <span className="font-medium">Local authority:</span>{" "}
-                  {localAuthority || "ÔÇö"}
-                </div>
-                <div>
-                  <span className="font-medium">Created:</span>{" "}
-                  {booking.created_at ? fmtDateTime(booking.created_at) : "ÔÇö"}
-                </div>
-
-                <div className="sm:col-span-2">
-                  <span className="font-medium">Booking ID:</span> {booking.id}
-                </div>
-
-                <div className="sm:col-span-2">
-                  <span className="font-medium">Notes:</span> {notes || "ÔÇö"}
-                </div>
-              </div>
-            </div>
             )}
           </>
         )}
 
-{!compact && (
-  <div
-    className="mt-4 sticky bottom-0 z-10 border-t bg-white pt-3 pb-2 flex flex-wrap gap-2"
-    onClick={stopCardToggle}
-  >
-    <Link
-      href={`/edit/${booking.id}`}
-      className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-    >
-      Edit
-    </Link>
+        {!compact && (
+          <div
+            className="mt-4 sticky bottom-0 z-10 border-t bg-white pt-3 pb-2 flex flex-wrap gap-2"
+            onClick={stopCardToggle}
+          >
+            <Link
+              href={`/edit/${booking.id}`}
+              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+            >
+              Edit
+            </Link>
 
-    {phone ? (
-      <a
-        href={telHref(phone)}
-        className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-      >
-        Call
-      </a>
-    ) : null}
+            {phone ? (
+              <a
+                href={telHref(phone)}
+                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+              >
+                Call
+              </a>
+            ) : null}
 
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
 
-        if (!driverPhone) return;
+                if (!driverPhone) return;
 
-        const message = `MY WAY CARS
+                const message = `MY WAY CARS
 
 Passenger: ${name}
 Passenger Phone: ${phone || "ÔÇö"}
@@ -1172,27 +1210,27 @@ Estimated Price: ${fare === null ? "ÔÇö" : `┬ú${fare.toFixed(2)}`}
 Notes:
 ${notes || "None"}`;
 
-        window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
-      }}
-      disabled={!driverPhone}
-      className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      Text details to driver
-    </button>
+                window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
+              }}
+              disabled={!driverPhone}
+              className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Text details to driver
+            </button>
 
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
 
-        if (!phone) return;
+                if (!phone) return;
 
-        const returnNote = isOutboundLeg
-          ? `
+                const returnNote = isOutboundLeg
+                  ? `
 
 Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
-          : "";
+                  : "";
 
-        const customerMessage = `MY WAY CARS
+                const customerMessage = `MY WAY CARS
 
 Your booking is confirmed.
 
@@ -1214,119 +1252,119 @@ ${driverPhone || "Will be provided prior to pickup"}
 Vehicle:
 ${vehicle || "To be confirmed"}${returnNote}`;
 
-        window.location.href = `sms:${phone.replace(/\s+/g, "")}?body=${encodeURIComponent(customerMessage)}`;
-      }}
-      disabled={!phone}
-      className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      Text customer
-    </button>
+                window.location.href = `sms:${phone.replace(/\s+/g, "")}?body=${encodeURIComponent(customerMessage)}`;
+              }}
+              disabled={!phone}
+              className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Text customer
+            </button>
 
-    {status === "Scheduled" ? (
-      <button
-        onClick={() => void updateBooking(booking.id, { status: "POB" })}
-        disabled={isBusy}
-        className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        Mark POB
-      </button>
-    ) : null}
+            {status === "Scheduled" ? (
+              <button
+                onClick={() => void updateBooking(booking.id, { status: "POB" })}
+                disabled={isBusy}
+                className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Mark POB
+              </button>
+            ) : null}
 
-    {phone ? (
-      <a
-        href={smsHref(phone)}
-        className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-      >
-        Text
-      </a>
-    ) : null}
+            {phone ? (
+              <a
+                href={smsHref(phone)}
+                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+              >
+                Text
+              </a>
+            ) : null}
 
-    {pickup ? (
-      <a
-        href={mapHref(pickup)}
-        target="_blank"
-        rel="noreferrer"
-        className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-      >
-        Pickup map
-      </a>
-    ) : null}
+            {pickup ? (
+              <a
+                href={mapHref(pickup)}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+              >
+                Pickup map
+              </a>
+            ) : null}
 
-    {dropoff ? (
-      <a
-        href={mapHref(dropoff)}
-        target="_blank"
-        rel="noreferrer"
-        className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-      >
-        Dropoff map
-      </a>
-    ) : null}
+            {dropoff ? (
+              <a
+                href={mapHref(dropoff)}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+              >
+                Dropoff map
+              </a>
+            ) : null}
 
-    {status !== "Completed" ? (
-      <button
-        onClick={() =>
-          void updateBooking(booking.id, {
-            status: "Completed",
-            payment_status: "Unpaid",
-          })
-        }
-        disabled={isBusy}
-        className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        Complete (Unpaid)
-      </button>
-    ) : null}
+            {status !== "Completed" ? (
+              <button
+                onClick={() =>
+                  void updateBooking(booking.id, {
+                    status: "Completed",
+                    payment_status: "Unpaid",
+                  })
+                }
+                disabled={isBusy}
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Complete (Unpaid)
+              </button>
+            ) : null}
 
-    {status !== "Completed" ? (
-      <button
-        onClick={() =>
-          void updateBooking(booking.id, {
-            status: "Completed",
-            payment_status: "Paid",
-          })
-        }
-        disabled={isBusy}
-        className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        Complete & Paid
-      </button>
-    ) : null}
+            {status !== "Completed" ? (
+              <button
+                onClick={() =>
+                  void updateBooking(booking.id, {
+                    status: "Completed",
+                    payment_status: "Paid",
+                  })
+                }
+                disabled={isBusy}
+                className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Complete & Paid
+              </button>
+            ) : null}
 
-    {expanded && status === "Completed" && paymentStatus !== "Paid" ? (
-      <button
-        onClick={() => void onMarkPaid(booking.id)}
-        disabled={isBusy}
-        className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        Mark paid
-      </button>
-    ) : null}
+            {expanded && status === "Completed" && paymentStatus !== "Paid" ? (
+              <button
+                onClick={() => void onMarkPaid(booking.id)}
+                disabled={isBusy}
+                className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Mark paid
+              </button>
+            ) : null}
 
-    {status !== "Cancelled" ? (
-      <button
-        onClick={() => void onCancel(booking.id)}
-        disabled={isBusy}
-        className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        Cancel
-      </button>
-    ) : expanded ? (
-      <button
-        onClick={() =>
-          void updateBooking(booking.id, { status: "Scheduled" })
-        }
-        disabled={isBusy}
-        className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        Restore booking
-      </button>
-    ) : null}
-  </div>
-)}
-    </div>
-  );
-}
+            {status !== "Cancelled" ? (
+              <button
+                onClick={() => void onCancel(booking.id)}
+                disabled={isBusy}
+                className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            ) : expanded ? (
+              <button
+                onClick={() =>
+                  void updateBooking(booking.id, { status: "Scheduled" })
+                }
+                disabled={isBusy}
+                className="rounded-xl bg-slate-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Restore booking
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
@@ -1392,34 +1430,35 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             </div>
           </div>
         </section>
-{linkedBookings.length > 0 && (
-  <section
-    ref={linkedSectionRef}
-    className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm"
-  >
+
+        {linkedBookings.length > 0 && (
+          <section
+            ref={linkedSectionRef}
+            className="rounded-3xl border border-indigo-300 bg-indigo-50 p-5 shadow-sm"
+          >
             <div className="mb-3 flex items-center justify-between">
               <div className="text-lg font-semibold text-indigo-900">
                 Linked return journey
               </div>
 
-<button
-  onClick={() => {
-    setCardModes((current) => {
-      const next = { ...current };
+              <button
+                onClick={() => {
+                  setCardModes((current) => {
+                    const next = { ...current };
 
-      linkedBookings.forEach((booking) => {
-        next[booking.id] = "compact";
-      });
+                    linkedBookings.forEach((booking) => {
+                      next[booking.id] = "compact";
+                    });
 
-      return next;
-    });
+                    return next;
+                  });
 
-    setSelectedReturnGroupId(null);
-  }}
-  className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
->
-  Clear
-</button>
+                  setSelectedReturnGroupId(null);
+                }}
+                className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
+              >
+                Clear
+              </button>
             </div>
 
             <div className="space-y-4">
@@ -1441,11 +1480,11 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 ? "Current Job"
                 : "Next Job"}
             </div>
-<BookingCard
-  booking={nextJob}
-  forceExpanded
-  highlightClash={selectedClashBookingIds.includes(nextJob.id)}
-/>
+            <BookingCard
+              booking={nextJob}
+              forceExpanded
+              highlightClash={selectedClashBookingIds.includes(nextJob.id)}
+            />
           </section>
         ) : (
           <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
@@ -1633,23 +1672,23 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             </div>
           </div>
 
-<div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
-  {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
-    (value) => (
-      <button
-        key={value}
-        onClick={() => setStatusFilter(value)}
-        className={`rounded-xl px-3 py-2 text-sm font-medium ${
-          statusFilter === value
-            ? "bg-slate-900 text-white"
-            : "bg-slate-200 text-slate-900"
-        }`}
-      >
-        {value}
-      </button>
-    )
-  )}
-</div>
+          <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
+            {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
+              (value) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value)}
+                  className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                    statusFilter === value
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-200 text-slate-900"
+                  }`}
+                >
+                  {value}
+                </button>
+              )
+            )}
+          </div>
 
           {errorMessage ? (
             <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
@@ -1664,11 +1703,11 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           ) : (
             <div className="space-y-4">
               {filteredBookings.map((booking) => (
-<BookingCard
-  key={booking.id}
-  booking={booking}
-  highlightClash={selectedClashBookingIds.includes(booking.id)}
-/>
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  highlightClash={selectedClashBookingIds.includes(booking.id)}
+                />
               ))}
             </div>
           )}
