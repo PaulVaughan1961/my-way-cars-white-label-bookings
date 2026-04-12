@@ -1374,14 +1374,20 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             <div className="rounded-xl bg-slate-100 px-4 py-3">
               <div className="text-slate-500">Revenue</div>
               <div className="text-lg font-bold text-slate-900">
-                ┬ú{dashboardStats.revenue.toFixed(2)}
+                {new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: "GBP",
+                }).format(dashboardStats.revenue)}
               </div>
             </div>
 
             <div className="rounded-xl bg-amber-50 px-4 py-3">
               <div className="text-amber-700">Unpaid</div>
               <div className="text-lg font-bold text-amber-800">
-                ┬ú{dashboardStats.unpaid.toFixed(2)}
+                {new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: "GBP",
+                }).format(dashboardStats.unpaid)}
               </div>
             </div>
           </div>
@@ -1444,7 +1450,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
         ) : (
           <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
             <div className="text-lg font-semibold text-slate-900">
-              YouÔÇÖre clear
+              You’re clear
             </div>
             <p className="mt-1 text-sm text-slate-600">
               No upcoming scheduled jobs found.
@@ -1456,7 +1462,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           {detectedClashes.length > 0 && (
             <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
               <div>
-                ÔÜá {detectedClashes.length} scheduling issue
+                ⚠ {detectedClashes.length} scheduling issue
                 {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
               </div>
 
@@ -1489,7 +1495,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 }}
                 className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
               >
-                ÔåÉ Back to all bookings
+                ← Back to all bookings
               </button>
             </div>
           )}
@@ -1508,10 +1514,10 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                     <div className="mb-2 font-medium">
                       {clash.type} clash{" "}
                       {clash.sameDriver
-                        ? "ÔÇö same driver"
+                        ? "— same driver"
                         : clash.unassigned
-                        ? "ÔÇö unassigned driver"
-                        : "ÔÇö jobs close together"}
+                        ? "— unassigned driver"
+                        : "— jobs close together"}
                     </div>
 
                     <div className="flex gap-2">
@@ -1527,7 +1533,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                         }}
                         className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
                       >
-                        Ô£ö Mark resolved
+                        ✔ Mark resolved
                       </button>
                     </div>
                   </div>
@@ -1569,7 +1575,10 @@ ${vehicle || "To be confirmed"}${returnNote}`;
 
           {unpaidTotal > 0 ? (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
-              Unpaid total: ┬ú{unpaidTotal.toFixed(2)}
+              Unpaid total: {new Intl.NumberFormat("en-GB", {
+                style: "currency",
+                currency: "GBP",
+              }).format(unpaidTotal)}
             </div>
           ) : null}
 
@@ -1577,8 +1586,18 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             <div className="mb-1 font-semibold text-slate-800">Today</div>
             <div className="flex gap-4 text-slate-700">
               <span>Jobs: {todayStats.jobs}</span>
-              <span>Revenue: ┬ú{todayStats.revenue.toFixed(2)}</span>
-              <span>Unpaid: ┬ú{todayStats.unpaid.toFixed(2)}</span>
+              <span>
+                Revenue: {new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: "GBP",
+                }).format(todayStats.revenue)}
+              </span>
+              <span>
+                Unpaid: {new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: "GBP",
+                }).format(todayStats.unpaid)}
+              </span>
             </div>
           </div>
 
