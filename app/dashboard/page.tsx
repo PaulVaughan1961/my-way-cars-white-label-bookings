@@ -58,44 +58,70 @@ type ClashRow = {
   strong: boolean;
 };
 
+function cleanDisplayText(value: unknown): string {
+  if (typeof value !== "string") return "";
+
+  let text = value.trim();
+
+  if (!text) return "";
+
+  text = text
+    .replace(/ÔÇö|ÔÇò|ÔÇ£|ÔÇ¥|â€”|â€“|â€˜|â€™|â€œ|â€|┬ú|�/g, "")
+    .trim();
+
+  if (
+    !text ||
+    text === "—" ||
+    text === "–" ||
+    text === "-" ||
+    text.toLowerCase() === "null" ||
+    text.toLowerCase() === "undefined" ||
+    text.toLowerCase() === "n/a" ||
+    text.toLowerCase() === "none"
+  ) {
+    return "";
+  }
+
+  return text;
+}
+
+function displayOrDash(value: unknown): string {
+  const cleaned = cleanDisplayText(value);
+  return cleaned || "—";
+}
+
 function buildDriverMessage(booking: any) {
-  const passenger =
+  const passenger = displayOrDash(
     booking.leadPassenger ??
-    booking.lead_passenger ??
-    booking.passenger_name ??
-    "ÔÇö";
+      booking.lead_passenger ??
+      booking.passenger_name
+  );
 
-  const date =
-    booking.when ??
-    booking.outbound_date ??
-    booking.date ??
-    "ÔÇö";
+  const date = displayOrDash(
+    booking.when ?? booking.outbound_date ?? booking.date
+  );
 
-  const time =
-    booking.time ??
-    booking.outbound_time ??
-    "ÔÇö";
+  const time = displayOrDash(
+    booking.time ?? booking.outbound_time
+  );
 
-  const pickup =
-    booking.pickup ??
-    booking.outbound_pickup ??
-    "ÔÇö";
+  const pickup = displayOrDash(
+    booking.pickup ?? booking.outbound_pickup
+  );
 
-  const dropoff =
-    booking.dropoff ??
-    booking.outbound_dropoff ??
-    "ÔÇö";
+  const dropoff = displayOrDash(
+    booking.dropoff ?? booking.outbound_dropoff
+  );
 
-  const customerPhone =
+  const customerPhone = displayOrDash(
     booking.booker_phone ??
-    booking.customer_phone ??
-    booking.passenger_phone ??
-    "ÔÇö";
+      booking.customer_phone ??
+      booking.passenger_phone
+  );
 
-  const notes =
-    booking.notes ??
-    booking.outbound_notes ??
-    "None";
+  const notes = cleanDisplayText(
+    booking.notes ?? booking.outbound_notes
+  ) || "None";
 
   return `My Way Cars
 
@@ -114,7 +140,6 @@ ${customerPhone}
 
 Notes:
 ${notes}`;
-
 }
 
 function getDriverPhone(row: BookingRow): string {
@@ -125,38 +150,6 @@ function getSmsLink(booking: any) {
   const phone = booking.driver_phone || "";
   const message = encodeURIComponent(buildDriverMessage(booking));
   return `sms:${phone}?body=${message}`;
-}
-
-function cleanDisplayText(value: unknown): string {
-  if (typeof value !== "string") return "";
-
-  const text = value.trim();
-
-  if (!text) return "";
-
-  const junkValues = new Set([
-    "ÔÇö",
-    "ÔÇò",
-    "â€”",
-    "â€“",
-    "—",
-    "–",
-    "-",
-    "null",
-    "undefined",
-    "N/A",
-    "n/a",
-    "none",
-    "NONE",
-  ]);
-
-  if (junkValues.has(text)) return "";
-
-  return text;
-}
-function displayOrDash(value: unknown): string {
-  const cleaned = cleanDisplayText(value);
-  return cleaned || "—";
 }
 
 function pickString(row: BookingRow, keys: string[]): string {
@@ -745,9 +738,9 @@ export default function HomePage() {
 
         return `${c.type} ${label}${
           c.count > 2 ? ` (${c.count} jobs)` : ""
-        } ÔÇö ${reason}`;
+        } — ${reason}`;
       })
-      .join(" ÔÇó ");
+      .join(" • ");
   }, [detectedClashes]);
 
   const nextJob = useMemo(() => {
@@ -868,10 +861,10 @@ export default function HomePage() {
     forceExpanded?: boolean;
     highlightClash?: boolean;
   }) {
-    const driver = getDriver(booking);
-    const vehicle = getVehicle(booking);
-    const bookingType = getBookingType(booking);
-    const journeyType = getJourneyType(booking);
+    const driver = cleanDisplayText(getDriver(booking));
+    const vehicle = cleanDisplayText(getVehicle(booking));
+    const bookingType = cleanDisplayText(getBookingType(booking));
+    const journeyType = cleanDisplayText(getJourneyType(booking));
     const when = getWhen(booking);
     const name = getName(booking);
     const phone = getPhone(booking);
@@ -880,9 +873,9 @@ export default function HomePage() {
     const fare = getFare(booking);
     const status = (booking.status ?? "Scheduled").toString();
     const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
-    const notes = pickString(booking, ["notes"]);
-    const via = pickString(booking, ["via"]);
-    const localAuthority = pickString(booking, ["local_authority"]);
+    const notes = cleanDisplayText(booking.notes);
+    const via = cleanDisplayText(booking.via);
+    const localAuthority = cleanDisplayText(booking.local_authority);
     const passengers = pickNumber(booking, ["passengers"]);
     const bagsLarge = pickNumber(booking, ["bags_large"]);
     const bagsSmall = pickNumber(booking, ["bags_small"]);
@@ -954,7 +947,7 @@ export default function HomePage() {
                 const parts = parseLocalDateTimeParts(when);
 
                 if (!parts) {
-                  return `ÔÇö | ÔÇö | ${name} | ${pickup || "ÔÇö"}`;
+                  return `— | — | ${name} | ${displayOrDash(pickup)}`;
                 }
 
                 const d = new Date(
@@ -978,7 +971,9 @@ export default function HomePage() {
                   hour12: false,
                 });
 
-                return `${dateText} | ${timeText} | ${name} | ${pickup || "ÔÇö"}`;
+                return `${dateText} | ${timeText} | ${name} | ${displayOrDash(
+                  pickup
+                )}`;
               })()}
             </div>
           </div>
@@ -1030,18 +1025,18 @@ export default function HomePage() {
           <>
             <div className="space-y-1 text-sm text-slate-700">
               <div>
-                <span className="font-medium">From:</span> {pickup || "ÔÇö"}
+                <span className="font-medium">From:</span> {displayOrDash(pickup)}
               </div>
               <div>
-                <span className="font-medium">To:</span> {dropoff || "ÔÇö"}
+                <span className="font-medium">To:</span> {displayOrDash(dropoff)}
               </div>
               <div>
-                <span className="font-medium">Phone:</span> {phone || "ÔÇö"}
+                <span className="font-medium">Phone:</span> {displayOrDash(phone)}
               </div>
-<div>
-  <span className="font-medium">Fare:</span>{" "}
-  {fare === null ? "ÔÇö" : `£${fare.toFixed(2)}`}
-</div>
+              <div>
+                <span className="font-medium">Fare:</span>{" "}
+                {fare === null ? "—" : `£${fare.toFixed(2)}`}
+              </div>
               <div>
                 <span className="font-medium">Driver:</span>{" "}
                 <span className="font-semibold text-blue-700">
@@ -1053,7 +1048,7 @@ export default function HomePage() {
                 {vehicle || "Unassigned"}
               </div>
               <div>
-                <span className="font-medium">Type:</span> {bookingType || "ÔÇö"}
+                <span className="font-medium">Type:</span> {displayOrDash(bookingType)}
               </div>
 
               {(() => {
@@ -1072,7 +1067,7 @@ export default function HomePage() {
                 if (!Number.isNaN(whenMs) && diff <= 2 * 60 * 60 * 1000) {
                   return (
                     <div className="mt-2 rounded-xl border border-red-300 bg-red-50 p-2 text-sm font-semibold text-red-700 animate-pulse">
-                      URGENT ÔÇö driver not assigned
+                      URGENT — driver not assigned
                     </div>
                   );
                 }
@@ -1094,17 +1089,17 @@ export default function HomePage() {
                 <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
                   <div>
                     <span className="font-medium">Status:</span>{" "}
-                    {booking.status || "ÔÇö"}
+                    {displayOrDash(booking.status)}
                   </div>
                   <div>
                     <span className="font-medium">Payment:</span>{" "}
-                    {booking.payment_status || "ÔÇö"}
+                    {displayOrDash(booking.payment_status)}
                   </div>
 
                   <div>
                     <span className="font-medium">Driver:</span>{" "}
                     <span className="font-semibold text-blue-700">
-                      {driver || "ÔÇö"}
+                      {displayOrDash(driver)}
                     </span>
                   </div>
                   <div>
@@ -1114,17 +1109,17 @@ export default function HomePage() {
                   <div>
                     <span className="font-medium">Vehicle:</span>{" "}
                     <span className="font-semibold text-purple-700">
-                      {vehicle || "ÔÇö"}
+                      {displayOrDash(vehicle)}
                     </span>
                   </div>
 
                   <div>
                     <span className="font-medium">Passengers:</span>{" "}
-                    {passengers === null ? "ÔÇö" : passengers}
+                    {passengers === null ? "—" : passengers}
                   </div>
                   <div>
                     <span className="font-medium">Distance:</span>{" "}
-                    {distanceMiles === null ? "ÔÇö" : `${distanceMiles} miles`}
+                    {distanceMiles === null ? "—" : `${distanceMiles} miles`}
                   </div>
 
                   {via ? (
@@ -1142,20 +1137,20 @@ export default function HomePage() {
 
                   <div>
                     <span className="font-medium">Large bags:</span>{" "}
-                    {bagsLarge === null ? "ÔÇö" : bagsLarge}
+                    {bagsLarge === null ? "—" : bagsLarge}
                   </div>
                   <div>
                     <span className="font-medium">Small bags:</span>{" "}
-                    {bagsSmall === null ? "ÔÇö" : bagsSmall}
+                    {bagsSmall === null ? "—" : bagsSmall}
                   </div>
 
                   <div>
                     <span className="font-medium">Local authority:</span>{" "}
-                    {localAuthority || "ÔÇö"}
+                    {displayOrDash(localAuthority)}
                   </div>
                   <div>
                     <span className="font-medium">Created:</span>{" "}
-                    {booking.created_at ? fmtDateTime(booking.created_at) : "ÔÇö"}
+                    {booking.created_at ? fmtDateTime(booking.created_at) : "—"}
                   </div>
 
                   <div className="sm:col-span-2">
@@ -1201,19 +1196,19 @@ export default function HomePage() {
                 const message = `MY WAY CARS
 
 Passenger: ${name}
-Passenger Phone: ${phone || "ÔÇö"}
+Passenger Phone: ${displayOrDash(phone)}
 When: ${fmtDateTime(when)}
 
 From:
-${pickup || "ÔÇö"}
+${displayOrDash(pickup)}
 
 To:
-${dropoff || "ÔÇö"}
+${displayOrDash(dropoff)}
 
-Estimated Price: ${fare === null ? "ÔÇö" : `£${fare.toFixed(2)}`}
+Estimated Price: ${fare === null ? "—" : `£${fare.toFixed(2)}`}
 
 Notes:
-${notes || "None"}`;
+${cleanDisplayText(notes) || "None"}`;
 
                 window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
               }}
@@ -1243,10 +1238,10 @@ When:
 ${fmtDateTime(when)}
 
 From:
-${pickup || "ÔÇö"}
+${displayOrDash(pickup)}
 
 To:
-${dropoff || "ÔÇö"}
+${displayOrDash(dropoff)}
 
 Driver:
 ${driver || "To be confirmed"}
@@ -1702,7 +1697,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           ) : null}
 
           {loading ? (
-            <div className="text-sm text-slate-600">Loading bookingsÔÇª</div>
+            <div className="text-sm text-slate-600">Loading bookings...</div>
           ) : filteredBookings.length === 0 ? (
             <div className="text-sm text-slate-600">No bookings found.</div>
           ) : (
