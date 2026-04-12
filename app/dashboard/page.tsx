@@ -114,6 +114,7 @@ ${customerPhone}
 
 Notes:
 ${notes}`;
+
 }
 
 function getDriverPhone(row: BookingRow): string {
@@ -152,6 +153,10 @@ function cleanDisplayText(value: unknown): string {
   if (junkValues.has(text)) return "";
 
   return text;
+}
+function displayOrDash(value: unknown): string {
+  const cleaned = cleanDisplayText(value);
+  return cleaned || "—";
 }
 
 function pickString(row: BookingRow, keys: string[]): string {
@@ -1158,7 +1163,7 @@ export default function HomePage() {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <span className="font-medium">Notes:</span> {notes || "ÔÇö"}
+                    <span className="font-medium">Notes:</span> {displayOrDash(notes)}
                   </div>
                 </div>
               </div>
