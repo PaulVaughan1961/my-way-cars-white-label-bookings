@@ -1033,10 +1033,10 @@ export default function HomePage() {
               <div>
                 <span className="font-medium">Phone:</span> {phone || "ÔÇö"}
               </div>
-              <div>
-                <span className="font-medium">Fare:</span>{" "}
-                {fare === null ? "ÔÇö" : `┬ú${fare.toFixed(2)}`}
-              </div>
+<div>
+  <span className="font-medium">Fare:</span>{" "}
+  {fare === null ? "ÔÇö" : `£${fare.toFixed(2)}`}
+</div>
               <div>
                 <span className="font-medium">Driver:</span>{" "}
                 <span className="font-semibold text-blue-700">
@@ -1205,7 +1205,7 @@ ${pickup || "ÔÇö"}
 To:
 ${dropoff || "ÔÇö"}
 
-Estimated Price: ${fare === null ? "ÔÇö" : `┬ú${fare.toFixed(2)}`}
+Estimated Price: ${fare === null ? "ÔÇö" : `£${fare.toFixed(2)}`}
 
 Notes:
 ${notes || "None"}`;
