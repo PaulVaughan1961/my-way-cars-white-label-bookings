@@ -28,7 +28,8 @@ type BookingRow = {
   vehicle?: string | null;
   booking_type?: string | null;
   return_datetime?: string | null;
-return_notes?: string | null;
+  return_flight_number?: string | null;
+  return_notes?: string | null;
 };
 
 type DriverRow = {
@@ -108,6 +109,8 @@ export default function EditBookingPage() {
 const [returnDate, setReturnDate] = useState("");
 const [returnTime, setReturnTime] = useState("");
 const [returnNotes, setReturnNotes] = useState("");
+const [returnFlightNumber, setReturnFlightNumber] = useState("");
+
 
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
@@ -200,10 +203,11 @@ const { data: driverData, error: driverError } = await supabase
         setBookingType(row.booking_type ?? "");
         setStatus((row.status ?? "Scheduled").toString());
         setPaymentStatus((row.payment_status ?? "Unpaid").toString());
-setHasReturn(!!row.return_datetime);
-setReturnDate(localDateFromIso(row.return_datetime));
-setReturnTime(localTimeFromIso(row.return_datetime));
-setReturnNotes(row.return_notes ?? "");
+        setHasReturn(!!row.return_datetime);
+        setReturnDate(localDateFromIso(row.return_datetime));
+        setReturnTime(localTimeFromIso(row.return_datetime));
+        setReturnFlightNumber(row.return_flight_number ?? "");
+        setReturnNotes(row.return_notes ?? "");
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Failed to load booking"
@@ -285,6 +289,9 @@ notes: notes.trim() || null,
   booking_type: bookingType.trim() || null,
   return_datetime: hasReturn
     ? isoFromDateTime(returnDate, returnTime)
+    : null,
+  return_flight_number: hasReturn
+    ? returnFlightNumber.trim() || null
     : null,
   return_notes: hasReturn ? returnNotes.trim() || null : null,
 };
@@ -618,7 +625,7 @@ notes: notes.trim() || null,
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-4">
+<div className="border-t border-gray-200 pt-4">
   <label className="flex items-center gap-2 text-sm font-medium">
     <input
       type="checkbox"
@@ -640,7 +647,6 @@ notes: notes.trim() || null,
             onChange={(e) => setReturnDate(e.target.value)}
           />
         </div>
-        
 
         <div>
           <label className="text-sm font-medium">Return time</label>
@@ -654,13 +660,23 @@ notes: notes.trim() || null,
       </div>
 
       <div>
-        <label className="text-sm font-medium">Return notes</label>
+        <label className="text-sm font-medium">Return flight number</label>
+        <input
+          className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+          value={returnFlightNumber}
+          onChange={(e) => setReturnFlightNumber(e.target.value)}
+          placeholder="e.g. BA123"
+        />
+      </div>
+
+      <div>
+        <label className="text-sm font-medium">Driver notes (return)</label>
         <textarea
-          className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3"
+          className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
           value={returnNotes}
           onChange={(e) => setReturnNotes(e.target.value)}
           rows={3}
-          placeholder="Flight number / return info"
+          placeholder="Terminal, pickup instructions, delay info, meet point, etc."
         />
       </div>
     </div>
