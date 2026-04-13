@@ -95,22 +95,24 @@ export default function AddBookingPage() {
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
 
-  const [isReturn, setIsReturn] = useState(false);
+  const [hasReturn, setHasReturn] = useState(false);
   const [reverseReturn, setReverseReturn] = useState(true);
   const [returnDate, setReturnDate] = useState(todayYYYYMMDD());
   const [returnTime, setReturnTime] = useState("17:30");
+  const [returnFlightNumber, setReturnFlightNumber] = useState("");
+  const [returnNotes, setReturnNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function loadData() {
-const { data: driverData, error: driverError } = await supabase
-  .from("drivers")
-  .select(
-    "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
-  )
-  .eq("active", true)
-  .order("name", { ascending: true });
+      const { data: driverData, error: driverError } = await supabase
+        .from("drivers")
+        .select(
+          "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
+        )
+        .eq("active", true)
+        .order("name", { ascending: true });
 
       if (!driverError) {
         setDrivers((driverData as DriverRow[]) ?? []);
@@ -137,7 +139,8 @@ const { data: driverData, error: driverError } = await supabase
       dropoffAddress.trim().length > 0 &&
       pickupDate.trim().length > 0 &&
       pickupTime.trim().length > 0 &&
-      (!isReturn || (returnDate.trim().length > 0 && returnTime.trim().length > 0))
+      (!hasReturn ||
+        (returnDate.trim().length > 0 && returnTime.trim().length > 0))
     );
   }, [
     passengerName,
@@ -146,7 +149,7 @@ const { data: driverData, error: driverError } = await supabase
     dropoffAddress,
     pickupDate,
     pickupTime,
-    isReturn,
+    hasReturn,
     returnDate,
     returnTime,
   ]);
@@ -159,14 +162,18 @@ const { data: driverData, error: driverError } = await supabase
     e.preventDefault();
     if (!canSave || saving) return;
 
-    if (isReturn) {
+    if (hasReturn) {
       const outwardDateTime = isoFromDateTime(pickupDate, pickupTime);
       const returnDateTime = isoFromDateTime(returnDate, returnTime);
 
       const outwardMs = new Date(outwardDateTime).getTime();
       const returnMs = new Date(returnDateTime).getTime();
 
-      if (!Number.isNaN(outwardMs) && !Number.isNaN(returnMs) && returnMs <= outwardMs) {
+      if (
+        !Number.isNaN(outwardMs) &&
+        !Number.isNaN(returnMs) &&
+        returnMs <= outwardMs
+      ) {
         alert("Return journey must be after the outward journey.");
         return;
       }
@@ -174,50 +181,51 @@ const { data: driverData, error: driverError } = await supabase
 
     setSaving(true);
 
-try {
-  const returnGroupId = isReturn
-    ? `RET-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    : null;
+    try {
+      const returnGroupId = hasReturn
+        ? `RET-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        : null;
 
-  const estFareGBP =
-    estFare.trim().length > 0
-      ? Number(estFare.replace(/[^\d.]/g, ""))
-      : null;
+      const estFareGBP =
+        estFare.trim().length > 0
+          ? Number(estFare.replace(/[^\d.]/g, ""))
+          : null;
 
-  const distanceMilesNumber =
-    distanceMiles.trim().length > 0
-      ? Number(distanceMiles.replace(/[^\d.]/g, ""))
-      : null;
-        const selectedDriver = drivers.find(
-    (d) => d.name?.trim().toLowerCase() === driverName.trim().toLowerCase()
-  );
+      const distanceMilesNumber =
+        distanceMiles.trim().length > 0
+          ? Number(distanceMiles.replace(/[^\d.]/g, ""))
+          : null;
 
-  const driverPhone = selectedDriver?.driver_phone?.trim() || null;
+      const selectedDriver = drivers.find(
+        (d) => d.name?.trim().toLowerCase() === driverName.trim().toLowerCase()
+      );
+
+      const driverPhone = selectedDriver?.driver_phone?.trim() || null;
 
       const outboundInsert = await supabase.from("bookings").insert([
-     {
-  passenger_name: passengerName.trim(),
-  passenger_phone: passengerPhone.trim(),
-  pickup_address: pickupAddress.trim(),
-  dropoff_address: dropoffAddress.trim(),
-  pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
-  distance_miles: distanceMilesNumber,
-  fare: estFareGBP,
-  notes: notes.trim() || null,
-  status: "Scheduled",
-  payment_status: "Unpaid",
-  created_at: new Date().toISOString(),
-  passengers: pax === "" ? 1 : Number(pax),
-  via: via.trim() || null,
-  bags_large: bagsLarge,
-  bags_small: bagsSmall,
-  local_authority: localAuthority.trim() || null,
-  driver_name: driverName.trim() || null,
-  driver_phone: driverPhone,
-  vehicle: vehicle.trim() || null,
-  booking_type: bookingType.trim() || null,
-  return_group_id: returnGroupId,
-}
+        {
+          passenger_name: passengerName.trim(),
+          passenger_phone: passengerPhone.trim(),
+          pickup_address: pickupAddress.trim(),
+          dropoff_address: dropoffAddress.trim(),
+          pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
+          distance_miles: distanceMilesNumber,
+          fare: estFareGBP,
+          notes: notes.trim() || null,
+          status: "Scheduled",
+          payment_status: "Unpaid",
+          created_at: new Date().toISOString(),
+          passengers: pax === "" ? 1 : Number(pax),
+          via: via.trim() || null,
+          bags_large: bagsLarge,
+          bags_small: bagsSmall,
+          local_authority: localAuthority.trim() || null,
+          driver_name: driverName.trim() || null,
+          driver_phone: driverPhone,
+          vehicle: vehicle.trim() || null,
+          booking_type: bookingType.trim() || null,
+          return_group_id: returnGroupId,
+        },
       ]);
 
       if (outboundInsert.error) {
@@ -227,10 +235,11 @@ try {
         return;
       }
 
-      if (isReturn) {
+      if (hasReturn) {
         const retPickup = reverseReturn
           ? dropoffAddress.trim()
           : pickupAddress.trim();
+
         const retDrop = reverseReturn
           ? pickupAddress.trim()
           : dropoffAddress.trim();
@@ -244,7 +253,7 @@ try {
             pickup_datetime: isoFromDateTime(returnDate, returnTime),
             distance_miles: distanceMilesNumber,
             fare: estFareGBP,
-            notes: notes.trim() || null,
+            notes: returnNotes.trim() || null,
             status: "Scheduled",
             payment_status: "Unpaid",
             created_at: new Date().toISOString(),
@@ -258,12 +267,15 @@ try {
             vehicle: vehicle.trim() || null,
             booking_type: bookingType.trim() || null,
             return_group_id: returnGroupId,
+            return_flight_number: returnFlightNumber.trim() || null,
           },
         ]);
 
         if (returnInsert.error) {
           console.error(returnInsert.error);
-          alert(`Outbound saved, but return booking failed: ${returnInsert.error.message}`);
+          alert(
+            `Outbound saved, but return booking failed: ${returnInsert.error.message}`
+          );
           setSaving(false);
           return;
         }
@@ -289,7 +301,7 @@ try {
 
         <form
           onSubmit={onSubmit}
-          className="rounded-2xl bg-white p-4 shadow border border-gray-200 space-y-4"
+          className="rounded-2xl border border-gray-200 bg-white p-4 shadow space-y-4"
         >
           <div>
             <label className="text-sm font-medium">Passenger name</label>
@@ -379,10 +391,13 @@ try {
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => {
                   const cleaned = e.target.value.replace(/\D/g, "");
-                  setPax(cleaned === "" ? "" : String(Math.max(1, Number(cleaned))));
+                  setPax(
+                    cleaned === "" ? "" : String(Math.max(1, Number(cleaned)))
+                  );
                 }}
               />
             </div>
+
             <div>
               <label className="text-sm font-medium">Large bags</label>
               <input
@@ -393,6 +408,7 @@ try {
                 onChange={(e) => setBagsLarge(Number(e.target.value || 0))}
               />
             </div>
+
             <div>
               <label className="text-sm font-medium">Small bags</label>
               <input
@@ -466,9 +482,7 @@ try {
 
                 const matchedVehicle = vehicles.find((v) => {
                   const matchName = getVehicleMatchName(v).toLowerCase();
-                  return (
-                    matchName === preferredVehicleName.trim().toLowerCase()
-                  );
+                  return matchName === preferredVehicleName.trim().toLowerCase();
                 });
 
                 if (matchedVehicle) {
@@ -536,7 +550,9 @@ try {
           </div>
 
           <div>
-            <label className="text-sm font-medium">Booking type (optional)</label>
+            <label className="text-sm font-medium">
+              Booking type (optional)
+            </label>
             <select
               className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
               value={bookingType}
@@ -565,13 +581,13 @@ try {
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
-                checked={isReturn}
-                onChange={(e) => setIsReturn(e.target.checked)}
+                checked={hasReturn}
+                onChange={(e) => setHasReturn(e.target.checked)}
               />
               Return journey?
             </label>
 
-            {isReturn && (
+            {hasReturn && (
               <div className="mt-3 space-y-3">
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -579,7 +595,7 @@ try {
                     checked={reverseReturn}
                     onChange={(e) => setReverseReturn(e.target.checked)}
                   />
-                  Return pickup/dropoff is the reverse of outbound?
+                  Reverse pickup/dropoff for return
                 </label>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -592,6 +608,7 @@ try {
                       onChange={(e) => setReturnDate(e.target.value)}
                     />
                   </div>
+
                   <div>
                     <label className="text-sm font-medium">Return time</label>
                     <input
@@ -602,6 +619,31 @@ try {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="text-sm font-medium">
+                    Return flight number
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                    value={returnFlightNumber}
+                    onChange={(e) => setReturnFlightNumber(e.target.value)}
+                    placeholder="e.g. BA123"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">
+                    Driver notes (return)
+                  </label>
+                  <textarea
+                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                    value={returnNotes}
+                    onChange={(e) => setReturnNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Terminal, delays, pickup instructions..."
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -610,7 +652,9 @@ try {
             type="submit"
             disabled={!canSave || saving}
             className={`w-full rounded-xl py-3 font-semibold text-white ${
-              canSave && !saving ? "bg-gray-900" : "bg-gray-400 cursor-not-allowed"
+              canSave && !saving
+                ? "bg-gray-900"
+                : "cursor-not-allowed bg-gray-400"
             }`}
           >
             {saving ? "Saving..." : "Save booking"}
@@ -619,7 +663,7 @@ try {
           <button
             type="button"
             onClick={onCancel}
-            className="w-full rounded-xl py-3 font-semibold border border-gray-200"
+            className="w-full rounded-xl border border-gray-200 py-3 font-semibold"
           >
             Cancel
           </button>
