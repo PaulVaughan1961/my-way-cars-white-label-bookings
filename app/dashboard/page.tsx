@@ -1523,7 +1523,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                   setSelectedClashBookingIds([...new Set(clashIds)]);
 
                   requestAnimationFrame(() => {
-                    clashSectionRef.current?.scrollIntoView({
+   linkedSectionRef.current?.scrollIntoView({
                       behavior: "smooth",
                       block: "start",
                     });
@@ -1602,7 +1602,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 setSelectedClashBookingIds(clash.bookingIds);
 
                 requestAnimationFrame(() => {
-                  clashSectionRef.current?.scrollIntoView({
+                linkedSectionRef.current?.scrollIntoView({
                     behavior: "smooth",
                     block: "start",
                   });
@@ -1610,7 +1610,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               }}
               className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
             >
-              Show bookings
+              Show this clash group
             </button>
 
             <button
