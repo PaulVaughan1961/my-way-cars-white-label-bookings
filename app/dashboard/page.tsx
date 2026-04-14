@@ -1609,7 +1609,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
       const el = offendingBookingsRef.current;
       if (!el) return;
 
-      const y = el.getBoundingClientRect().top + window.scrollY - 500;
+      const y = el.getBoundingClientRect().top + window.scrollY - 515;
 
       window.scrollTo({
         top: y,
