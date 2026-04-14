@@ -1599,29 +1599,28 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                     </div>
 
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setStatusFilter("All");
-                          setSearchTerm("");
-                          setSelectedClashBookingIds(clash.bookingIds);
+<button
+  onClick={() => {
+    setStatusFilter("All");
+    setSearchTerm("");
+    setSelectedClashBookingIds(clash.bookingIds);
 
-                          requestAnimationFrame(() => {
-                            const el = offendingBookingsRef.current;
-                            if (!el) return;
+    requestAnimationFrame(() => {
+      const el = offendingBookingsRef.current;
+      if (!el) return;
 
-                            const y =
-                              el.getBoundingClientRect().top + window.scrollY - 120;
+      const y = el.getBoundingClientRect().top + window.scrollY - 320;
 
-                            window.scrollTo({
-                              top: y,
-                              behavior: "smooth",
-                            });
-                          });
-                        }}
-                        className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
-                      >
-                        Show this clash group
-                      </button>
+      window.scrollTo({
+        top: y,
+        behavior: "smooth",
+      });
+    });
+  }}
+  className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
+>
+  Show this clash group
+</button>
 
                       <button
                         onClick={async () => {
