@@ -358,12 +358,14 @@ export default function HomePage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState("Upcoming");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+const [errorMessage, setErrorMessage] = useState("");
+const [searchTerm, setSearchTerm] = useState("");
 
-  const [cardModes, setCardModes] = useState<
-    Record<string, "compact" | "normal" | "full">
-  >({});
+const [highlightedClashGroup, setHighlightedClashGroup] = useState<string | null>(null);
+
+const [cardModes, setCardModes] = useState<
+  Record<string, "compact" | "normal" | "full">
+>({});
 
   const [nowMs, setNowMs] = useState(Date.now());
   const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
