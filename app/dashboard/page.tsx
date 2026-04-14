@@ -358,9 +358,27 @@ function makeClashKey(a: string, b: string): string {
 
 export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
-  const clashSectionRef = useRef<HTMLDivElement | null>(null);
-  const linkedSectionRef = useRef<HTMLDivElement | null>(null);
-  const offendingBookingsRef = useRef<HTMLDivElement | null>(null);
+const clashSectionRef = useRef<HTMLDivElement | null>(null);
+const linkedSectionRef = useRef<HTMLDivElement | null>(null);
+const offendingBookingsRef = useRef<HTMLDivElement | null>(null);
+function scrollToRefWithOffset(
+  ref: React.RefObject<HTMLDivElement | null>,
+  offset = 120
+) {
+  requestAnimationFrame(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const y = el.getBoundingClientRect().top + window.scrollY - offset;
+
+    window.scrollTo({
+      top: y,
+      behavior: "smooth",
+    });
+  });
+}
+
+
 
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -1605,17 +1623,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
     setSearchTerm("");
     setSelectedClashBookingIds(clash.bookingIds);
 
-    requestAnimationFrame(() => {
-      const el = offendingBookingsRef.current;
-      if (!el) return;
-
-      const y = el.getBoundingClientRect().top + window.scrollY - 515;
-
-      window.scrollTo({
-        top: y,
-        behavior: "smooth",
-      });
-    });
+scrollToRefWithOffset(offendingBookingsRef, 515);
   }}
   className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
 >
