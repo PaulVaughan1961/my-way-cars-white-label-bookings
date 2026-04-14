@@ -27,7 +27,7 @@ type BookingRow = {
   vehicle?: string | null;
   booking_type?: string | null;
   return_group_id?: string | null;
-    return_flight_number?: string | null;
+  return_flight_number?: string | null;
 
   lead_passenger?: string | null;
   customer_name?: string | null;
@@ -43,6 +43,8 @@ type BookingRow = {
   pickup_at?: string | null;
   journey_at?: string | null;
   date_time?: string | null;
+  journey_type?: string | null;
+  type?: string | null;
 
   [key: string]: unknown;
 };
@@ -58,6 +60,74 @@ type ClashRow = {
   unassigned: boolean;
   strong: boolean;
 };
+
+function buildDriverMessage(booking: any) {
+  const passenger =
+    booking.leadPassenger ??
+    booking.lead_passenger ??
+    booking.passenger_name ??
+    "—";
+
+  const date =
+    booking.when ??
+    booking.outbound_date ??
+    booking.date ??
+    "—";
+
+  const time =
+    booking.time ??
+    booking.outbound_time ??
+    "—";
+
+  const pickup =
+    booking.pickup ??
+    booking.outbound_pickup ??
+    "—";
+
+  const dropoff =
+    booking.dropoff ??
+    booking.outbound_dropoff ??
+    "—";
+
+  const customerPhone =
+    booking.booker_phone ??
+    booking.customer_phone ??
+    booking.passenger_phone ??
+    "—";
+
+  const notes =
+    booking.notes ??
+    booking.outbound_notes ??
+    "None";
+
+  return `My Way Cars
+
+Passenger: ${passenger}
+Date: ${date}
+Time: ${time}
+
+Pickup:
+${pickup}
+
+Dropoff:
+${dropoff}
+
+Customer Phone:
+${customerPhone}
+
+Notes:
+${notes}`;
+}
+
+function getDriverPhone(row: BookingRow): string {
+  return pickString(row, ["driver_phone"]);
+}
+
+function getSmsLink(booking: any) {
+  const phone = booking.driver_phone || "";
+  const message = encodeURIComponent(buildDriverMessage(booking));
+  return `sms:${phone}?body=${message}`;
+}
 
 function cleanDisplayText(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -89,68 +159,6 @@ function cleanDisplayText(value: unknown): string {
 function displayOrDash(value: unknown): string {
   const cleaned = cleanDisplayText(value);
   return cleaned || "—";
-}
-
-function buildDriverMessage(booking: any) {
-  const passenger = displayOrDash(
-    booking.leadPassenger ??
-      booking.lead_passenger ??
-      booking.passenger_name
-  );
-
-  const date = displayOrDash(
-    booking.when ?? booking.outbound_date ?? booking.date
-  );
-
-  const time = displayOrDash(
-    booking.time ?? booking.outbound_time
-  );
-
-  const pickup = displayOrDash(
-    booking.pickup ?? booking.outbound_pickup
-  );
-
-  const dropoff = displayOrDash(
-    booking.dropoff ?? booking.outbound_dropoff
-  );
-
-  const customerPhone = displayOrDash(
-    booking.booker_phone ??
-      booking.customer_phone ??
-      booking.passenger_phone
-  );
-
-  const notes = cleanDisplayText(
-    booking.notes ?? booking.outbound_notes
-  ) || "None";
-
-  return `My Way Cars
-
-Passenger: ${passenger}
-Date: ${date}
-Time: ${time}
-
-Pickup:
-${pickup}
-
-Dropoff:
-${dropoff}
-
-Customer Phone:
-${customerPhone}
-
-Notes:
-${notes}`;
-}
-
-function getDriverPhone(row: BookingRow): string {
-  return pickString(row, ["driver_phone"]);
-}
-
-function getSmsLink(booking: any) {
-  const phone = booking.driver_phone || "";
-  const message = encodeURIComponent(buildDriverMessage(booking));
-  return `sms:${phone}?body=${message}`;
 }
 
 function pickString(row: BookingRow, keys: string[]): string {
@@ -352,29 +360,23 @@ export default function HomePage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const clashSectionRef = useRef<HTMLDivElement | null>(null);
   const linkedSectionRef = useRef<HTMLDivElement | null>(null);
+  const offendingBookingsRef = useRef<HTMLDivElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-
   const [statusFilter, setStatusFilter] = useState("Upcoming");
-const [errorMessage, setErrorMessage] = useState("");
-const [searchTerm, setSearchTerm] = useState("");
-
-const [highlightedClashGroup, setHighlightedClashGroup] = useState<string | null>(null);
-
-const [cardModes, setCardModes] = useState<
-  Record<string, "compact" | "normal" | "full">
->({});
-
+  const [errorMessage, setErrorMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [cardModes, setCardModes] = useState<
+    Record<string, "compact" | "normal" | "full">
+  >({});
   const [nowMs, setNowMs] = useState(Date.now());
   const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
-  const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<string[]>(
-    []
-  );
-  const [selectedReturnGroupId, setSelectedReturnGroupId] = useState<string | null>(
-    null
-  );
+  const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<
+    string[]
+  >([]);
+  const [selectedReturnGroupId, setSelectedReturnGroupId] = useState<string | null>(null);
 
   async function loadReviewedClashes() {
     try {
@@ -1525,7 +1527,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                   setSelectedClashBookingIds([...new Set(clashIds)]);
 
                   requestAnimationFrame(() => {
-   linkedSectionRef.current?.scrollIntoView({
+                    linkedSectionRef.current?.scrollIntoView({
                       behavior: "smooth",
                       block: "start",
                     });
@@ -1551,233 +1553,239 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             </div>
           )}
 
-{selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
-  <div className="mb-4 space-y-3">
-    {detectedClashes
-      .filter((c) =>
-        c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
-      )
-      .map((clash) => (
-        <div
-          key={clash.key}
-          className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-        >
-          <div className="mb-2 font-medium">
-            {clash.type} clash{" "}
-            {clash.sameDriver
-              ? "— same driver"
-              : clash.unassigned
-              ? "— unassigned driver"
-              : "— jobs close together"}
-          </div>
+          {selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
+            <div className="mb-4 space-y-3">
+              {detectedClashes
+                .filter((c) =>
+                  c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
+                )
+                .map((clash) => (
+                  <div
+                    key={clash.key}
+                    className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+                  >
+                    <div className="mb-2 font-medium">
+                      {clash.type} clash{" "}
+                      {clash.sameDriver
+                        ? "— same driver"
+                        : clash.unassigned
+                        ? "— unassigned driver"
+                        : "— jobs close together"}
+                    </div>
 
-          <div className="mb-3 space-y-2">
-            {clash.bookingIds.map((id, index) => {
-              const booking = bookings.find((b) => b.id === id);
-              if (!booking) return null;
+                    <div className="mb-3 space-y-2">
+                      {clash.bookingIds.map((id, index) => {
+                        const booking = bookings.find((b) => b.id === id);
+                        if (!booking) return null;
 
-              return (
-                <div
-                  key={id}
-                  className="rounded-lg border border-amber-200 bg-white/70 p-2"
-                >
-                  <div className="font-semibold">
-                    {index + 1}) {getName(booking)}
+                        return (
+                          <div
+                            key={id}
+                            className="rounded-lg border border-amber-200 bg-white/70 p-2"
+                          >
+                            <div className="font-semibold">
+                              {index + 1}) {getName(booking)}
+                            </div>
+                            <div>{fmtDateTime(getWhen(booking))}</div>
+                            <div>From: {getPickup(booking) || "—"}</div>
+                            <div>To: {getDropoff(booking) || "—"}</div>
+                            <div>Driver: {getDriver(booking) || "Unassigned"}</div>
+                            <div className="text-xs text-slate-500">
+                              ID: {booking.id.slice(0, 8)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setStatusFilter("All");
+                          setSearchTerm("");
+                          setSelectedClashBookingIds(clash.bookingIds);
+
+                          requestAnimationFrame(() => {
+                            const el = offendingBookingsRef.current;
+                            if (!el) return;
+
+                            const y =
+                              el.getBoundingClientRect().top + window.scrollY - 120;
+
+                            window.scrollTo({
+                              top: y,
+                              behavior: "smooth",
+                            });
+                          });
+                        }}
+                        className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                      >
+                        Show this clash group
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          await markClashResolved(clash.key, clash.bookingIds);
+
+                          const remainingIds = detectedClashes
+                            .filter((c) => c.key !== clash.key)
+                            .flatMap((c) => c.bookingIds);
+
+                          setSelectedClashBookingIds([...new Set(remainingIds)]);
+                        }}
+                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        ✔ Mark resolved
+                      </button>
+                    </div>
                   </div>
-                  <div>{fmtDateTime(getWhen(booking))}</div>
-                  <div>From: {getPickup(booking) || "—"}</div>
-                  <div>To: {getDropoff(booking) || "—"}</div>
-                  <div>Driver: {getDriver(booking) || "Unassigned"}</div>
-                  <div className="text-xs text-slate-500">
-                    ID: {booking.id.slice(0, 8)}
-                  </div>
+                ))}
+            </div>
+          )}
+
+          {selectedClashBookingIds.length > 0 &&
+            bookings.some(
+              (booking) =>
+                selectedClashBookingIds.includes(booking.id) &&
+                (booking.status ?? "Scheduled").toString() !== "Cancelled" &&
+                (booking.status ?? "Scheduled").toString() !== "Completed"
+            ) && (
+              <div ref={offendingBookingsRef} className="mb-6">
+                <div className="mb-3 text-base font-semibold text-slate-900">
+                  Offending bookings
                 </div>
-              );
-            })}
+
+                <div className="space-y-4">
+                  {bookings
+                    .filter(
+                      (booking) =>
+                        selectedClashBookingIds.includes(booking.id) &&
+                        (booking.status ?? "Scheduled").toString() !== "Cancelled" &&
+                        (booking.status ?? "Scheduled").toString() !== "Completed"
+                    )
+                    .sort((a, b) => getWhenMs(a) - getWhenMs(b))
+                    .map((booking) => (
+                      <BookingCard
+                        key={`clash-top-${booking.id}`}
+                        booking={booking}
+                        highlightClash
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
+          {unpaidTotal > 0 ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
+              Unpaid total:{" "}
+              {new Intl.NumberFormat("en-GB", {
+                style: "currency",
+                currency: "GBP",
+              }).format(unpaidTotal)}
+            </div>
+          ) : null}
+
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <div className="mb-1 font-semibold text-slate-800">Today</div>
+            <div className="flex gap-4 text-slate-700">
+              <span>Jobs: {todayStats.jobs}</span>
+              <span>
+                Revenue:{" "}
+                {new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: "GBP",
+                }).format(todayStats.revenue)}
+              </span>
+              <span>
+                Unpaid:{" "}
+                {new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: "GBP",
+                }).format(todayStats.unpaid)}
+              </span>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setStatusFilter("All");
-                setSearchTerm("");
-                setSelectedClashBookingIds(clash.bookingIds);
+          <div className="mb-4">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Search bookings
+            </label>
 
-                requestAnimationFrame(() => {
-                linkedSectionRef.current?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-                });
-              }}
-              className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
-            >
-              Show this clash group
-            </button>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </span>
 
-            <button
-              onClick={async () => {
-                await markClashResolved(clash.key, clash.bookingIds);
-
-                const remainingIds = detectedClashes
-                  .filter((c) => c.key !== clash.key)
-                  .flatMap((c) => c.bookingIds);
-
-                setSelectedClashBookingIds([...new Set(remainingIds)]);
-              }}
-              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
-            >
-              ✔ Mark resolved
-            </button>
+              <input
+                type="text"
+                placeholder="Search by name, phone, pickup, dropoff or notes"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-2xl border-2 border-slate-300 bg-white py-3 pl-10 pr-4 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
+              />
+            </div>
           </div>
-        </div>
-      ))}
-  </div>
-)}
 
-{selectedClashBookingIds.length > 0 &&
-  bookings.some(
-    (booking) =>
-      selectedClashBookingIds.includes(booking.id) &&
-      (booking.status ?? "Scheduled").toString() !== "Cancelled" &&
-      (booking.status ?? "Scheduled").toString() !== "Completed"
-  ) && (
-    <div className="mb-6">
-      <div className="mb-3 text-base font-semibold text-slate-900">
-        Offending bookings
+          <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
+            {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
+              (value) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value)}
+                  className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                    statusFilter === value
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-200 text-slate-900"
+                  }`}
+                >
+                  {value}
+                </button>
+              )
+            )}
+          </div>
+
+          {errorMessage ? (
+            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="text-sm text-slate-600">Loading bookings...</div>
+          ) : filteredBookings.length === 0 ? (
+            <div className="text-sm text-slate-600">No bookings found.</div>
+          ) : (
+            <div className="space-y-4">
+              {filteredBookings.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  highlightClash={selectedClashBookingIds.includes(booking.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
-      <div className="space-y-4">
-        {bookings
-          .filter(
-            (booking) =>
-              selectedClashBookingIds.includes(booking.id) &&
-              (booking.status ?? "Scheduled").toString() !== "Cancelled" &&
-              (booking.status ?? "Scheduled").toString() !== "Completed"
-          )
-          .sort((a, b) => getWhenMs(a) - getWhenMs(b))
-          .map((booking) => (
-            <BookingCard
-              key={`clash-top-${booking.id}`}
-              booking={booking}
-              highlightClash
-            />
-          ))}
-      </div>
-    </div>
-  )}
-
-{unpaidTotal > 0 ? (
-  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
-    Unpaid total:{" "}
-    {new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency: "GBP",
-    }).format(unpaidTotal)}
-  </div>
-) : null}
-
-<div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
-  <div className="mb-1 font-semibold text-slate-800">Today</div>
-  <div className="flex gap-4 text-slate-700">
-    <span>Jobs: {todayStats.jobs}</span>
-    <span>
-      Revenue:{" "}
-      {new Intl.NumberFormat("en-GB", {
-        style: "currency",
-        currency: "GBP",
-      }).format(todayStats.revenue)}
-    </span>
-    <span>
-      Unpaid:{" "}
-      {new Intl.NumberFormat("en-GB", {
-        style: "currency",
-        currency: "GBP",
-      }).format(todayStats.unpaid)}
-    </span>
-  </div>
-</div>
-
-<div className="mb-4">
-  <label className="mb-2 block text-sm font-semibold text-slate-700">
-    Search bookings
-  </label>
-
-  <div className="relative">
-    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
+      <Link
+        href="/add"
+        className="fixed bottom-6 right-6 z-50 rounded-full bg-slate-900 px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-slate-800 sm:hidden"
       >
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-    </span>
-
-    <input
-      type="text"
-      placeholder="Search by name, phone, pickup, dropoff or notes"
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-      className="w-full rounded-2xl border-2 border-slate-300 bg-white py-3 pl-10 pr-4 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
-    />
-  </div>
-</div>
-
-<div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
-  {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
-    (value) => (
-      <button
-        key={value}
-        onClick={() => setStatusFilter(value)}
-        className={`rounded-xl px-3 py-2 text-sm font-medium ${
-          statusFilter === value
-            ? "bg-slate-900 text-white"
-            : "bg-slate-200 text-slate-900"
-        }`}
-      >
-        {value}
-      </button>
-    )
-  )}
-</div>
-
-{errorMessage ? (
-  <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-    {errorMessage}
-  </div>
-) : null}
-
-{loading ? (
-  <div className="text-sm text-slate-600">Loading bookings...</div>
-) : filteredBookings.length === 0 ? (
-  <div className="text-sm text-slate-600">No bookings found.</div>
-) : (
-  <div className="space-y-4">
-    {filteredBookings.map((booking) => (
-      <BookingCard
-        key={booking.id}
-        booking={booking}
-        highlightClash={selectedClashBookingIds.includes(booking.id)}
-      />
-    ))}
-  </div>
-)}
-</section>
-</div>
-
-<Link
-  href="/add"
-  className="fixed bottom-6 right-6 z-50 rounded-full bg-slate-900 px-5 py-4 text-sm font-semibold text-white shadow-lg hover:bg-slate-800 sm:hidden"
->
-  + Add booking
-</Link>
-</main>
-);
+        + Add booking
+      </Link>
+    </main>
+  );
 }
