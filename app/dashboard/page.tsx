@@ -7,6 +7,7 @@ import { getSupabase } from "../lib/supabase";
 type BookingRow = {
   id: string;
   created_at?: string | null;
+  account_name?: string | null;
   passenger_name?: string | null;
   passenger_phone?: string | null;
   pickup_address?: string | null;
@@ -541,20 +542,21 @@ function scrollToRefWithOffset(
     }
 
     return result.filter((row) => {
-      const haystack = [
-        getName(row),
-        getPhone(row),
-        getPickup(row),
-        getDropoff(row),
-        pickString(row, ["notes"]),
-        pickString(row, ["via"]),
-        pickString(row, ["local_authority"]),
-        pickString(row, ["return_flight_number"]),
-        (row.status ?? "Scheduled").toString(),
-        (row.payment_status ?? "Unpaid").toString(),
-      ]
-        .join(" ")
-        .toLowerCase();
+const haystack = [
+  getName(row),
+  getPhone(row),
+  getPickup(row),
+  getDropoff(row),
+  pickString(row, ["notes"]),
+  pickString(row, ["via"]),
+  pickString(row, ["local_authority"]),
+  pickString(row, ["account_name"]),
+  pickString(row, ["return_flight_number"]),
+  (row.status ?? "Scheduled").toString(),
+  (row.payment_status ?? "Unpaid").toString(),
+]
+  .join(" ")
+  .toLowerCase();
 
       return haystack.includes(needle);
     });
@@ -1020,7 +1022,13 @@ function scrollToRefWithOffset(
                 </div>
               ) : null}
 
-              <div className="text-lg font-semibold">{name}</div>
+<div className="text-lg font-semibold">{name}</div>
+
+{booking.account_name && (
+  <div className="mt-1 inline-block rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-700">
+    {booking.account_name}
+  </div>
+)}
               {booking.return_group_id ? (
                 <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
                   Linked return booking

@@ -68,6 +68,7 @@ function nowHHMM() {
 
 export default function AddBookingPage() {
   const router = useRouter();
+  const [accountName, setAccountName] = useState("");
 
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
@@ -214,6 +215,7 @@ export default function AddBookingPage() {
           notes: notes.trim() || null,
           status: "Scheduled",
           payment_status: "Unpaid",
+          account_name: accountName.trim() || null,
           created_at: new Date().toISOString(),
           passengers: pax === "" ? 1 : Number(pax),
           via: via.trim() || null,
@@ -244,32 +246,35 @@ export default function AddBookingPage() {
           ? pickupAddress.trim()
           : dropoffAddress.trim();
 
-        const returnInsert = await supabase.from("bookings").insert([
-          {
-            passenger_name: passengerName.trim(),
-            passenger_phone: passengerPhone.trim(),
-            pickup_address: retPickup,
-            dropoff_address: retDrop,
-            pickup_datetime: isoFromDateTime(returnDate, returnTime),
-            distance_miles: distanceMilesNumber,
-            fare: estFareGBP,
-            notes: returnNotes.trim() || null,
-            status: "Scheduled",
-            payment_status: "Unpaid",
-            created_at: new Date().toISOString(),
-            passengers: pax === "" ? 1 : Number(pax),
-            via: via.trim() || null,
-            bags_large: bagsLarge,
-            bags_small: bagsSmall,
-            local_authority: localAuthority.trim() || null,
-            driver_name: driverName.trim() || null,
-            driver_phone: driverPhone,
-            vehicle: vehicle.trim() || null,
-            booking_type: bookingType.trim() || null,
-            return_group_id: returnGroupId,
-            return_flight_number: returnFlightNumber.trim() || null,
-          },
-        ]);
+const returnInsert = await supabase.from("bookings").insert([
+  {
+    passenger_name: passengerName.trim(),
+    passenger_phone: passengerPhone.trim(),
+    pickup_address: retPickup,
+    dropoff_address: retDrop,
+    pickup_datetime: isoFromDateTime(returnDate, returnTime),
+    distance_miles: distanceMilesNumber,
+    fare: estFareGBP,
+    notes: returnNotes.trim() || null,
+    status: "Scheduled",
+    payment_status: "Unpaid",
+    created_at: new Date().toISOString(),
+    passengers: pax === "" ? 1 : Number(pax),
+    via: via.trim() || null,
+    bags_large: bagsLarge,
+    bags_small: bagsSmall,
+    local_authority: localAuthority.trim() || null,
+    driver_name: driverName.trim() || null,
+    driver_phone: driverPhone,
+    vehicle: vehicle.trim() || null,
+    booking_type: bookingType.trim() || null,
+    return_group_id: returnGroupId,
+    return_flight_number: returnFlightNumber.trim() || null,
+
+    // 👇 ADD THIS LINE
+    account_name: accountName.trim() || null,
+  },
+]);
 
         if (returnInsert.error) {
           console.error(returnInsert.error);
@@ -313,6 +318,13 @@ export default function AddBookingPage() {
               autoComplete="name"
             />
           </div>
+          <input
+  type="text"
+  placeholder="Account / Business (optional)"
+  value={accountName}
+  onChange={(e) => setAccountName(e.target.value)}
+  className="w-full rounded-xl border px-3 py-2"
+/>
 
           <div>
             <label className="text-sm font-medium">Passenger phone</label>
