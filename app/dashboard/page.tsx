@@ -531,11 +531,23 @@ function scrollToRefWithOffset(
         const status = (row.status ?? "Scheduled").toString();
         return payment === "Unpaid" && status === "Completed";
       });
-    } else if (statusFilter !== "All") {
-      result = result.filter(
-        (row) => (row.status ?? "Scheduled").toString() === statusFilter
-      );
-    }
+} else if (statusFilter === "Needs Action") {
+  result = result.filter((row) => {
+    const when = getWhenMs(row);
+    const status = (row.status ?? "Scheduled").toString();
+
+    return (
+      !Number.isNaN(when) &&
+      when < now &&
+      status !== "Completed" &&
+      status !== "Cancelled"
+    );
+  });
+} else if (statusFilter !== "All") {
+  result = result.filter(
+    (row) => (row.status ?? "Scheduled").toString() === statusFilter
+  );
+}
 
     if (!needle) {
       return result;
@@ -1754,7 +1766,7 @@ scrollToRefWithOffset(offendingBookingsRef, 515);
           </div>
 
           <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
-            {["All", "Upcoming", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
+            {["All", "Upcoming", "Needs Action", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
               (value) => (
                 <button
                   key={value}
