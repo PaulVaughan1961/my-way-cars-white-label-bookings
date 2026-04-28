@@ -554,6 +554,25 @@ function scrollToRefWithOffset(
     }
 
     return result.filter((row) => {
+      const whenText = getWhen(row);
+const whenParts = parseLocalDateTimeParts(whenText);
+
+const ukDateText = whenParts
+  ? [
+      `${String(whenParts.day).padStart(2, "0")}/${String(
+        whenParts.month
+      ).padStart(2, "0")}/${String(whenParts.year).slice(-2)}`,
+      `${String(whenParts.day).padStart(2, "0")}/${String(
+        whenParts.month
+      ).padStart(2, "0")}/${whenParts.year}`,
+      `${String(whenParts.day).padStart(2, "0")}-${String(
+        whenParts.month
+      ).padStart(2, "0")}-${String(whenParts.year).slice(-2)}`,
+      `${String(whenParts.day).padStart(2, "0")}-${String(
+        whenParts.month
+      ).padStart(2, "0")}-${whenParts.year}`,
+    ].join(" ")
+  : "";
 const haystack = [
   getName(row),
   getPhone(row),
