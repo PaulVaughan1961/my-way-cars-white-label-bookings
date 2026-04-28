@@ -560,6 +560,17 @@ const whenParts = parseLocalDateTimeParts(whenText);
 
 const ukDateText = whenParts
   ? [
+      // Day + Month (most important fix)
+      `${String(whenParts.day).padStart(2, "0")}/${String(
+        whenParts.month
+      ).padStart(2, "0")}`,
+      `${String(whenParts.day).padStart(2, "0")}-${String(
+        whenParts.month
+      ).padStart(2, "0")}`,
+      `${whenParts.day}/${whenParts.month}`,
+      `${whenParts.day}-${whenParts.month}`,
+
+      // With year (keep your originals)
       `${String(whenParts.day).padStart(2, "0")}/${String(
         whenParts.month
       ).padStart(2, "0")}/${String(whenParts.year).slice(-2)}`,
