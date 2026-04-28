@@ -488,7 +488,8 @@ function scrollToRefWithOffset(
 
   const filteredBookings = useMemo(() => {
     const now = Date.now();
-    const needle = searchTerm.trim().toLowerCase();
+   const needle = searchTerm.trim().toLowerCase();
+const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
 
     const sorted = [...bookings].sort((a, b) => {
       const aTime = getWhenMs(a);
@@ -599,7 +600,12 @@ const haystack = [
   .join(" ")
   .toLowerCase();
 
-      return haystack.includes(needle);
+const normalisedHaystack = haystack.replace(/[^\dA-Za-z]/g, "");
+
+return (
+  haystack.includes(needle) ||
+  normalisedHaystack.includes(normalisedNeedle)
+);
     });
   }, [bookings, statusFilter, searchTerm]);
 
