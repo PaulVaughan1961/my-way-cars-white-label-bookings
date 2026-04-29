@@ -303,8 +303,8 @@ notes: notes.trim() || null,
  
       if (error) throw error;
 
-      router.push("/");
-      router.refresh();
+router.push("/dashboard?filter=All");
+router.refresh();
 } catch (error: any) {
   console.error("Update booking error:", error);
   setErrorMessage(
