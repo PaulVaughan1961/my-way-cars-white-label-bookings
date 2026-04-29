@@ -1646,37 +1646,39 @@ ${vehicle || "To be confirmed"}${returnNote}`;
       </button>
     </div>
   )}
-            <div className="mb-4">
-              <button
-                onClick={() => {
-                  setSelectedClashBookingIds([]);
-                }}
-                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-              >
-                ← Back to all bookings
-              </button>
-            </div>
-         
 
-          {selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
-            <div className="mb-4 space-y-3">
-              {detectedClashes
-                .filter((c) =>
-                  c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
-                )
-                .map((clash) => (
-                  <div
-                    key={clash.key}
-                    className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-                  >
-                    <div className="mb-2 font-medium">
-                      {clash.type} clash{" "}
-                      {clash.sameDriver
-                        ? "— same driver"
-                        : clash.unassigned
-                        ? "— unassigned driver"
-                        : "— jobs close together"}
-                    </div>
+  {selectedClashBookingIds.length > 0 && (
+    <div className="mb-4">
+      <button
+        onClick={() => {
+          setSelectedClashBookingIds([]);
+        }}
+        className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+      >
+        ← Back to all bookings
+      </button>
+    </div>
+  )}
+
+  {selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
+    <div className="mb-4 space-y-3">
+      {detectedClashes
+        .filter((c) =>
+          c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
+        )
+        .map((clash) => (
+          <div
+            key={clash.key}
+            className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            <div className="mb-2 font-medium">
+              {clash.type} clash{" "}
+              {clash.sameDriver
+                ? "— same driver"
+                : clash.unassigned
+                ? "— unassigned driver"
+                : "— jobs close together"}
+            </div>
 
                     <div className="mb-3 space-y-2">
                       {clash.bookingIds.map((id, index) => {
