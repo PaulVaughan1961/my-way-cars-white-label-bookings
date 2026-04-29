@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "../lib/supabase";
 
@@ -358,6 +359,8 @@ function makeClashKey(a: string, b: string): string {
 }
 
 export default function HomePage() {
+  const searchParams = useSearchParams();
+const focusBookingId = searchParams.get("focus");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
 const clashSectionRef = useRef<HTMLDivElement | null>(null);
 const linkedSectionRef = useRef<HTMLDivElement | null>(null);
@@ -1571,60 +1574,78 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           </section>
         )}
 
-        {nextJob ? (
-          <section id="next-job">
-            <div className="mb-3 text-xl font-bold text-slate-900">
-              {(nextJob?.status ?? "Scheduled").toString() === "POB"
-                ? "Current Job"
-                : "Next Job"}
-            </div>
-            <BookingCard
-              booking={nextJob}
-              forceExpanded
-              highlightClash={selectedClashBookingIds.includes(nextJob.id)}
-            />
-          </section>
-        ) : (
-          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-            <div className="text-lg font-semibold text-slate-900">
-              You’re clear
-            </div>
-            <p className="mt-1 text-sm text-slate-600">
-              No upcoming scheduled jobs found.
-            </p>
-          </section>
-        )}
+{focusBookingId ? (
+  <section id="focused-booking">
+    <div className="mb-3 text-xl font-bold text-slate-900">
+      Edited Booking
+    </div>
 
-        <section ref={clashSectionRef} className="rounded-3xl bg-white p-5 shadow-sm">
-          {detectedClashes.length > 0 && (
-            <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-              <div>
-                ⚠ {detectedClashes.length} scheduling issue
-                {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
-              </div>
+    {bookings.find((booking) => booking.id === focusBookingId) ? (
+      <BookingCard
+        booking={bookings.find((booking) => booking.id === focusBookingId)!}
+        forceExpanded
+      />
+    ) : (
+      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+        <div className="text-sm text-slate-600">
+          Edited booking not found.
+        </div>
+      </div>
+    )}
+  </section>
+) : nextJob ? (
+  <section id="next-job">
+    <div className="mb-3 text-xl font-bold text-slate-900">
+      {(nextJob?.status ?? "Scheduled").toString() === "POB"
+        ? "Current Job"
+        : "Next Job"}
+    </div>
 
-              <button
-                onClick={() => {
-                  const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
-                  setSearchTerm("");
-                  setStatusFilter("All");
-                  setSelectedClashBookingIds([...new Set(clashIds)]);
+    <BookingCard
+      booking={nextJob}
+      forceExpanded
+      highlightClash={selectedClashBookingIds.includes(nextJob.id)}
+    />
+  </section>
+) : (
+  <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+    <div className="text-lg font-semibold text-slate-900">
+      You’re clear
+    </div>
+    <p className="mt-1 text-sm text-slate-600">
+      No upcoming scheduled jobs found.
+    </p>
+  </section>
+)}
 
-                  requestAnimationFrame(() => {
-                    linkedSectionRef.current?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    });
-                  });
-                }}
-                className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
-              >
-                View
-              </button>
-            </div>
-          )}
+<section ref={clashSectionRef} className="rounded-3xl bg-white p-5 shadow-sm">
+  {detectedClashes.length > 0 && (
+    <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+      <div>
+        ⚠ {detectedClashes.length} scheduling issue
+        {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
+      </div>
 
-          {selectedClashBookingIds.length > 0 && (
+      <button
+        onClick={() => {
+          const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
+          setSearchTerm("");
+          setStatusFilter("All");
+          setSelectedClashBookingIds([...new Set(clashIds)]);
+
+          requestAnimationFrame(() => {
+            linkedSectionRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          });
+        }}
+        className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+      >
+        View
+      </button>
+    </div>
+  )}
             <div className="mb-4">
               <button
                 onClick={() => {
@@ -1635,7 +1656,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 ← Back to all bookings
               </button>
             </div>
-          )}
+         
 
           {selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
             <div className="mb-4 space-y-3">
