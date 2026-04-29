@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "../lib/supabase";
 
 type BookingRow = {
@@ -97,10 +97,7 @@ function buildDriverMessage(booking: any) {
     booking.passenger_phone ??
     "—";
 
-  const notes =
-    booking.notes ??
-    booking.outbound_notes ??
-    "None";
+  const notes = booking.notes ?? booking.outbound_notes ?? "None";
 
   return `My Way Cars
 
@@ -139,7 +136,7 @@ function cleanDisplayText(value: unknown): string {
   if (!text) return "";
 
   text = text
-    .replace(/ÔÇö|ÔÇò|ÔÇ£|ÔÇ¥|â€”|â€“|â€˜|â€™|â€œ|â€|┬ú|�/g, "")
+    .replace(/ÔÇö|ÔÇò|ÔÇ£|ÔÇ¥|â€”|â€“|â€˜|â€™|â€œ|â€�|┬ú|�/g, "")
     .trim();
 
   if (
@@ -358,31 +355,30 @@ function makeClashKey(a: string, b: string): string {
   return [a, b].sort().join("__");
 }
 
-export default function HomePage() {
+function DashboardContent() {
   const searchParams = useSearchParams();
-const focusBookingId = searchParams.get("focus");
+  const focusBookingId = searchParams.get("focus");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
-const clashSectionRef = useRef<HTMLDivElement | null>(null);
-const linkedSectionRef = useRef<HTMLDivElement | null>(null);
-const offendingBookingsRef = useRef<HTMLDivElement | null>(null);
-function scrollToRefWithOffset(
-  ref: React.RefObject<HTMLDivElement | null>,
-  offset = 120
-) {
-  requestAnimationFrame(() => {
-    const el = ref.current;
-    if (!el) return;
+  const clashSectionRef = useRef<HTMLDivElement | null>(null);
+  const linkedSectionRef = useRef<HTMLDivElement | null>(null);
+  const offendingBookingsRef = useRef<HTMLDivElement | null>(null);
 
-    const y = el.getBoundingClientRect().top + window.scrollY - offset;
+  function scrollToRefWithOffset(
+    ref: React.RefObject<HTMLDivElement | null>,
+    offset = 120
+  ) {
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
 
-    window.scrollTo({
-      top: y,
-      behavior: "smooth",
+      const y = el.getBoundingClientRect().top + window.scrollY - offset;
+
+      window.scrollTo({
+        top: y,
+        behavior: "smooth",
+      });
     });
-  });
-}
-
-
+  }
 
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -491,8 +487,8 @@ function scrollToRefWithOffset(
 
   const filteredBookings = useMemo(() => {
     const now = Date.now();
-   const needle = searchTerm.trim().toLowerCase();
-const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
+    const needle = searchTerm.trim().toLowerCase();
+    const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
 
     const sorted = [...bookings].sort((a, b) => {
       const aTime = getWhenMs(a);
@@ -535,23 +531,23 @@ const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
         const status = (row.status ?? "Scheduled").toString();
         return payment === "Unpaid" && status === "Completed";
       });
-} else if (statusFilter === "Needs Action") {
-  result = result.filter((row) => {
-    const when = getWhenMs(row);
-    const status = (row.status ?? "Scheduled").toString();
+    } else if (statusFilter === "Needs Action") {
+      result = result.filter((row) => {
+        const when = getWhenMs(row);
+        const status = (row.status ?? "Scheduled").toString();
 
-    return (
-      !Number.isNaN(when) &&
-      when < now &&
-      status !== "Completed" &&
-      status !== "Cancelled"
-    );
-  });
-} else if (statusFilter !== "All") {
-  result = result.filter(
-    (row) => (row.status ?? "Scheduled").toString() === statusFilter
-  );
-}
+        return (
+          !Number.isNaN(when) &&
+          when < now &&
+          status !== "Completed" &&
+          status !== "Cancelled"
+        );
+      });
+    } else if (statusFilter !== "All") {
+      result = result.filter(
+        (row) => (row.status ?? "Scheduled").toString() === statusFilter
+      );
+    }
 
     if (!needle) {
       return result;
@@ -559,67 +555,66 @@ const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
 
     return result.filter((row) => {
       const whenText = getWhen(row);
-const whenParts = parseLocalDateTimeParts(whenText);
+      const whenParts = parseLocalDateTimeParts(whenText);
 
-const ukDateText = whenParts
-  ? [
-      // Day + Month (most important fix)
-      `${String(whenParts.day).padStart(2, "0")}/${String(
-        whenParts.month
-      ).padStart(2, "0")}`,
-      `${String(whenParts.day).padStart(2, "0")}-${String(
-        whenParts.month
-      ).padStart(2, "0")}`,
-      `${whenParts.day}/${whenParts.month}`,
-      `${whenParts.day}-${whenParts.month}`,
+      const ukDateText = whenParts
+        ? [
+            `${String(whenParts.day).padStart(2, "0")}/${String(
+              whenParts.month
+            ).padStart(2, "0")}`,
+            `${String(whenParts.day).padStart(2, "0")}-${String(
+              whenParts.month
+            ).padStart(2, "0")}`,
+            `${whenParts.day}/${whenParts.month}`,
+            `${whenParts.day}-${whenParts.month}`,
+            `${String(whenParts.day).padStart(2, "0")}/${String(
+              whenParts.month
+            ).padStart(2, "0")}/${String(whenParts.year).slice(-2)}`,
+            `${String(whenParts.day).padStart(2, "0")}/${String(
+              whenParts.month
+            ).padStart(2, "0")}/${whenParts.year}`,
+            `${String(whenParts.day).padStart(2, "0")}-${String(
+              whenParts.month
+            ).padStart(2, "0")}-${String(whenParts.year).slice(-2)}`,
+            `${String(whenParts.day).padStart(2, "0")}-${String(
+              whenParts.month
+            ).padStart(2, "0")}-${whenParts.year}`,
+          ].join(" ")
+        : "";
 
-      // With year (keep your originals)
-      `${String(whenParts.day).padStart(2, "0")}/${String(
-        whenParts.month
-      ).padStart(2, "0")}/${String(whenParts.year).slice(-2)}`,
-      `${String(whenParts.day).padStart(2, "0")}/${String(
-        whenParts.month
-      ).padStart(2, "0")}/${whenParts.year}`,
-      `${String(whenParts.day).padStart(2, "0")}-${String(
-        whenParts.month
-      ).padStart(2, "0")}-${String(whenParts.year).slice(-2)}`,
-      `${String(whenParts.day).padStart(2, "0")}-${String(
-        whenParts.month
-      ).padStart(2, "0")}-${whenParts.year}`,
-    ].join(" ")
-  : "";
-const haystack = [
-  getName(row),
-  getPhone(row),
-  getPickup(row),
-  getDropoff(row),
-  getDriver(row),
-  getVehicle(row),
-  fmtDateTime(getWhen(row)),
-  getWhen(row),
-  pickString(row, ["notes"]),
-  pickString(row, ["via"]),
-  pickString(row, ["local_authority"]),
-  pickString(row, [
-  "account_name",
-  "account",
-  "customer_account",
-  "business_name",
-  "company_name",
-]),
-  pickString(row, ["return_flight_number"]),
-  (row.status ?? "Scheduled").toString(),
-  (row.payment_status ?? "Unpaid").toString(),
-]
-  .join(" ")
-  .toLowerCase();
+      const haystack = [
+        getName(row),
+        getPhone(row),
+        getPickup(row),
+        getDropoff(row),
+        getDriver(row),
+        getVehicle(row),
+        ukDateText,
+        fmtDateTime(getWhen(row)),
+        getWhen(row),
+        pickString(row, ["notes"]),
+        pickString(row, ["via"]),
+        pickString(row, ["local_authority"]),
+        pickString(row, [
+          "account_name",
+          "account",
+          "customer_account",
+          "business_name",
+          "company_name",
+        ]),
+        pickString(row, ["return_flight_number"]),
+        (row.status ?? "Scheduled").toString(),
+        (row.payment_status ?? "Unpaid").toString(),
+      ]
+        .join(" ")
+        .toLowerCase();
 
-const normalisedHaystack = haystack.replace(/[^\dA-Za-z]/g, "");
+      const normalisedHaystack = haystack.replace(/[^\dA-Za-z]/g, "");
 
-return (
-  haystack.includes(needle) ||
-  normalisedHaystack.includes(normalisedNeedle)
-);
+      return (
+        haystack.includes(needle) ||
+        normalisedHaystack.includes(normalisedNeedle)
+      );
     });
   }, [bookings, statusFilter, searchTerm]);
 
@@ -808,9 +803,7 @@ return (
   const linkedBookings = useMemo(() => {
     if (!selectedReturnGroupId) return [];
 
-    return bookings.filter(
-      (b) => b.return_group_id === selectedReturnGroupId
-    );
+    return bookings.filter((b) => b.return_group_id === selectedReturnGroupId);
   }, [bookings, selectedReturnGroupId]);
 
   const clashSummaryText = useMemo(() => {
@@ -1083,13 +1076,14 @@ return (
                 </div>
               ) : null}
 
-<div className="text-lg font-semibold">{name}</div>
+              <div className="text-lg font-semibold">{name}</div>
 
-{booking.account_name && (
-  <div className="mt-1 inline-block rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-700">
-    {booking.account_name}
-  </div>
-)}
+              {booking.account_name && (
+                <div className="mt-1 inline-block rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-700">
+                  {booking.account_name}
+                </div>
+              )}
+
               {booking.return_group_id ? (
                 <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
                   Linked return booking
@@ -1574,111 +1568,111 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           </section>
         )}
 
-{focusBookingId ? (
-  <section id="focused-booking">
-    <div className="mb-3 text-xl font-bold text-slate-900">
-      Edited Booking
-    </div>
-
-    {bookings.find((booking) => booking.id === focusBookingId) ? (
-      <BookingCard
-        booking={bookings.find((booking) => booking.id === focusBookingId)!}
-        forceExpanded
-      />
-    ) : (
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-        <div className="text-sm text-slate-600">
-          Edited booking not found.
-        </div>
-      </div>
-    )}
-  </section>
-) : nextJob ? (
-  <section id="next-job">
-    <div className="mb-3 text-xl font-bold text-slate-900">
-      {(nextJob?.status ?? "Scheduled").toString() === "POB"
-        ? "Current Job"
-        : "Next Job"}
-    </div>
-
-    <BookingCard
-      booking={nextJob}
-      forceExpanded
-      highlightClash={selectedClashBookingIds.includes(nextJob.id)}
-    />
-  </section>
-) : (
-  <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-    <div className="text-lg font-semibold text-slate-900">
-      You’re clear
-    </div>
-    <p className="mt-1 text-sm text-slate-600">
-      No upcoming scheduled jobs found.
-    </p>
-  </section>
-)}
-
-<section ref={clashSectionRef} className="rounded-3xl bg-white p-5 shadow-sm">
-  {detectedClashes.length > 0 && (
-    <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-      <div>
-        ⚠ {detectedClashes.length} scheduling issue
-        {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
-      </div>
-
-      <button
-        onClick={() => {
-          const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
-          setSearchTerm("");
-          setStatusFilter("All");
-          setSelectedClashBookingIds([...new Set(clashIds)]);
-
-          requestAnimationFrame(() => {
-            linkedSectionRef.current?.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            });
-          });
-        }}
-        className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
-      >
-        View
-      </button>
-    </div>
-  )}
-
-  {selectedClashBookingIds.length > 0 && (
-    <div className="mb-4">
-      <button
-        onClick={() => {
-          setSelectedClashBookingIds([]);
-        }}
-        className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-      >
-        ← Back to all bookings
-      </button>
-    </div>
-  )}
-
-  {selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
-    <div className="mb-4 space-y-3">
-      {detectedClashes
-        .filter((c) =>
-          c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
-        )
-        .map((clash) => (
-          <div
-            key={clash.key}
-            className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-          >
-            <div className="mb-2 font-medium">
-              {clash.type} clash{" "}
-              {clash.sameDriver
-                ? "— same driver"
-                : clash.unassigned
-                ? "— unassigned driver"
-                : "— jobs close together"}
+        {focusBookingId ? (
+          <section id="focused-booking">
+            <div className="mb-3 text-xl font-bold text-slate-900">
+              Edited Booking
             </div>
+
+            {bookings.find((booking) => booking.id === focusBookingId) ? (
+              <BookingCard
+                booking={bookings.find((booking) => booking.id === focusBookingId)!}
+                forceExpanded
+              />
+            ) : (
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                <div className="text-sm text-slate-600">
+                  Edited booking not found.
+                </div>
+              </div>
+            )}
+          </section>
+        ) : nextJob ? (
+          <section id="next-job">
+            <div className="mb-3 text-xl font-bold text-slate-900">
+              {(nextJob?.status ?? "Scheduled").toString() === "POB"
+                ? "Current Job"
+                : "Next Job"}
+            </div>
+
+            <BookingCard
+              booking={nextJob}
+              forceExpanded
+              highlightClash={selectedClashBookingIds.includes(nextJob.id)}
+            />
+          </section>
+        ) : (
+          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <div className="text-lg font-semibold text-slate-900">
+              You’re clear
+            </div>
+            <p className="mt-1 text-sm text-slate-600">
+              No upcoming scheduled jobs found.
+            </p>
+          </section>
+        )}
+
+        <section ref={clashSectionRef} className="rounded-3xl bg-white p-5 shadow-sm">
+          {detectedClashes.length > 0 && (
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <div>
+                ⚠ {detectedClashes.length} scheduling issue
+                {detectedClashes.length > 1 ? "s" : ""}: {clashSummaryText}
+              </div>
+
+              <button
+                onClick={() => {
+                  const clashIds = detectedClashes.flatMap((c) => c.bookingIds);
+                  setSearchTerm("");
+                  setStatusFilter("All");
+                  setSelectedClashBookingIds([...new Set(clashIds)]);
+
+                  requestAnimationFrame(() => {
+                    linkedSectionRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  });
+                }}
+                className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+              >
+                View
+              </button>
+            </div>
+          )}
+
+          {selectedClashBookingIds.length > 0 && (
+            <div className="mb-4">
+              <button
+                onClick={() => {
+                  setSelectedClashBookingIds([]);
+                }}
+                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+              >
+                ← Back to all bookings
+              </button>
+            </div>
+          )}
+
+          {selectedClashBookingIds.length > 0 && detectedClashes.length > 0 && (
+            <div className="mb-4 space-y-3">
+              {detectedClashes
+                .filter((c) =>
+                  c.bookingIds.some((id) => selectedClashBookingIds.includes(id))
+                )
+                .map((clash) => (
+                  <div
+                    key={clash.key}
+                    className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+                  >
+                    <div className="mb-2 font-medium">
+                      {clash.type} clash{" "}
+                      {clash.sameDriver
+                        ? "— same driver"
+                        : clash.unassigned
+                        ? "— unassigned driver"
+                        : "— jobs close together"}
+                    </div>
 
                     <div className="mb-3 space-y-2">
                       {clash.bookingIds.map((id, index) => {
@@ -1706,18 +1700,17 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                     </div>
 
                     <div className="flex gap-2">
-<button
-  onClick={() => {
-    setStatusFilter("All");
-    setSearchTerm("");
-    setSelectedClashBookingIds(clash.bookingIds);
-
-scrollToRefWithOffset(offendingBookingsRef, 515);
-  }}
-  className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
->
-  Show this clash group
-</button>
+                      <button
+                        onClick={() => {
+                          setStatusFilter("All");
+                          setSearchTerm("");
+                          setSelectedClashBookingIds(clash.bookingIds);
+                          scrollToRefWithOffset(offendingBookingsRef, 515);
+                        }}
+                        className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                      >
+                        Show this clash group
+                      </button>
 
                       <button
                         onClick={async () => {
@@ -1835,21 +1828,27 @@ scrollToRefWithOffset(offendingBookingsRef, 515);
           </div>
 
           <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
-            {["All", "Upcoming", "Needs Action", "Scheduled", "Completed", "Unpaid", "Cancelled"].map(
-              (value) => (
-                <button
-                  key={value}
-                  onClick={() => setStatusFilter(value)}
-                  className={`rounded-xl px-3 py-2 text-sm font-medium ${
-                    statusFilter === value
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-200 text-slate-900"
-                  }`}
-                >
-                  {value}
-                </button>
-              )
-            )}
+            {[
+              "All",
+              "Upcoming",
+              "Needs Action",
+              "Scheduled",
+              "Completed",
+              "Unpaid",
+              "Cancelled",
+            ].map((value) => (
+              <button
+                key={value}
+                onClick={() => setStatusFilter(value)}
+                className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                  statusFilter === value
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-200 text-slate-900"
+                }`}
+              >
+                {value}
+              </button>
+            ))}
           </div>
 
           {errorMessage ? (
@@ -1883,5 +1882,13 @@ scrollToRefWithOffset(offendingBookingsRef, 515);
         + Add booking
       </Link>
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
