@@ -60,12 +60,39 @@ function todayYYYYMMDD() {
 }
 
 function nowHHMM() {
+  function isAirportPickup(address: string) {
+  const value = address.toLowerCase();
+
+  return (
+    value.includes("airport") ||
+    value.includes("terminal") ||
+    value.includes("heathrow") ||
+    value.includes("gatwick") ||
+    value.includes("stansted") ||
+    value.includes("luton") ||
+    value.includes("bristol") ||
+    value.includes("southampton")
+  );
+}
   const d = new Date();
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
+function isAirportPickup(address: string) {
+  const value = address.toLowerCase();
 
+  return (
+    value.includes("airport") ||
+    value.includes("terminal") ||
+    value.includes("heathrow") ||
+    value.includes("gatwick") ||
+    value.includes("stansted") ||
+    value.includes("luton") ||
+    value.includes("bristol") ||
+    value.includes("southampton")
+  );
+}
 export default function AddBookingPage() {
   const router = useRouter();
   const [accountName, setAccountName] = useState("");
@@ -227,6 +254,9 @@ export default function AddBookingPage() {
           vehicle: vehicle.trim() || null,
           booking_type: bookingType.trim() || null,
           return_group_id: returnGroupId,
+          return_flight_number: isAirportPickup(pickupAddress)
+            ? returnFlightNumber.trim() || null
+            : null,
         },
       ]);
 
