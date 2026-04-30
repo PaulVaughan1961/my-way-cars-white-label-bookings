@@ -450,11 +450,16 @@ function DashboardContent() {
       setRefreshing(false);
     }
   }
-  useEffect(() => {
+useEffect(() => {
   if (!focusBookingId) return;
+  if (loading) return;
 
-  scrollToRefWithOffset(editedBookingRef, 20); // small offset so it sits nicely below header
-}, [focusBookingId]);
+  const timer = window.setTimeout(() => {
+    scrollToRefWithOffset(editedBookingRef, 0);
+  }, 150);
+
+  return () => window.clearTimeout(timer);
+}, [focusBookingId, loading, bookings.length]);
 
   useEffect(() => {
     void loadBookings();
