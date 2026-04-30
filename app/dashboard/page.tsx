@@ -362,6 +362,7 @@ function DashboardContent() {
   const clashSectionRef = useRef<HTMLDivElement | null>(null);
   const linkedSectionRef = useRef<HTMLDivElement | null>(null);
   const offendingBookingsRef = useRef<HTMLDivElement | null>(null);
+  const editedBookingRef = useRef<HTMLDivElement | null>(null);
 
   function scrollToRefWithOffset(
     ref: React.RefObject<HTMLDivElement | null>,
@@ -449,6 +450,11 @@ function DashboardContent() {
       setRefreshing(false);
     }
   }
+  useEffect(() => {
+  if (!focusBookingId) return;
+
+  scrollToRefWithOffset(editedBookingRef, 20); // small offset so it sits nicely below header
+}, [focusBookingId]);
 
   useEffect(() => {
     void loadBookings();
@@ -1569,10 +1575,19 @@ ${vehicle || "To be confirmed"}${returnNote}`;
         )}
 
         {focusBookingId ? (
-          <section id="focused-booking">
-            <div className="mb-3 text-xl font-bold text-slate-900">
-              Edited Booking
-            </div>
+        <section id="focused-booking" ref={editedBookingRef}>
+<div className="mb-3 flex items-center justify-between gap-3">
+  <div className="text-xl font-bold text-slate-900">
+    Edited Booking
+  </div>
+
+  <Link
+    href="/dashboard"
+    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+  >
+    Clear
+  </Link>
+</div>
 
             {bookings.find((booking) => booking.id === focusBookingId) ? (
               <BookingCard
