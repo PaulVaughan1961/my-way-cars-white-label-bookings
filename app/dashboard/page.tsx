@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { getSupabase } from "../lib/supabase";
+import { getSupabase } from "@/lib/supabase/client";
 
 type BookingRow = {
   id: string;
@@ -491,7 +491,7 @@ useEffect(() => {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
-    }, 1000);
+    }, 60000);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -1283,6 +1283,12 @@ useEffect(() => {
             >
               Edit
             </Link>
+            <Link
+  href={`/receipt/${booking.id}`}
+  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+>
+  Receipt / Invoice
+</Link>
 
             {phone ? (
               <a
