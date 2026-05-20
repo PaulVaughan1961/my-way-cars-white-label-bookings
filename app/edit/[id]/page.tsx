@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getSupabase } from "../../lib/supabase";
+import { getSupabase } from "@/lib/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 
 const supabase = getSupabase();
@@ -298,7 +298,7 @@ notes: notes.trim() || null,
 
       const { error } = await supabase
         .from("bookings")
-        .update(payload)
+  .update(payload as never)
         .eq("id", id);
  
       if (error) throw error;

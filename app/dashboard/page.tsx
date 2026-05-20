@@ -870,42 +870,59 @@ useEffect(() => {
     );
   }, [bookings]);
 
-  async function updateBooking(id: string, patch: Record<string, unknown>) {
-    try {
-      setBusyId(id);
-      setErrorMessage("");
+async function updateBooking(
+  id: string,
+  patch: Partial<BookingRow>
+) {
+  try {
+    setBusyId(id);
+    setErrorMessage("");
 
-      const supabase = getSupabase();
-      const { error } = await supabase
-        .from("bookings")
-        .update(patch)
-        .eq("id", id);
+    const supabase = getSupabase();
 
-      if (error) throw error;
+    const { error } = await supabase
+      .from("bookings")
+  .update(patch as never)
+      .eq("id", id);
 
-      setBookings((current) =>
-        current.map((row) => (row.id === id ? { ...row, ...patch } : row))
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to update booking";
-      setErrorMessage(message);
-    } finally {
-      setBusyId(null);
-    }
+    if (error) throw error;
+
+    setBookings((current) =>
+      current.map((row) =>
+        row.id === id ? { ...row, ...patch } : row
+      )
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to update booking";
+
+    setErrorMessage(message);
+  } finally {
+    setBusyId(null);
   }
+}
 
-  async function markClashResolved(clashKey: string, bookingIds: string[]) {
-    try {
-      setErrorMessage("");
-      const supabase = getSupabase();
-      const sortedIds = [...bookingIds].sort();
+async function markClashResolved(
+  clashKey: string,
+  bookingIds: string[]
+) {
+  try {
+    setErrorMessage("");
 
-      const { error } = await supabase.from("clash_reviews").upsert({
-        clash_key: clashKey,
-        booking_a_id: sortedIds[0],
-        booking_b_id: sortedIds[1],
-      });
+    const supabase = getSupabase();
+    const sortedIds = [...bookingIds].sort();
+
+    const { error } = await supabase
+      .from("clash_reviews")
+.upsert({
+  clash_key: clashKey,
+  booking_a_id: sortedIds[0],
+  booking_b_id: sortedIds[1],
+} as never)
+
+    if (error) throw error;
 
       if (error) throw error;
 

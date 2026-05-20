@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 type Booking = {
   id: string;
@@ -34,12 +34,12 @@ type Driver = {
 };
 
 export default function DriverDashboardPage() {
-  const supabase = createClient();
+  const supabase = getSupabase();
   const router = useRouter();
 
-  const [email, setEmail] = useState<string>("Loading...");
-  const [status, setStatus] = useState<string>("Checking...");
-  const [driverName, setDriverName] = useState<string>("");
+  const [email, setEmail] = useState("Loading...");
+  const [status, setStatus] = useState("Checking...");
+  const [driverName, setDriverName] = useState("");
   const [jobs, setJobs] = useState<Booking[]>([]);
 
   useEffect(() => {
@@ -53,11 +53,13 @@ export default function DriverDashboardPage() {
         return;
       }
 
-      const { data: driver } = await supabase
-        .from("drivers")
-        .select("*")
-        .eq("email", user.email)
-        .single<Driver>();
+const { data: driverData } = await supabase
+  .from("drivers")
+  .select("*")
+  .eq("email", user.email)
+  .single();
+
+const driver = driverData as Driver | null;
 
       if (!driver || !driver.is_active) {
         await supabase.auth.signOut();
@@ -69,12 +71,12 @@ export default function DriverDashboardPage() {
       setDriverName(driver.name);
       setStatus("Access confirmed");
 
-const { data: bookings } = await supabase
-  .from("bookings")
-  .select("*")
-  .eq("driver_name", driver.name)
-  .neq("status", "Completed")
-  .order("pickup_datetime", { ascending: true });
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("driver_name", driver.name)
+        .neq("status", "Completed")
+        .order("pickup_datetime", { ascending: true });
 
       setJobs((bookings as Booking[]) || []);
     }
@@ -88,7 +90,10 @@ const { data: bookings } = await supabase
     router.refresh();
   }
 
-  async function updatePaymentStatus(jobId: string, paymentStatus: string) {
+  async function updatePaymentStatus(
+    jobId: string,
+    paymentStatus: string
+  ) {
     const confirmed = window.confirm(
       `Are you sure you want to mark this job as ${paymentStatus}?`
     );
@@ -97,7 +102,7 @@ const { data: bookings } = await supabase
 
     const { error } = await supabase
       .from("bookings")
-      .update({ payment_status: paymentStatus })
+  .update({ payment_status: paymentStatus } as never)
       .eq("id", jobId);
 
     if (error) {
@@ -107,7 +112,9 @@ const { data: bookings } = await supabase
 
     setJobs((prevJobs) =>
       prevJobs.map((job) =>
-        job.id === jobId ? { ...job, payment_status: paymentStatus } : job
+        job.id === jobId
+          ? { ...job, payment_status: paymentStatus }
+          : job
       )
     );
   }
@@ -121,7 +128,7 @@ const { data: bookings } = await supabase
 
     const { error } = await supabase
       .from("bookings")
-      .update({ status: newStatus })
+   .update({ status: newStatus } as never)
       .eq("id", jobId);
 
     if (error) {
@@ -138,6 +145,7 @@ const { data: bookings } = await supabase
 
   function openMap(address: string) {
     const encoded = encodeURIComponent(address);
+
     window.open(
       `https://www.google.com/maps/search/?api=1&query=${encoded}`,
       "_blank"
@@ -154,17 +162,10 @@ const { data: bookings } = await supabase
       alert("No customer phone number found");
       return;
     }
-    function callCustomer(phone: string) {
-  if (!phone) {
-    alert("No customer phone number found");
-    return;
-  }
-
-  window.open(`tel:${phone}`, "_self");
-}
 
     const firstName = passenger?.split(" ")[0] || "Customer";
-    const driverFirstName = currentDriverName?.split(" ")[0] || "Driver";
+    const driverFirstName =
+      currentDriverName?.split(" ")[0] || "Driver";
 
     const message = `Hello ${firstName}, this is ${driverFirstName}, I'm your My Way Cars driver. I just wanted to inform you that I am on my way to ${pickup} and will see you soon.
 
@@ -172,31 +173,40 @@ Regards
 ${driverFirstName}`;
 
     const encodedMessage = encodeURIComponent(message);
+
     window.open(`sms:${phone}?body=${encodedMessage}`, "_blank");
   }
 
- function callCustomer(phone: string) {
-  if (!phone) {
-    alert("No customer phone number found");
-    return;
+  function callCustomer(phone: string) {
+    if (!phone) {
+      alert("No customer phone number found");
+      return;
+    }
+
+    window.open(`tel:${phone}`, "_self");
   }
 
-  window.open(`tel:${phone}`, "_self");
-}
-
-return (
+  return (
     <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-bold">Driver Dashboard</h1>
+          <h1 className="text-2xl font-bold">
+            Driver Dashboard
+          </h1>
 
-          <p className="mt-2 text-sm text-slate-600">Status:</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Status:
+          </p>
           <p className="font-medium">{status}</p>
 
-          <p className="mt-2 text-sm text-slate-600">Logged in as:</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Logged in as:
+          </p>
           <p className="font-medium">{email}</p>
 
-          <p className="mt-2 text-sm text-slate-600">Driver:</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Driver:
+          </p>
           <p className="font-medium">{driverName}</p>
 
           <button
@@ -208,10 +218,14 @@ return (
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold">Your Jobs</h2>
+          <h2 className="mb-4 text-xl font-semibold">
+            Your Jobs
+          </h2>
 
           {jobs.length === 0 ? (
-            <p className="text-slate-500">No jobs found</p>
+            <p className="text-slate-500">
+              No jobs found
+            </p>
           ) : (
             <div className="space-y-3">
               {jobs.map((job, index) => {
@@ -235,18 +249,27 @@ return (
                   job.dropoff_address ??
                   "Not set";
 
-                const bookingType = job.booking_type ?? job.type ?? "Not set";
+                const bookingType =
+                  job.booking_type ??
+                  job.type ??
+                  "Not set";
 
-                const vehicle = job.vehicle ?? "Not assigned";
+                const vehicle =
+                  job.vehicle ?? "Not assigned";
 
-                const rawDateTime = job.pickup_datetime;
+                const rawDateTime =
+                  job.pickup_datetime;
 
                 const date = rawDateTime
-                  ? new Date(rawDateTime).toLocaleDateString()
+                  ? new Date(
+                      rawDateTime
+                    ).toLocaleDateString()
                   : "No date";
 
                 const time = rawDateTime
-                  ? new Date(rawDateTime).toLocaleTimeString([], {
+                  ? new Date(
+                      rawDateTime
+                    ).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
                     })
@@ -268,54 +291,79 @@ return (
                     )}
 
                     <p>
-                      <strong>Passenger:</strong> {passenger}
+                      <strong>Passenger:</strong>{" "}
+                      {passenger}
                     </p>
+
                     <p>
                       <strong>Date:</strong> {date}
                     </p>
+
                     <p>
                       <strong>Time:</strong> {time}
                     </p>
+
                     <p>
-                      <strong>Pickup:</strong> {pickup}
+                      <strong>Pickup:</strong>{" "}
+                      {pickup}
                     </p>
+
                     <p>
-                      <strong>Dropoff:</strong> {dropoff}
+                      <strong>Dropoff:</strong>{" "}
+                      {dropoff}
                     </p>
+
                     <p>
-                      <strong>Type:</strong> {bookingType}
+                      <strong>Type:</strong>{" "}
+                      {bookingType}
                     </p>
+
                     <p>
-                      <strong>Vehicle:</strong> {vehicle}
+                      <strong>Vehicle:</strong>{" "}
+                      {vehicle}
                     </p>
+
                     <p>
                       <strong>Payment:</strong>{" "}
-                      {job.payment_status ?? "Unknown"}
+                      {job.payment_status ??
+                        "Unknown"}
                     </p>
+
                     <p>
-                      <strong>Status:</strong> {job.status ?? "Unknown"}
+                      <strong>Status:</strong>{" "}
+                      {job.status ?? "Unknown"}
                     </p>
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
-                        onClick={() => updateJobStatus(job.id, "POB")}
+                        onClick={() =>
+                          updateJobStatus(
+                            job.id,
+                            "POB"
+                          )
+                        }
                         className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"
                       >
                         POB
                       </button>
 
                       <button
-                        onClick={() => updateJobStatus(job.id, "Scheduled")}
+                        onClick={() =>
+                          updateJobStatus(
+                            job.id,
+                            "Scheduled"
+                          )
+                        }
                         className="rounded-lg bg-gray-600 px-3 py-2 text-sm text-white"
                       >
                         Reset Status
                       </button>
-                      
 
                       <button
                         onClick={() =>
                           textCustomer(
-                            job.passenger_phone ?? "",
+                            job.passenger_phone ??
+                              "",
                             passenger,
                             driverName,
                             pickup
@@ -325,36 +373,56 @@ return (
                       >
                         Text Customer
                       </button>
-                      <button
-  onClick={() => callCustomer(job.passenger_phone ?? "")}
-  className="rounded-lg bg-purple-600 px-3 py-2 text-white text-sm"
->
-  Call Customer
-</button>
 
                       <button
-                        onClick={() => updatePaymentStatus(job.id, "Paid")}
+                        onClick={() =>
+                          callCustomer(
+                            job.passenger_phone ??
+                              ""
+                          )
+                        }
+                        className="rounded-lg bg-purple-600 px-3 py-2 text-sm text-white"
+                      >
+                        Call Customer
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          updatePaymentStatus(
+                            job.id,
+                            "Paid"
+                          )
+                        }
                         className="rounded-lg bg-green-600 px-3 py-2 text-sm text-white"
                       >
                         Mark Paid
                       </button>
 
                       <button
-                        onClick={() => updatePaymentStatus(job.id, "Unpaid")}
+                        onClick={() =>
+                          updatePaymentStatus(
+                            job.id,
+                            "Unpaid"
+                          )
+                        }
                         className="rounded-lg bg-amber-600 px-3 py-2 text-sm text-white"
                       >
                         Mark Unpaid
                       </button>
 
                       <button
-                        onClick={() => openMap(pickup)}
+                        onClick={() =>
+                          openMap(pickup)
+                        }
                         className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white"
                       >
                         Pickup Map
                       </button>
 
                       <button
-                        onClick={() => openMap(dropoff)}
+                        onClick={() =>
+                          openMap(dropoff)
+                        }
                         className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white"
                       >
                         Dropoff Map

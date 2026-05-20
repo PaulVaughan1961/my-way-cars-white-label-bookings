@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 export default function DriverLoginPage() {
-  const supabase = createClient();
+const supabase = getSupabase();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
