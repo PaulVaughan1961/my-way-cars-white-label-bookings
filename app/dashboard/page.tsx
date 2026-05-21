@@ -274,7 +274,13 @@ function localDateTimeToMs(value: string | null | undefined): number {
 }
 
 function getWhenMs(row: BookingRow): number {
-  return localDateTimeToMs(getWhen(row));
+  const value = getWhen(row);
+
+  if (!value) return Number.NaN;
+
+  const parsed = new Date(value).getTime();
+
+  return Number.isNaN(parsed) ? Number.NaN : parsed;
 }
 
 function fmtDateTime(value: string): string {
@@ -519,46 +525,62 @@ useEffect(() => {
 
     let result = sorted;
 
-    if (statusFilter === "Upcoming") {
-      result = result.filter((row) => {
-        const when = getWhenMs(row);
-        const status = (row.status ?? "Scheduled").toString();
-        const graceMs = 30 * 60 * 1000;
+if (statusFilter === "Upcoming") {
+  result = result.filter((row) => {
+    const when = getWhenMs(row);
+    const status = (row.status ?? "Scheduled").toString();
+    const graceMs = 30 * 60 * 1000;
 
-        if (status === "POB") {
-          return true;
-        }
+    console.log(
+      "CHECKING JOB:",
+      getName(row),
+      "RAW:",
+      getWhen(row),
+      "MS:",
+      when,
+      "DATE:",
+      new Date(when).toString(),
+      "STATUS:",
+      status,
+      "NOW:",
+      new Date(now).toString()
+    );
 
-        return (
-          !Number.isNaN(when) &&
-          when >= now - graceMs &&
-          status !== "Cancelled" &&
-          status !== "Completed"
-        );
-      });
-    } else if (statusFilter === "Unpaid") {
-      result = result.filter((row) => {
-        const payment = (row.payment_status ?? "Unpaid").toString();
-        const status = (row.status ?? "Scheduled").toString();
-        return payment === "Unpaid" && status === "Completed";
-      });
-    } else if (statusFilter === "Needs Action") {
-      result = result.filter((row) => {
-        const when = getWhenMs(row);
-        const status = (row.status ?? "Scheduled").toString();
-
-        return (
-          !Number.isNaN(when) &&
-          when < now &&
-          status !== "Completed" &&
-          status !== "Cancelled"
-        );
-      });
-    } else if (statusFilter !== "All") {
-      result = result.filter(
-        (row) => (row.status ?? "Scheduled").toString() === statusFilter
-      );
+    if (status === "POB") {
+      return true;
     }
+
+    return (
+      !Number.isNaN(when) &&
+      when >= now - graceMs &&
+      status !== "Cancelled" &&
+      status !== "Completed"
+    );
+  });
+} else if (statusFilter === "Unpaid") {
+  result = result.filter((row) => {
+    const payment = (row.payment_status ?? "Unpaid").toString();
+    const status = (row.status ?? "Scheduled").toString();
+
+    return payment === "Unpaid" && status === "Completed";
+  });
+} else if (statusFilter === "Needs Action") {
+  result = result.filter((row) => {
+    const when = getWhenMs(row);
+    const status = (row.status ?? "Scheduled").toString();
+
+    return (
+      !Number.isNaN(when) &&
+      when < now &&
+      status !== "Completed" &&
+      status !== "Cancelled"
+    );
+  });
+} else if (statusFilter !== "All") {
+  result = result.filter(
+    (row) => (row.status ?? "Scheduled").toString() === statusFilter
+  );
+}
 
     if (!needle) {
       return result;
@@ -568,31 +590,16 @@ useEffect(() => {
       const whenText = getWhen(row);
       const whenParts = parseLocalDateTimeParts(whenText);
 
-      const ukDateText = whenParts
-        ? [
-            `${String(whenParts.day).padStart(2, "0")}/${String(
-              whenParts.month
-            ).padStart(2, "0")}`,
-            `${String(whenParts.day).padStart(2, "0")}-${String(
-              whenParts.month
-            ).padStart(2, "0")}`,
-            `${whenParts.day}/${whenParts.month}`,
-            `${whenParts.day}-${whenParts.month}`,
-            `${String(whenParts.day).padStart(2, "0")}/${String(
-              whenParts.month
-            ).padStart(2, "0")}/${String(whenParts.year).slice(-2)}`,
-            `${String(whenParts.day).padStart(2, "0")}/${String(
-              whenParts.month
-            ).padStart(2, "0")}/${whenParts.year}`,
-            `${String(whenParts.day).padStart(2, "0")}-${String(
-              whenParts.month
-            ).padStart(2, "0")}-${String(whenParts.year).slice(-2)}`,
-            `${String(whenParts.day).padStart(2, "0")}-${String(
-              whenParts.month
-            ).padStart(2, "0")}-${whenParts.year}`,
-          ].join(" ")
-        : "";
 
+const ukDateText = whenParts
+  ? new Date(
+      whenParts.year,
+      whenParts.month - 1,
+      whenParts.day
+    ).toLocaleDateString("en-GB")
+  : "";
+
+const shortUkDateText = ukDateText.slice(0, 5);
       const haystack = [
         getName(row),
         getPhone(row),
@@ -601,6 +608,7 @@ useEffect(() => {
         getDriver(row),
         getVehicle(row),
         ukDateText,
+        shortUkDateText,
         fmtDateTime(getWhen(row)),
         getWhen(row),
         pickString(row, ["notes"]),
@@ -852,22 +860,21 @@ useEffect(() => {
 
     if (pobJob) return pobJob;
 
-    return (
-      [...bookings]
-        .filter((row) => {
-          const when = getWhenMs(row);
-          const status = (row.status ?? "Scheduled").toString();
+  return (
+  [...bookings]
+    .filter((row) => {
+      const when = getWhenMs(row);
+      const status = (row.status ?? "Scheduled").toString();
 
-          return (
-            !Number.isNaN(when) &&
-            when >= now &&
-            status !== "Cancelled" &&
-            status !== "Completed" &&
-            status !== "POB"
-          );
-        })
-        .sort((a, b) => getWhenMs(a) - getWhenMs(b))[0] ?? null
-    );
+      return (
+        !Number.isNaN(when) &&
+        status !== "Cancelled" &&
+        status !== "Completed" &&
+        status !== "POB"
+      );
+    })
+    .sort((a, b) => getWhenMs(a) - getWhenMs(b))[0] ?? null
+);
   }, [bookings]);
 
 async function updateBooking(
@@ -1075,17 +1082,17 @@ async function markClashResolved(
                   parts.second
                 );
 
-                const dateText = d.toLocaleDateString(undefined, {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "2-digit",
-                });
+const dateText = d.toLocaleDateString("en-GB", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "2-digit",
+});
 
-                const timeText = d.toLocaleTimeString(undefined, {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                });
+const timeText = d.toLocaleTimeString("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
                 return `${dateText} | ${timeText} | ${name} | ${displayOrDash(
                   pickup
@@ -1500,12 +1507,31 @@ ${vehicle || "To be confirmed"}${returnNote}`;
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">
-                My Way Cars
-              </h1>
-              <p className="text-sm text-slate-600">Booking dashboard</p>
-            </div>
+<div>
+  <h1 className="text-2xl font-bold text-slate-900">
+    My Way Cars
+  </h1>
+
+  <p className="text-sm text-slate-600">
+    Booking dashboard
+  </p>
+
+  <div className="mt-2 text-sm font-medium text-slate-700">
+    {new Date(nowMs).toLocaleDateString("en-GB", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    })}
+  </div>
+
+  <div className="text-lg font-bold text-slate-900">
+    {new Date(nowMs).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}
+  </div>
+</div>
 
             <div className="flex flex-wrap gap-2">
               <Link
