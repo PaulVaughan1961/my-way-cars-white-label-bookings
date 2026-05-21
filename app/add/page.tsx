@@ -230,35 +230,29 @@ export default function AddBookingPage() {
 
       const driverPhone = selectedDriver?.driver_phone?.trim() || null;
 
-      const outboundInsert = await supabase.from("bookings").insert([
-        {
-          passenger_name: passengerName.trim(),
-          passenger_phone: passengerPhone.trim(),
-          pickup_address: pickupAddress.trim(),
-          dropoff_address: dropoffAddress.trim(),
-          pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
-          distance_miles: distanceMilesNumber,
-          fare: estFareGBP,
-          notes: notes.trim() || null,
-          status: "Scheduled",
-          payment_status: "Unpaid",
-          account_name: accountName.trim() || null,
-          created_at: new Date().toISOString(),
-          passengers: pax === "" ? 1 : Number(pax),
-          via: via.trim() || null,
-          bags_large: bagsLarge,
-          bags_small: bagsSmall,
-          local_authority: localAuthority.trim() || null,
-          driver_name: driverName.trim() || null,
-          driver_phone: driverPhone,
-          vehicle: vehicle.trim() || null,
-          booking_type: bookingType.trim() || null,
-          return_group_id: returnGroupId,
-          return_flight_number: isAirportPickup(pickupAddress)
-            ? returnFlightNumber.trim() || null
-            : null,
-        },
-      ]);
+const outboundInsert = await supabase.from("bookings").insert([
+  {
+    passenger_name: passengerName.trim(),
+    passenger_phone: passengerPhone.trim(),
+    pickup_address: pickupAddress.trim(),
+    dropoff_address: dropoffAddress.trim(),
+    pickup_datetime: outboundDateTime.toISOString(),
+    fare: Number(fare || 0),
+    payment_status: "Unpaid",
+    status: "Scheduled",
+    notes: notes.trim(),
+    passengers: Number(passengers || 1),
+    via: via.trim(),
+    bags_large: Number(largeBags || 0),
+    bags_small: Number(smallBags || 0),
+    local_authority: authority || null,
+    driver_name: driverName || null,
+    driver_phone: driverPhone || null,
+    vehicle: vehicle || null,
+    booking_type: bookingType || null,
+    account_name: accountName.trim() || null,
+  } as never,
+]);
 
       if (outboundInsert.error) {
         console.error(outboundInsert.error);
