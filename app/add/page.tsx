@@ -236,7 +236,7 @@ const outboundInsert = await supabase.from("bookings").insert([
     passenger_phone: passengerPhone.trim(),
     pickup_address: pickupAddress.trim(),
     dropoff_address: dropoffAddress.trim(),
-    pickup_datetime: outboundDateTime.toISOString(),
+  pickup_datetime: isoFromDateTime(pickupDate, pickupTime),
     fare: Number(fare || 0),
     payment_status: "Unpaid",
     status: "Scheduled",
