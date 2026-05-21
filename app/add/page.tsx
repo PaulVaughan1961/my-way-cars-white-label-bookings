@@ -279,27 +279,36 @@ const returnInsert = await supabase.from("bookings").insert([
     pickup_address: retPickup,
     dropoff_address: retDrop,
     pickup_datetime: isoFromDateTime(returnDate, returnTime),
+
     distance_miles: distanceMilesNumber,
     fare: estFareGBP,
+
     notes: returnNotes.trim() || null,
+
     status: "Scheduled",
     payment_status: "Unpaid",
     created_at: new Date().toISOString(),
+
     passengers: pax === "" ? 1 : Number(pax),
+
     via: via.trim() || null,
+
     bags_large: bagsLarge,
     bags_small: bagsSmall,
+
     local_authority: localAuthority.trim() || null,
+
     driver_name: driverName.trim() || null,
-    driver_phone: driverPhone,
+    driver_phone: driverPhone || null,
+
     vehicle: vehicle.trim() || null,
     booking_type: bookingType.trim() || null,
+
     return_group_id: returnGroupId,
     return_flight_number: returnFlightNumber.trim() || null,
 
-    // 👇 ADD THIS LINE
     account_name: accountName.trim() || null,
-  },
+  } as never,
 ]);
 
         if (returnInsert.error) {
