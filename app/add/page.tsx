@@ -122,6 +122,11 @@ export default function AddBookingPage() {
   const [driverName, setDriverName] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
+const [customerMatches, setCustomerMatches] = useState<any[]>([]);
+
+const [showCustomerMatches, setShowCustomerMatches] = useState(false);
+
+const [customerSelected, setCustomerSelected] = useState(false);
 
   const [hasReturn, setHasReturn] = useState(false);
   const [reverseReturn, setReverseReturn] = useState(true);
@@ -131,34 +136,55 @@ export default function AddBookingPage() {
   const [returnNotes, setReturnNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
-
   useEffect(() => {
-    async function loadData() {
-      const { data: driverData, error: driverError } = await supabase
-        .from("drivers")
-        .select(
-          "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
-        )
-        .eq("active", true)
-        .order("name", { ascending: true });
+  async function loadData() {
+    const { data: driverData, error: driverError } = await supabase
+      .from("drivers")
+      .select(
+        "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
+      )
+      .eq("active", true)
+      .order("name", { ascending: true });
 
-      if (!driverError) {
-        setDrivers((driverData as DriverRow[]) ?? []);
-      }
-
-      const { data: vehicleData, error: vehicleError } = await supabase
-        .from("vehicles")
-        .select("*")
-        .order("make", { ascending: true });
-
-      if (!vehicleError) {
-        setVehicles((vehicleData as VehicleRow[]) ?? []);
-      }
+    if (!driverError) {
+      setDrivers((driverData as DriverRow[]) ?? []);
     }
 
-    void loadData();
-  }, []);
+    const { data: vehicleData, error: vehicleError } = await supabase
+      .from("vehicles")
+      .select("*")
+      .order("make", { ascending: true });
 
+    if (!vehicleError) {
+      setVehicles((vehicleData as VehicleRow[]) ?? []);
+    }
+  }
+
+  void loadData();
+}, []);
+
+useEffect(() => {
+  async function searchCustomers() {
+    if (!showCustomerMatches) return;
+
+    if (passengerName.trim().length < 2) {
+      setCustomerMatches([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .ilike("passenger_name", `%${passengerName.trim()}%`)
+      .limit(5);
+
+    if (!error && data) {
+      setCustomerMatches(data);
+    }
+  }
+
+  searchCustomers();
+}, [passengerName, showCustomerMatches]);
   const canSave = useMemo(() => {
     return (
       passengerName.trim().length > 0 &&
@@ -311,17 +337,43 @@ const returnInsert = await supabase.from("bookings").insert([
   } as never,
 ]);
 
-        if (returnInsert.error) {
-          console.error(returnInsert.error);
-          alert(
-            `Outbound saved, but return booking failed: ${returnInsert.error.message}`
-          );
-          setSaving(false);
-          return;
-        }
-      }
 
-      router.push("/");
+
+if (returnInsert.error) {
+  console.error(returnInsert.error);
+  alert(
+    `Outbound saved, but return booking failed: ${returnInsert.error.message}`
+  );
+  setSaving(false);
+  return;
+}
+
+}
+
+const customerSave = await supabase
+  .from("customers")
+  .upsert(
+    [
+      {
+        passenger_name: passengerName.trim(),
+        passenger_phone: passengerPhone.trim(),
+        home_address: pickupAddress.trim(),
+ 
+      },
+    ] as never,
+    {
+      onConflict: "passenger_phone",
+    }
+  );
+
+console.log("CUSTOMER SAVE RESULT:", customerSave);
+
+if (customerSave.error) {
+  console.error("CUSTOMER SAVE ERROR:", customerSave.error);
+}
+
+router.push("/");
+
     } catch (err) {
       console.error(err);
       alert("Something went wrong while saving the booking.");
@@ -347,11 +399,47 @@ const returnInsert = await supabase.from("bookings").insert([
             <label className="text-sm font-medium">Passenger name</label>
             <input
               className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-              value={passengerName}
-              onChange={(e) => setPassengerName(e.target.value)}
-              placeholder="e.g. Bridget"
-              autoComplete="name"
-            />
+value={passengerName}
+onChange={(e) => {
+  setPassengerName(e.target.value);
+  setShowCustomerMatches(true);
+}}
+placeholder="e.g. Bridget"
+autoComplete="name"
+/>
+{showCustomerMatches && customerMatches.length > 0 && (
+  <div
+    className="mt-1 rounded-xl border border-gray-200 bg-white shadow"
+  >
+    {customerMatches.map((customer) => (
+      <button
+        type="button"
+        key={customer.id}
+onClick={() => {
+  setPassengerName(customer.passenger_name || "");
+  setPassengerPhone(customer.passenger_phone || "");
+  setPickupAddress(customer.home_address || "");
+  setAccountName(customer.account_name || "");
+
+  setTimeout(() => {
+setCustomerSelected(true);
+setCustomerMatches([]);
+setShowCustomerMatches(false);
+  }, 0);
+}}
+        className="block w-full border-b border-gray-100 p-3 text-left hover:bg-gray-50"
+      >
+        <div className="font-medium">
+          {customer.passenger_name}
+        </div>
+
+        <div className="text-sm text-gray-500">
+          {customer.passenger_phone}
+        </div>
+      </button>
+    ))}
+  </div>
+)}
           </div>
           <input
   type="text"
