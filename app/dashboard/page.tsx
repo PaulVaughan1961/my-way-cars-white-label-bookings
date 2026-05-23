@@ -502,143 +502,130 @@ useEffect(() => {
     return () => window.clearInterval(timer);
   }, []);
 
-  const filteredBookings = useMemo(() => {
-    const now = Date.now();
-    const needle = searchTerm.trim().toLowerCase();
-    const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
+const filteredBookings = useMemo(() => {
+  const now = Date.now();
+  const needle = searchTerm.trim().toLowerCase();
+  const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
 
-    const sorted = [...bookings].sort((a, b) => {
-      const aTime = getWhenMs(a);
-      const bTime = getWhenMs(b);
+  const sorted = [...bookings].sort((a, b) => {
+    const aTime = getWhenMs(a);
+    const bTime = getWhenMs(b);
 
-      const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
-      const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+    const safeA = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
+    const safeB = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
 
-      const aStatus = (a.status ?? "Scheduled").toString();
+    const aStatus = (a.status ?? "Scheduled").toString();
 
-      if (aStatus === "Completed" || aStatus === "Cancelled") {
-        return safeB - safeA;
-      }
-
-      return safeA - safeB;
-    });
-
-    let result = sorted;
-
-if (statusFilter === "Upcoming") {
-  result = result.filter((row) => {
-    const when = getWhenMs(row);
-    const status = (row.status ?? "Scheduled").toString();
-    const graceMs = 30 * 60 * 1000;
-
-    console.log(
-      "CHECKING JOB:",
-      getName(row),
-      "RAW:",
-      getWhen(row),
-      "MS:",
-      when,
-      "DATE:",
-      new Date(when).toString(),
-      "STATUS:",
-      status,
-      "NOW:",
-      new Date(now).toString()
-    );
-
-    if (status === "POB") {
-      return true;
+    if (
+      aStatus === "Completed" ||
+      aStatus === "Cancelled" ||
+      aStatus === "Rejected"
+    ) {
+      return safeB - safeA;
     }
 
-    return (
-      !Number.isNaN(when) &&
-      when >= now - graceMs &&
-      status !== "Cancelled" &&
-      status !== "Completed"
-    );
+    return safeA - safeB;
   });
-} else if (statusFilter === "Unpaid") {
-  result = result.filter((row) => {
-    const payment = (row.payment_status ?? "Unpaid").toString();
-    const status = (row.status ?? "Scheduled").toString();
 
-    return payment === "Unpaid" && status === "Completed";
-  });
-} else if (statusFilter === "Needs Action") {
-  result = result.filter((row) => {
-    const when = getWhenMs(row);
-    const status = (row.status ?? "Scheduled").toString();
+  let result = sorted;
 
-    return (
-      !Number.isNaN(when) &&
-      when < now &&
-      status !== "Completed" &&
-      status !== "Cancelled"
-    );
-  });
-} else if (statusFilter !== "All") {
-  result = result.filter(
-    (row) => (row.status ?? "Scheduled").toString() === statusFilter
-  );
-}
+  if (statusFilter === "Upcoming") {
+    result = result.filter((row) => {
+      const when = getWhenMs(row);
+      const status = (row.status ?? "Scheduled").toString();
+      const graceMs = 30 * 60 * 1000;
 
-    if (!needle) {
-      return result;
-    }
-
-    return result.filter((row) => {
-      const whenText = getWhen(row);
-      const whenParts = parseLocalDateTimeParts(whenText);
-
-
-const ukDateText = whenParts
-  ? new Date(
-      whenParts.year,
-      whenParts.month - 1,
-      whenParts.day
-    ).toLocaleDateString("en-GB")
-  : "";
-
-const shortUkDateText = ukDateText.slice(0, 5);
-      const haystack = [
-        getName(row),
-        getPhone(row),
-        getPickup(row),
-        getDropoff(row),
-        getDriver(row),
-        getVehicle(row),
-        ukDateText,
-        shortUkDateText,
-        fmtDateTime(getWhen(row)),
-        getWhen(row),
-        pickString(row, ["notes"]),
-        pickString(row, ["via"]),
-        pickString(row, ["local_authority"]),
-        pickString(row, [
-          "account_name",
-          "account",
-          "customer_account",
-          "business_name",
-          "company_name",
-        ]),
-        pickString(row, ["return_flight_number"]),
-        (row.status ?? "Scheduled").toString(),
-        (row.payment_status ?? "Unpaid").toString(),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      const normalisedHaystack = haystack.replace(/[^\dA-Za-z]/g, "");
+      if (status === "POB") return true;
 
       return (
-        haystack.includes(needle) ||
-        normalisedHaystack.includes(normalisedNeedle)
+        !Number.isNaN(when) &&
+        when >= now - graceMs &&
+        status !== "Cancelled" &&
+        status !== "Completed" &&
+        status !== "Rejected"
       );
     });
-  }, [bookings, statusFilter, searchTerm]);
+  } else if (statusFilter === "Unpaid") {
+    result = result.filter((row) => {
+      const payment = (row.payment_status ?? "Unpaid").toString();
+      const status = (row.status ?? "Scheduled").toString();
 
-  const unpaidTotal = useMemo(() => {
-    return bookings.reduce((sum, row) => {
+      return payment === "Unpaid" && status === "Completed";
+    });
+  } else if (statusFilter === "Needs Action") {
+    result = result.filter((row) => {
+      const when = getWhenMs(row);
+      const status = (row.status ?? "Scheduled").toString();
+
+      return (
+        !Number.isNaN(when) &&
+        when < now &&
+        status !== "Completed" &&
+        status !== "Cancelled" &&
+        status !== "Rejected"
+      );
+    });
+  } else if (statusFilter !== "All") {
+    result = result.filter(
+      (row) => (row.status ?? "Scheduled").toString() === statusFilter
+    );
+  }
+
+  if (!needle) return result;
+
+  return result.filter((row) => {
+    const whenText = getWhen(row);
+    const whenParts = parseLocalDateTimeParts(whenText);
+
+    const ukDateText = whenParts
+      ? new Date(
+          whenParts.year,
+          whenParts.month - 1,
+          whenParts.day
+        ).toLocaleDateString("en-GB")
+      : "";
+
+    const shortUkDateText = ukDateText.slice(0, 5);
+
+    const haystack = [
+      getName(row),
+      getPhone(row),
+      getPickup(row),
+      getDropoff(row),
+      getDriver(row),
+      getVehicle(row),
+      ukDateText,
+      shortUkDateText,
+      fmtDateTime(getWhen(row)),
+      getWhen(row),
+      pickString(row, ["notes"]),
+      pickString(row, ["via"]),
+      pickString(row, ["local_authority"]),
+      pickString(row, [
+        "account_name",
+        "account",
+        "customer_account",
+        "business_name",
+        "company_name",
+      ]),
+      pickString(row, ["return_flight_number"]),
+      (row.status ?? "Scheduled").toString(),
+      (row.payment_status ?? "Unpaid").toString(),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const normalisedHaystack = haystack.replace(/[^\dA-Za-z]/g, "");
+
+    return (
+      haystack.includes(needle) ||
+      normalisedHaystack.includes(normalisedNeedle)
+    );
+  });
+}, [bookings, statusFilter, searchTerm]);
+
+const unpaidTotal = useMemo(() => {
+  return bookings.reduce((sum, row) => {
       const payment = (row.payment_status ?? "Unpaid").toString();
       const status = (row.status ?? "Scheduled").toString();
 
@@ -870,7 +857,8 @@ const shortUkDateText = ukDateText.slice(0, 5);
         !Number.isNaN(when) &&
         status !== "Cancelled" &&
         status !== "Completed" &&
-        status !== "POB"
+status !== "POB" &&
+status !== "Rejected"
       );
     })
     .sort((a, b) => getWhenMs(a) - getWhenMs(b))[0] ?? null
@@ -976,7 +964,10 @@ async function markClashResolved(
   }
 
   function BookingCard({
+  
+    
     booking,
+    
     forceExpanded = false,
     highlightClash = false,
   }: {
@@ -996,6 +987,7 @@ async function markClashResolved(
     const fare = getFare(booking);
     const status = (booking.status ?? "Scheduled").toString();
     const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
+    const supabase = getSupabase();
     const notes = cleanDisplayText(booking.notes);
     const via = cleanDisplayText(booking.via);
     const localAuthority = cleanDisplayText(booking.local_authority);
@@ -1213,6 +1205,7 @@ const timeText = d.toLocaleTimeString("en-GB", {
             {expanded && (
               <div className="mt-4 border-t pt-4">
                 <div className="mb-3 text-sm font-semibold text-slate-900">
+                
                   Compliance / Job details
                 </div>
 
@@ -1436,7 +1429,41 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 Dropoff map
               </a>
             ) : null}
+{status === "Pending Approval" ? (
+  <div className="mb-3 flex gap-2">
+    <button
+      onClick={async () => {
+        await supabase
+          .from("bookings")
+.update({
+  status: "Scheduled",
+} as never)
+          .eq("id", booking.id);
 
+        loadBookings();
+      }}
+      className="rounded-xl bg-green-600 px-3 py-2 text-sm font-medium text-white"
+    >
+      Approve Request
+    </button>
+
+    <button
+      onClick={async () => {
+        await supabase
+          .from("bookings")
+.update({
+  status: "Rejected",
+} as never)
+          .eq("id", booking.id);
+
+        loadBookings();
+      }}
+      className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white"
+    >
+      Reject Request
+    </button>
+  </div>
+) : null}
             {status !== "Completed" ? (
               <button
                 onClick={() =>
@@ -1448,6 +1475,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 disabled={isBusy}
                 className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
+        
                 Complete (Unpaid)
               </button>
             ) : null}
