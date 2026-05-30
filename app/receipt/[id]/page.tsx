@@ -46,11 +46,15 @@ const journeyLine = `${booking.pickup_address} → ${booking.dropoff_address}`;
   <div className="mx-auto max-w-3xl bg-white p-10">
 
     <div className="flex justify-between items-start mb-10">
-      <div>
-        <h1 className="text-4xl font-bold text-purple-700">
-          MY WAY CARS
-        </h1>
-      </div>
+<div>
+  <Image
+    src="/logo.png"
+    alt="My Way Cars"
+    width={300}
+    height={100}
+    priority
+  />
+</div>
 
       <div className="text-right text-sm">
         <div>MY WAY CARS</div>
