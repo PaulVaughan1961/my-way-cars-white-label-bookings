@@ -289,6 +289,43 @@ local_authority: localAuthority || null,
         return;
       }
 
+// Create or update customer record
+
+const customerPhone = passengerPhone.trim();
+
+if (customerPhone) {
+  const existingCustomer = await supabase
+    .from("customers")
+    .select("id")
+    .eq("passenger_phone", customerPhone)
+    .maybeSingle();
+
+  if (existingCustomer.data) {
+await supabase
+  .from("customers")
+  .update({
+    passenger_name: passengerName.trim(),
+    email: null,
+    account_name: accountName.trim() || null,
+    last_booking_at: new Date().toISOString(),
+  } as any)
+  .eq("id", (existingCustomer.data as any).id);
+  } else {
+await supabase
+  .from("customers")
+  .insert([
+    {
+      passenger_name: passengerName.trim(),
+      passenger_phone: customerPhone,
+      home_address: pickupAddress.trim() || null,
+      account_name: accountName.trim() || null,
+      last_booking_at: new Date().toISOString(),
+    } as any,
+  ]);
+  }
+}
+      
+
       if (hasReturn) {
         const retPickup = reverseReturn
           ? dropoffAddress.trim()
