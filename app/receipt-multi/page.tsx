@@ -3,13 +3,13 @@
 export const dynamic = "force-dynamic";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabase/client";
 
 const supabase = getSupabase();
 
-export default function MultiReceiptPage() {
+function MultiReceiptContent() {
   const searchParams = useSearchParams();
 
   const idsParam = searchParams.get("ids") || "";
@@ -219,5 +219,12 @@ export default function MultiReceiptPage() {
 
       </div>
     </main>
+  );
+}
+export default function MultiReceiptPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading...</div>}>
+      <MultiReceiptContent />
+    </Suspense>
   );
 }
