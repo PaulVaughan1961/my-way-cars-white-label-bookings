@@ -1036,21 +1036,32 @@ function toggleBookingSelection(id: string) {
 
     return (
       <div
-        onClick={() => {
-          cycleCardMode(booking.id);
+<div
+  onClick={(e) => {
+    const target = e.target as HTMLElement;
 
-          const groupId = booking.return_group_id;
-          if (groupId) {
-            setSelectedReturnGroupId(groupId);
+    if (
+      target.closest("input") ||
+      target.closest("label") ||
+      target.closest("button")
+    ) {
+      return;
+    }
 
-            requestAnimationFrame(() => {
-              linkedSectionRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            });
-          }
-        }}
+    cycleCardMode(booking.id);
+
+    const groupId = booking.return_group_id;
+    if (groupId) {
+      setSelectedReturnGroupId(groupId);
+
+      requestAnimationFrame(() => {
+        linkedSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
+  }}
         className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
@@ -1317,14 +1328,18 @@ const timeText = d.toLocaleTimeString("en-GB", {
   className="mt-4 sticky bottom-0 z-10 border-t bg-white pt-3 pb-2 flex flex-wrap gap-2"
   onClick={stopCardToggle}
 >
-  <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
-    <input
-      type="checkbox"
-      checked={isSelected}
-      onChange={() => toggleBookingSelection(booking.id)}
-    />
-    Select for Invoice / Receipt
-  </label>
+ <label
+  className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm"
+  onClick={(e) => e.stopPropagation()}
+>
+  <input
+    type="checkbox"
+    checked={isSelected}
+    onChange={() => toggleBookingSelection(booking.id)}
+    onClick={(e) => e.stopPropagation()}
+  />
+  Select for Invoice / Receipt
+</label>
 
   <Link
     href={`/edit/${booking.id}`}
