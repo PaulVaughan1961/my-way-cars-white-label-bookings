@@ -1036,32 +1036,21 @@ function toggleBookingSelection(id: string) {
 
     return (
       <div
-<div
-  onClick={(e) => {
-    const target = e.target as HTMLElement;
+        onClick={() => {
+          cycleCardMode(booking.id);
 
-    if (
-      target.closest("input") ||
-      target.closest("label") ||
-      target.closest("button")
-    ) {
-      return;
-    }
+          const groupId = booking.return_group_id;
+          if (groupId) {
+            setSelectedReturnGroupId(groupId);
 
-    cycleCardMode(booking.id);
-
-    const groupId = booking.return_group_id;
-    if (groupId) {
-      setSelectedReturnGroupId(groupId);
-
-      requestAnimationFrame(() => {
-        linkedSectionRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      });
-    }
-  }}
+            requestAnimationFrame(() => {
+              linkedSectionRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            });
+          }
+        }}
         className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
