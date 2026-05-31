@@ -402,7 +402,7 @@ function DashboardContent() {
     string[]
   >([]);
   const [selectedReturnGroupId, setSelectedReturnGroupId] = useState<string | null>(null);
-
+const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
   async function loadReviewedClashes() {
     try {
       const supabase = getSupabase();
@@ -837,6 +837,20 @@ const unpaidTotal = useMemo(() => {
       .join(" • ");
   }, [detectedClashes]);
 
+  const selectedRows = useMemo(
+  () => bookings.filter((b) => selectedBookings.includes(b.id)),
+  [bookings, selectedBookings]
+);
+
+const selectedTotal = useMemo(
+  () =>
+    selectedRows.reduce(
+      (sum, row) => sum + (getFare(row) ?? 0),
+      0
+    ),
+  [selectedRows]
+);
+
   const nextJob = useMemo(() => {
     const now = Date.now();
 
@@ -940,6 +954,13 @@ async function markClashResolved(
     if (!ok) return;
     await updateBooking(id, { status: "Cancelled" });
   }
+function toggleBookingSelection(id: string) {
+  setSelectedBookings((current) =>
+    current.includes(id)
+      ? current.filter((x) => x !== id)
+      : [...current, id]
+  );
+}
 
   function cycleCardMode(id: string) {
     setCardModes((current) => {
@@ -962,6 +983,7 @@ async function markClashResolved(
   function stopCardToggle(e: React.MouseEvent) {
     e.stopPropagation();
   }
+
 
   function BookingCard({
   
@@ -996,6 +1018,7 @@ async function markClashResolved(
     const bagsSmall = pickNumber(booking, ["bags_small"]);
     const distanceMiles = pickNumber(booking, ["distance_miles"]);
     const isBusy = busyId === booking.id;
+    const isSelected = selectedBookings.includes(booking.id);
     const cardMode = forceExpanded ? "full" : cardModes[booking.id] ?? "compact";
     const compact = cardMode === "compact";
     const expanded = cardMode === "full";
@@ -1290,22 +1313,32 @@ const timeText = d.toLocaleTimeString("en-GB", {
         )}
 
         {!compact && (
-          <div
-            className="mt-4 sticky bottom-0 z-10 border-t bg-white pt-3 pb-2 flex flex-wrap gap-2"
-            onClick={stopCardToggle}
-          >
-            <Link
-              href={`/edit/${booking.id}`}
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-            >
-              Edit
-            </Link>
-            <Link
-  href={`/receipt/${booking.id}`}
-  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+       <div
+  className="mt-4 sticky bottom-0 z-10 border-t bg-white pt-3 pb-2 flex flex-wrap gap-2"
+  onClick={stopCardToggle}
 >
-  Receipt / Invoice
-</Link>
+  <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
+    <input
+      type="checkbox"
+      checked={isSelected}
+      onChange={() => toggleBookingSelection(booking.id)}
+    />
+    Select for Invoice / Receipt
+  </label>
+
+  <Link
+    href={`/edit/${booking.id}`}
+    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+  >
+    Edit
+  </Link>
+
+  <Link
+    href={`/receipt/${booking.id}`}
+    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+  >
+    Receipt / Invoice
+  </Link>
 
             {phone ? (
               <a
@@ -1533,6 +1566,47 @@ ${vehicle || "To be confirmed"}${returnNote}`;
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
+        {selectedBookings.length > 0 && (
+  <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+    <div className="font-semibold text-slate-900">
+      {selectedBookings.length} booking
+      {selectedBookings.length !== 1 ? "s" : ""} selected
+    </div>
+
+    <div className="text-sm text-slate-600">
+      Total value: £{selectedTotal.toFixed(2)}
+    </div>
+
+    <div className="mt-3 flex flex-wrap gap-2">
+ <button
+  onClick={() => {
+    const ids = selectedBookings.join(",");
+    window.location.href = `/receipt-multi?ids=${ids}&type=invoice`;
+  }}
+  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+>
+  Generate Invoice
+</button>
+
+<button
+  onClick={() => {
+    const ids = selectedBookings.join(",");
+    window.location.href = `/receipt-multi?ids=${ids}&type=receipt`;
+  }}
+  className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white"
+>
+  Generate Receipt
+</button>
+
+      <button
+        onClick={() => setSelectedBookings([])}
+        className="rounded-xl bg-slate-500 px-4 py-2 text-sm font-medium text-white"
+      >
+        Clear
+      </button>
+    </div>
+  </div>
+)}
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 <div>
