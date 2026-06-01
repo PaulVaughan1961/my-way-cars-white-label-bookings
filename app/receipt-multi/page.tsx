@@ -72,18 +72,18 @@ const billTo =
   );
 
   return (
-    <main className="min-h-screen bg-white p-6">
+   <main className="min-h-screen bg-white p-6 text-sm">
       <div className="mx-auto max-w-5xl bg-white p-10">
 
-        <div className="mb-10 flex items-start justify-between">
+        <div className="mb-4 flex items-start justify-between">
           <div>
-            <Image
-              src="/logo.png"
-              alt="My Way Cars"
-              width={300}
-              height={100}
-              priority
-            />
+<Image
+  src="/logo.png"
+  alt="My Way Cars"
+  width={180}
+  height={60}
+  priority
+/>
           </div>
 
           <div className="text-right text-sm">
@@ -97,11 +97,11 @@ const billTo =
           </div>
         </div>
 
-        <h2 className="mb-8 text-3xl font-semibold">
+        <h2 className="mb-4 text-3xl font-semibold">
           {isReceipt ? "Receipt" : "Invoice"}
         </h2>
 
-        <div className="mb-6">
+        <div className="mb-3">
           <div>
             <strong>
               {isReceipt ? "Receipt #" : "Invoice #"}
@@ -114,7 +114,7 @@ const billTo =
           </div>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="mb-2 font-semibold">
             {isReceipt ? "Customer:" : "Bill To:"}
           </div>
@@ -122,8 +122,8 @@ const billTo =
           <div>{billTo}</div>
         </div>
 
-        <div className="mb-8">
-          <div className="mb-4 font-semibold">
+        <div className="mb-4">
+          <div className="mb-2 font-semibold">
             Journeys
           </div>
 
