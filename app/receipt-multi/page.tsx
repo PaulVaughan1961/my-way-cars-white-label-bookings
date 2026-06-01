@@ -166,17 +166,7 @@ const billTo =
                     })}
                   </td>
 
-<td className="py-4 align-top">
-  {new Date(
-    booking.pickup_datetime
-  ).toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })}
-</td>
+
 
 {showPassengers && (
   <td className="py-4 align-top">
