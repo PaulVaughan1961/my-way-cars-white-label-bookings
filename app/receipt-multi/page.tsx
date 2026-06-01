@@ -54,6 +54,7 @@ const showPassengers =
 const accountName = bookings.find(
   (b) => b.account_name
 )?.account_name;
+console.log("ACCOUNT NAME:", accountName);
 
 const billTo =
   accountName ||
