@@ -15,6 +15,10 @@ function MultiReceiptContent() {
   const idsParam = searchParams.get("ids") || "";
   const type = searchParams.get("type") || "invoice";
 
+const showPassengers =
+  searchParams.get("showPassengers") !== "false";
+
+
   const [bookings, setBookings] = useState<any[]>([]);
 
   useEffect(() => {
@@ -47,10 +51,14 @@ function MultiReceiptContent() {
 
   const issueDate = new Date().toLocaleDateString("en-GB");
 
-  const billTo =
-    bookings[0].account_name ||
-    bookings[0].passenger_name ||
-    "Customer";
+const accountName = bookings.find(
+  (b) => b.account_name
+)?.account_name;
+
+const billTo =
+  accountName ||
+  bookings[0].passenger_name ||
+  "Customer";
 
   const total = bookings.reduce(
     (sum, booking) => sum + Number(booking.fare || 0),
@@ -120,21 +128,27 @@ function MultiReceiptContent() {
           </div>
 
           <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="py-2 text-left w-40">
-                  Date / Time
-                </th>
+<thead>
+  <tr className="border-b">
+    <th className="py-2 text-left w-40">
+      Date / Time
+    </th>
 
-                <th className="py-2 text-left">
-                  Journey
-                </th>
+    {showPassengers && (
+      <th className="py-2 text-left w-48">
+        Passenger
+      </th>
+    )}
 
-                <th className="py-2 text-right w-28">
-                  Fare
-                </th>
-              </tr>
-            </thead>
+    <th className="py-2 text-left">
+      Journey
+    </th>
+
+    <th className="py-2 text-right w-28">
+      Fare
+    </th>
+  </tr>
+</thead>
 
             <tbody>
               {sortedBookings.map((booking) => (
@@ -152,8 +166,26 @@ function MultiReceiptContent() {
                     })}
                   </td>
 
-                  <td className="py-4 align-top">
-                    <div className="space-y-2">
+<td className="py-4 align-top">
+  {new Date(
+    booking.pickup_datetime
+  ).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })}
+</td>
+
+{showPassengers && (
+  <td className="py-4 align-top">
+    {booking.passenger_name}
+  </td>
+)}
+
+<td className="py-4 align-top">
+  <div className="space-y-2">
 
                       <div>
                         <div className="font-semibold">

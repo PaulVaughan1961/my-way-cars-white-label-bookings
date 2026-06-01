@@ -403,6 +403,10 @@ function DashboardContent() {
   >([]);
   const [selectedReturnGroupId, setSelectedReturnGroupId] = useState<string | null>(null);
 const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
+
+const [showPassengerNames, setShowPassengerNames] =
+  useState(true);
+
   async function loadReviewedClashes() {
     try {
       const supabase = getSupabase();
@@ -456,6 +460,17 @@ const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
       setRefreshing(false);
     }
   }
+
+useEffect(() => {
+  const saved = localStorage.getItem(
+    "showPassengerNames"
+  );
+
+  if (saved !== null) {
+    setShowPassengerNames(saved === "true");
+  }
+}, []);
+
 useEffect(() => {
   if (!focusBookingId) return;
   if (loading) return;
@@ -1072,50 +1087,68 @@ function toggleBookingSelection(id: string) {
               })()
         }`}
       >
-        {compact ? (
-          <div className="flex items-center gap-2 overflow-hidden text-sm text-slate-900">
-            {booking.return_group_id ? (
-              <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                Linked
-              </span>
-            ) : null}
+  {compact ? (
+  <div className="flex items-center justify-between gap-2 overflow-hidden text-sm text-slate-900">
 
-            <div className="truncate">
-              {(() => {
-                const parts = parseLocalDateTimeParts(when);
+    <div className="flex items-center gap-2 overflow-hidden">
+      {booking.return_group_id ? (
+        <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+          Linked
+        </span>
+      ) : null}
 
-                if (!parts) {
-                  return `— | — | ${name} | ${displayOrDash(pickup)}`;
-                }
+      <div className="truncate">
+        {(() => {
+          const parts = parseLocalDateTimeParts(when);
 
-                const d = new Date(
-                  parts.year,
-                  parts.month - 1,
-                  parts.day,
-                  parts.hour,
-                  parts.minute,
-                  parts.second
-                );
+          if (!parts) {
+            return `— | — | ${name} | ${displayOrDash(pickup)}`;
+          }
 
-const dateText = d.toLocaleDateString("en-GB", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "2-digit",
-});
+          const d = new Date(
+            parts.year,
+            parts.month - 1,
+            parts.day,
+            parts.hour,
+            parts.minute,
+            parts.second
+          );
 
-const timeText = d.toLocaleTimeString("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
+          const dateText = d.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          });
 
-                return `${dateText} | ${timeText} | ${name} | ${displayOrDash(
-                  pickup
-                )}`;
-              })()}
-            </div>
-          </div>
-        ) : (
+          const timeText = d.toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+
+          return `${dateText} | ${timeText} | ${name} | ${displayOrDash(
+            pickup
+          )}`;
+        })()}
+      </div>
+    </div>
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleBookingSelection(booking.id);
+      }}
+      className={`shrink-0 rounded-lg px-3 py-1 text-xs font-medium ${
+        isSelected
+          ? "bg-green-600 text-white"
+          : "bg-slate-200 text-slate-900"
+      }`}
+    >
+      {isSelected ? "Added" : "Invoice"}
+    </button>
+
+  </div>
+) : (
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               {highlightClash ? (
@@ -1582,10 +1615,33 @@ ${vehicle || "To be confirmed"}${returnNote}`;
     </div>
 
     <div className="mt-3 flex flex-wrap gap-2">
- <button
+
+
+
+<label className="flex items-center gap-2 text-sm">
+  <input
+    type="checkbox"
+    checked={showPassengerNames}
+    onChange={(e) => {
+      setShowPassengerNames(e.target.checked);
+
+      localStorage.setItem(
+        "showPassengerNames",
+        String(e.target.checked)
+      );
+    }}
+  />
+  Show Passenger Names
+</label>
+
+<button
   onClick={() => {
     const ids = selectedBookings.join(",");
-    window.location.href = `/receipt-multi?ids=${ids}&type=invoice`;
+
+    window.location.href =
+      `/receipt-multi?ids=${ids}` +
+      `&type=invoice` +
+      `&showPassengers=${showPassengerNames}`;
   }}
   className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white"
 >
