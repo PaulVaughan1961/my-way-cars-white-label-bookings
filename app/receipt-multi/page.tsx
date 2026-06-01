@@ -21,50 +21,87 @@ const showPassengers =
 
   const [bookings, setBookings] = useState<any[]>([]);
 
-  useEffect(() => {
-    async function load() {
-      const ids = idsParam
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
+const [account, setAccount] = useState<any>(null);
 
-      if (ids.length === 0) return;
+console.log("ACCOUNT STATE:", account);
 
-      const { data } = await supabase
-        .from("bookings")
-        .select("*")
-        .in("id", ids);
 
-      setBookings(data || []);
+
+
+useEffect(() => {
+  async function load() {
+    const ids = idsParam
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+    if (ids.length === 0) return;
+
+    const { data: bookingData } = await supabase
+      .from("bookings")
+      .select("*")
+      .in("id", ids);
+
+    const bookingsLoaded = (bookingData || []) as any[];
+
+    setBookings(bookingsLoaded);
+
+    const accountBooking = bookingsLoaded.find(
+      (booking) =>
+        typeof booking.account_name === "string" &&
+        booking.account_name.trim() !== ""
+    );
+
+    const foundAccountName =
+      accountBooking?.account_name?.trim();
+
+    if (!foundAccountName) {
+      setAccount(null);
+      return;
     }
 
-    load();
-  }, [idsParam]);
+    const { data: accountData } = await supabase
+      .from("accounts")
+      .select("*")
+      .eq("account_name", foundAccountName)
+      .maybeSingle();
 
-  if (bookings.length === 0) {
-    return <div className="p-6">Loading...</div>;
+    setAccount(accountData || null);
+
+console.log("ACCOUNT DATA LOADED:", accountData);
+
   }
 
-  const isReceipt = type === "receipt";
+  load();
+}, [idsParam]);
 
-  const documentNumber = `${isReceipt ? "R" : "INV"}-${Date.now()}`;
+if (bookings.length === 0) {
+  return <div className="p-6">Loading...</div>;
+}
 
-  const issueDate = new Date().toLocaleDateString("en-GB");
+const isReceipt = type === "receipt";
 
-const accountName = bookings.find(
-  (b) => b.account_name
-)?.account_name;
-console.log("ACCOUNT NAME:", accountName);
+const documentNumber = `${isReceipt ? "R" : "INV"}-${Date.now()}`;
+
+const issueDate = new Date().toLocaleDateString("en-GB");
+
+const bookingAccountName =
+  bookings.find(
+    (booking: any) =>
+      typeof booking.account_name === "string" &&
+      booking.account_name.trim() !== ""
+  )?.account_name?.trim();
 
 const billTo =
-  accountName ||
-  bookings[0].passenger_name ||
+  account?.account_name ||
+  bookingAccountName ||
+  bookings[0]?.passenger_name ||
   "Customer";
 
-  const total = bookings.reduce(
-    (sum, booking) => sum + Number(booking.fare || 0),
-    0
-  );
+const total = bookings.reduce(
+  (sum, booking) => sum + Number(booking.fare || 0),
+  0
+);
 
   const sortedBookings = [...bookings].sort(
     (a, b) =>
@@ -115,14 +152,25 @@ const billTo =
           </div>
         </div>
 
-        <div className="mb-4">
-          <div className="mb-2 font-semibold">
-            {isReceipt ? "Customer:" : "Bill To:"}
-          </div>
+<div className="mb-4">
+  <div className="mb-2 font-semibold">
+    {isReceipt ? "Customer:" : "Bill To:"}
+  </div>
 
-          <div>{billTo}</div>
-        </div>
+  <div>
+    {account?.account_name || billTo}
+  </div>
 
+ {account?.address ? (
+  <div className="mt-1 whitespace-pre-line">
+    {account.address}
+  </div>
+) : (
+  <div className="mt-1 text-red-600">
+    No address found
+  </div>
+)}
+</div>
         <div className="mb-4">
           <div className="mb-2 font-semibold">
             Journeys
