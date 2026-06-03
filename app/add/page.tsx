@@ -60,25 +60,12 @@ function todayYYYYMMDD() {
 }
 
 function nowHHMM() {
-  function isAirportPickup(address: string) {
-  const value = address.toLowerCase();
-
-  return (
-    value.includes("airport") ||
-    value.includes("terminal") ||
-    value.includes("heathrow") ||
-    value.includes("gatwick") ||
-    value.includes("stansted") ||
-    value.includes("luton") ||
-    value.includes("bristol") ||
-    value.includes("southampton")
-  );
-}
   const d = new Date();
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
+
 function isAirportPickup(address: string) {
   const value = address.toLowerCase();
 
@@ -288,7 +275,25 @@ local_authority: localAuthority || null,
         setSaving(false);
         return;
       }
+await supabase
+  .from("customers")
+  .upsert(
+    {
+      passenger_name: passengerName.trim(),
+      passenger_phone: passengerPhone.trim(),
 
+      home_address:
+        isAirportPickup(pickupAddress)
+          ? undefined
+          : pickupAddress.trim(),
+
+      account_name: accountName.trim() || null,
+      last_booking_at: new Date().toISOString(),
+    } as never,
+    {
+      onConflict: "passenger_name",
+    }
+  );
 
 
       
@@ -357,6 +362,7 @@ if (returnInsert.error) {
 
 
 router.push("/");
+setSaving(false);
 
     } catch (err) {
       console.error(err);

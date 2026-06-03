@@ -938,17 +938,15 @@ async function markClashResolved(
     const supabase = getSupabase();
     const sortedIds = [...bookingIds].sort();
 
-    const { error } = await supabase
-      .from("clash_reviews")
-.upsert({
-  clash_key: clashKey,
-  booking_a_id: sortedIds[0],
-  booking_b_id: sortedIds[1],
-} as never)
+ const { error } = await supabase
+  .from("clash_reviews")
+  .upsert({
+    clash_key: clashKey,
+    booking_a_id: sortedIds[0],
+    booking_b_id: sortedIds[1],
+  } as never);
 
-    if (error) throw error;
-
-      if (error) throw error;
+if (error) throw error;
 
       setReviewedClashKeys((current) =>
         current.includes(clashKey) ? current : [...current, clashKey]
