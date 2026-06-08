@@ -231,17 +231,23 @@ return (
                   <div className="font-bold">{day.getDate()}</div>
 
                   <div className="mt-2 text-xs">
-                    {count === 0 ? (
-                      <span className="text-emerald-700">Free</span>
-                    ) : count <= 2 ? (
-                      <span className="text-amber-700">
-                        {count} booking{count === 1 ? "" : "s"}
-                      </span>
-                    ) : (
-                      <span className="font-semibold text-rose-700">
-                        {count} bookings
-                      </span>
-                    )}
+{count === 0 ? (
+  <span className="font-semibold text-emerald-700">
+    🟢 Free
+  </span>
+) : count <= 2 ? (
+  <span className="font-semibold text-yellow-600">
+    🟡 {count} booking{count === 1 ? "" : "s"}
+  </span>
+) : count <= 4 ? (
+  <span className="font-semibold text-orange-600">
+    🟠 {count} bookings
+  </span>
+) : (
+  <span className="font-semibold text-red-600">
+    🔴 {count} bookings
+  </span>
+)}
                   </div>
                 </button>
               );
