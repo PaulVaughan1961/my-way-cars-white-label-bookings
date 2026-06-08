@@ -17,6 +17,7 @@ export default function CalendarPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadBookings() {
@@ -265,35 +266,72 @@ return (
               </p>
             ) : (
               <div className="space-y-3">
-                {selectedBookings.map((booking) => (
-                  <Link
-                    key={booking.id}
-                    href={`/edit/${booking.id}`}
-                    className="block rounded-2xl border border-slate-200 p-4 hover:bg-slate-50"
-                  >
-                    <div className="font-semibold">
-                      {booking.pickup_datetime
-                        ? new Date(booking.pickup_datetime).toLocaleTimeString(
-                            "en-GB",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
-                        : "No time"}{" "}
-                      — {booking.passenger_name || "Unnamed passenger"}
-                    </div>
+{selectedBookings.map((booking) => (
+ <div
+  key={booking.id}
+  onClick={() =>
+    setExpandedBookingId(
+      expandedBookingId === booking.id ? null : booking.id
+    )
+  }
+  className="cursor-pointer rounded-2xl border border-slate-200 p-4 hover:bg-slate-50"
+>
+    <div className="font-semibold">
+      {booking.pickup_datetime
+        ? new Date(booking.pickup_datetime).toLocaleTimeString(
+            "en-GB",
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+            }
+          )
+        : "No time"}{" "}
+      — {booking.passenger_name || "Unnamed passenger"}
+    </div>
 
-                    <div className="mt-1 text-sm text-slate-600">
-                      {booking.pickup_address || "No pickup"} →{" "}
-                      {booking.dropoff_address || "No dropoff"}
-                    </div>
+    <div className="mt-1 text-sm text-slate-600">
+      {booking.pickup_address || "No pickup"} →{" "}
+      {booking.dropoff_address || "No dropoff"}
+    </div>
 
-                    <div className="mt-1 text-xs text-slate-500">
-                      {booking.status || "No status"}
-                    </div>
-                  </Link>
-                ))}
+    <div className="mt-1 text-xs text-slate-500">
+      {booking.status || "No status"}
+    </div>
+    {expandedBookingId === booking.id && (
+  <div className="mt-4 border-t pt-4 text-sm text-slate-700">
+    <div>
+      <strong>Passenger:</strong>{" "}
+      {booking.passenger_name || "Unnamed passenger"}
+    </div>
+
+    <div>
+      <strong>Pickup:</strong>{" "}
+      {booking.pickup_address || "No pickup"}
+    </div>
+
+    <div>
+      <strong>Dropoff:</strong>{" "}
+      {booking.dropoff_address || "No dropoff"}
+    </div>
+
+    <div>
+      <strong>Status:</strong>{" "}
+      {booking.status || "No status"}
+    </div>
+
+    <div className="mt-3">
+      <Link
+        href={`/edit/${booking.id}`}
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-xl bg-slate-900 px-3 py-2 text-sm text-white"
+      >
+        Edit Booking
+      </Link>
+    </div>
+  </div>
+)}
+  </div>
+))}
               </div>
             )}
           </div>
