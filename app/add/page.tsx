@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 const supabase = getSupabase();
 
@@ -82,12 +83,18 @@ function isAirportPickup(address: string) {
 }
 export default function AddBookingPage() {
   const router = useRouter();
+
+  const searchParams = useSearchParams();
+  const prefilledDate = searchParams.get("date") ?? "";
+
   const [accountName, setAccountName] = useState("");
 
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
 
-  const [pickupDate, setPickupDate] = useState(todayYYYYMMDD());
+  const [pickupDate, setPickupDate] = useState(
+    prefilledDate || todayYYYYMMDD()
+  );
   const [pickupTime, setPickupTime] = useState(nowHHMM());
 
   const [pickupAddress, setPickupAddress] = useState("");
@@ -109,11 +116,10 @@ export default function AddBookingPage() {
   const [driverName, setDriverName] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
-const [customerMatches, setCustomerMatches] = useState<any[]>([]);
 
-const [showCustomerMatches, setShowCustomerMatches] = useState(false);
-
-const [customerSelected, setCustomerSelected] = useState(false);
+  const [customerMatches, setCustomerMatches] = useState<any[]>([]);
+  const [showCustomerMatches, setShowCustomerMatches] = useState(false);
+  const [customerSelected, setCustomerSelected] = useState(false);
 
   const [hasReturn, setHasReturn] = useState(false);
   const [reverseReturn, setReverseReturn] = useState(true);
@@ -123,15 +129,16 @@ const [customerSelected, setCustomerSelected] = useState(false);
   const [returnNotes, setReturnNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-  async function loadData() {
-    const { data: driverData, error: driverError } = await supabase
-      .from("drivers")
-      .select(
-        "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
-      )
-      .eq("active", true)
-      .order("name", { ascending: true });
+    async function loadData() {
+const { data: driverData, error: driverError } = await supabase
+  .from("drivers")
+  .select(
+    "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
+  )
+  .eq("active", true)
+  .order("name", { ascending: true });
 
     if (!driverError) {
       setDrivers((driverData as DriverRow[]) ?? []);

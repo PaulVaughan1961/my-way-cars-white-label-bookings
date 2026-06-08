@@ -273,6 +273,14 @@ className={`min-h-24 rounded-2xl border p-2 text-left ${
                 year: "numeric",
               })}
             </h2>
+            <div className="mb-4">
+  <Link
+    href={`/add?date=${selectedDate}`}
+    className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+  >
+    + Add Booking
+  </Link>
+</div>
 
             {selectedBookings.length === 0 ? (
               <p className="text-sm text-slate-600">
