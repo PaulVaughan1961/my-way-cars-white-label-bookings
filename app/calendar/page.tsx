@@ -222,11 +222,19 @@ return (
                 <button
                   key={key}
                   onClick={() => setSelectedDate(key)}
-                  className={`min-h-24 rounded-2xl border p-2 text-left ${
-                    selectedDate === key
-                      ? "border-slate-900 bg-slate-100"
-                      : "border-slate-200 bg-white"
-                  } ${!isCurrentMonth ? "opacity-40" : ""}`}
+className={`min-h-24 rounded-2xl border p-2 text-left ${
+  selectedDate === key
+    ? "border-slate-900"
+    : "border-slate-200"
+} ${
+  count === 0
+    ? "bg-emerald-50"
+    : count <= 2
+    ? "bg-yellow-50"
+    : count <= 4
+    ? "bg-orange-50"
+    : "bg-red-50"
+} ${!isCurrentMonth ? "opacity-40" : ""}`}
                 >
                   <div className="font-bold">{day.getDate()}</div>
 
