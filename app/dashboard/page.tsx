@@ -1697,9 +1697,16 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               <Link
                 href="/add"
                 className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                
               >
                 Add booking
               </Link>
+              <Link
+  href="/calendar"
+  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900"
+>
+  Calendar view
+</Link>
 
               <button
                 onClick={() => void onRefresh()}
@@ -2085,6 +2092,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               {errorMessage}
             </div>
           ) : null}
+
 
           {loading ? (
             <div className="text-sm text-slate-600">Loading bookings...</div>
