@@ -84,17 +84,16 @@ function isAirportPickup(address: string) {
 export default function AddBookingPage() {
   const router = useRouter();
 
-  const searchParams = useSearchParams();
-  const prefilledDate = searchParams.get("date") ?? "";
+
 
   const [accountName, setAccountName] = useState("");
 
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
 
-  const [pickupDate, setPickupDate] = useState(
-    prefilledDate || todayYYYYMMDD()
-  );
+const [pickupDate, setPickupDate] = useState(
+  todayYYYYMMDD()
+);
   const [pickupTime, setPickupTime] = useState(nowHHMM());
 
   const [pickupAddress, setPickupAddress] = useState("");
