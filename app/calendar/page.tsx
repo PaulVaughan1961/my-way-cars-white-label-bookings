@@ -217,24 +217,33 @@ return (
               const count = bookingsForDate(key).length;
               const isCurrentMonth =
                 day.getMonth() === currentMonth.getMonth();
-
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelectedDate(key)}
-className={`min-h-24 rounded-2xl border p-2 text-left ${
-  selectedDate === key
-    ? "border-slate-900"
-    : "border-slate-200"
-} ${
+                const bgColour =
   count === 0
     ? "bg-emerald-50"
     : count <= 2
     ? "bg-yellow-50"
     : count <= 4
     ? "bg-orange-50"
-    : "bg-red-50"
-} ${!isCurrentMonth ? "opacity-40" : ""}`}
+    : "bg-red-50";
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSelectedDate(key)}
+className={`min-h-24 rounded-2xl border p-2 text-left
+  ${bgColour}
+  ${
+    selectedDate === key
+      ? "border-slate-900"
+      : "border-slate-200"
+  }
+  ${
+    key === dateKey(new Date())
+       ? "ring-4 ring-slate-400"
+      : ""
+  }
+  ${!isCurrentMonth ? "opacity-40" : ""}
+`}
                 >
                   <div className="font-bold">{day.getDate()}</div>
 
