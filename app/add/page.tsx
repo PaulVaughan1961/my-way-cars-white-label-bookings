@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
 
 const supabase = getSupabase();
+
 
 type DriverRow = {
   id: string;
@@ -125,6 +125,8 @@ const [pickupDate, setPickupDate] = useState(
   const [returnDate, setReturnDate] = useState(todayYYYYMMDD());
   const [returnTime, setReturnTime] = useState("17:30");
   const [returnFlightNumber, setReturnFlightNumber] = useState("");
+  const [returnPickupAddress, setReturnPickupAddress] = useState("");
+const [returnDropoffAddress, setReturnDropoffAddress] = useState("");
   const [returnNotes, setReturnNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -287,12 +289,7 @@ await supabase
     {
       passenger_name: passengerName.trim(),
       passenger_phone: passengerPhone.trim(),
-
-      home_address:
-        isAirportPickup(pickupAddress)
-          ? undefined
-          : pickupAddress.trim(),
-
+      home_address: undefined,
       account_name: accountName.trim() || null,
       last_booking_at: new Date().toISOString(),
     } as never,
@@ -305,13 +302,13 @@ await supabase
       
 
       if (hasReturn) {
-        const retPickup = reverseReturn
-          ? dropoffAddress.trim()
-          : pickupAddress.trim();
+const retPickup = reverseReturn
+  ? dropoffAddress.trim()
+  : returnPickupAddress.trim();
 
-        const retDrop = reverseReturn
-          ? pickupAddress.trim()
-          : dropoffAddress.trim();
+const retDrop = reverseReturn
+  ? pickupAddress.trim()
+  : returnDropoffAddress.trim();
 
 const returnInsert = await supabase.from("bookings").insert([
   {
@@ -721,60 +718,98 @@ setShowCustomerMatches(false);
             {hasReturn && (
               <div className="mt-3 space-y-3">
                 <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={reverseReturn}
-                    onChange={(e) => setReverseReturn(e.target.checked)}
-                  />
-                  Reverse pickup/dropoff for return
-                </label>
+<input
+  type="checkbox"
+  checked={reverseReturn}
+  onChange={(e) => {
+    const checked = e.target.checked;
+    setReverseReturn(checked);
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium">Return date</label>
-                    <input
-                      type="date"
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-                      value={returnDate}
-                      onChange={(e) => setReturnDate(e.target.value)}
-                    />
-                  </div>
+    if (checked) {
+      setReturnPickupAddress("");
+      setReturnDropoffAddress("");
+    }
+  }}
+/>
+Reverse pickup/dropoff for return
+</label>
 
-                  <div>
-                    <label className="text-sm font-medium">Return time</label>
-                    <input
-                      type="time"
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-                      value={returnTime}
-                      onChange={(e) => setReturnTime(e.target.value)}
-                    />
-                  </div>
-                </div>
+<div className="grid grid-cols-2 gap-3">
+  <div>
+    <label className="text-sm font-medium">Return date</label>
+    <input
+      type="date"
+      className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+      value={returnDate}
+      onChange={(e) => setReturnDate(e.target.value)}
+    />
+  </div>
 
-                <div>
-                  <label className="text-sm font-medium">
-                    Return flight number
-                  </label>
-                  <input
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-                    value={returnFlightNumber}
-                    onChange={(e) => setReturnFlightNumber(e.target.value)}
-                    placeholder="e.g. BA123"
-                  />
-                </div>
+  <div>
+    <label className="text-sm font-medium">Return time</label>
+    <input
+      type="time"
+      className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+      value={returnTime}
+      onChange={(e) => setReturnTime(e.target.value)}
+    />
+  </div>
+</div>
 
-                <div>
-                  <label className="text-sm font-medium">
-                    Driver notes (return)
-                  </label>
-                  <textarea
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-                    value={returnNotes}
-                    onChange={(e) => setReturnNotes(e.target.value)}
-                    rows={3}
-                    placeholder="Terminal, delays, pickup instructions..."
-                  />
-                </div>
+{!reverseReturn && (
+  <>
+    <div>
+      <label className="text-sm font-medium">
+        Return pickup address
+      </label>
+
+      <input
+        className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+        value={returnPickupAddress}
+        onChange={(e) => setReturnPickupAddress(e.target.value)}
+        placeholder="e.g. Gatwick Airport South Terminal"
+      />
+    </div>
+
+    <div>
+      <label className="text-sm font-medium">
+        Return dropoff address
+      </label>
+
+      <input
+        className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+        value={returnDropoffAddress}
+        onChange={(e) => setReturnDropoffAddress(e.target.value)}
+        placeholder="e.g. 29 Culver Road, Winchester"
+      />
+    </div>
+  </>
+)}
+
+<div>
+  <label className="text-sm font-medium">
+    Return flight number
+  </label>
+  <input
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={returnFlightNumber}
+    onChange={(e) => setReturnFlightNumber(e.target.value)}
+    placeholder="e.g. BA123"
+  />
+</div>
+
+<div>
+  <label className="text-sm font-medium">
+    Driver notes (return)
+  </label>
+  <textarea
+    className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+    value={returnNotes}
+    onChange={(e) => setReturnNotes(e.target.value)}
+    rows={3}
+    placeholder="Terminal, delays, pickup instructions..."
+  />
+</div>
               </div>
             )}
           </div>

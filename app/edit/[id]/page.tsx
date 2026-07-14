@@ -110,6 +110,7 @@ const [returnDate, setReturnDate] = useState("");
 const [returnTime, setReturnTime] = useState("");
 const [returnNotes, setReturnNotes] = useState("");
 const [returnFlightNumber, setReturnFlightNumber] = useState("");
+const [reverseReturn, setReverseReturn] = useState(true);
 
 
   const [passengerName, setPassengerName] = useState("");
@@ -290,9 +291,7 @@ notes: notes.trim() || null,
   return_datetime: hasReturn
     ? isoFromDateTime(returnDate, returnTime)
     : null,
-  return_flight_number: hasReturn
-    ? returnFlightNumber.trim() || null
-    : null,
+return_flight_number: returnFlightNumber.trim() || null,
   return_notes: hasReturn ? returnNotes.trim() || null : null,
 };
 

@@ -84,11 +84,13 @@ function buildDriverMessage(booking: any) {
   const pickup =
     booking.pickup ??
     booking.outbound_pickup ??
+    booking.pickup_address ??
     "—";
 
   const dropoff =
     booking.dropoff ??
     booking.outbound_dropoff ??
+    booking.dropoff_address ??
     "—";
 
   const customerPhone =
@@ -96,6 +98,8 @@ function buildDriverMessage(booking: any) {
     booking.customer_phone ??
     booking.passenger_phone ??
     "—";
+
+  const flightNumber = booking.return_flight_number ?? "";
 
   const notes = booking.notes ?? booking.outbound_notes ?? "None";
 
@@ -111,7 +115,10 @@ ${pickup}
 Dropoff:
 ${dropoff}
 
-Customer Phone:
+${flightNumber ? `Flight Number:
+${flightNumber}
+
+` : ""}Customer Phone:
 ${customerPhone}
 
 Notes:
@@ -362,6 +369,8 @@ function makeClashKey(a: string, b: string): string {
 }
 
 function DashboardContent() {
+  const [completedFlash, setCompletedFlash] =
+  useState<BookingRow | null>(null);
   const searchParams = useSearchParams();
   const focusBookingId = searchParams.get("focus");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -916,6 +925,18 @@ async function updateBooking(
         row.id === id ? { ...row, ...patch } : row
       )
     );
+
+if (patch.status === "Completed") {
+  const completedBooking =
+    bookings.find((b) => b.id === id) ?? null;
+
+  setCompletedFlash(completedBooking);
+
+  window.setTimeout(() => {
+    setCompletedFlash(null);
+  }, 1000);
+}
+
   } catch (error) {
     const message =
       error instanceof Error
@@ -1165,12 +1186,20 @@ function toggleBookingSelection(id: string) {
                 </div>
               )}
 
-              {booking.return_group_id ? (
-                <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
-                  Linked return booking
-                </div>
-              ) : null}
-              <div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
+{booking.return_group_id ? (
+  <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
+    Linked return booking
+  </div>
+) : null}
+
+{booking.return_flight_number ? (
+  <div className="mt-1 inline-block rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700">
+    Flight: {booking.return_flight_number}
+  </div>
+) : null}
+
+<div className="text-sm text-slate-600">{fmtDateTime(when)}</div>
+
 
               <div
                 className={`mt-1 text-xs font-medium ${
@@ -1279,10 +1308,7 @@ function toggleBookingSelection(id: string) {
                       {displayOrDash(driver)}
                     </span>
                   </div>
-                  <div>
-                    <span className="font-medium">Driver phone test:</span>{" "}
-                    {String(booking.driver_phone || "NONE")}
-                  </div>
+
                   <div>
                     <span className="font-medium">Vehicle:</span>{" "}
                     <span className="font-semibold text-purple-700">
@@ -1356,30 +1382,23 @@ function toggleBookingSelection(id: string) {
     type="checkbox"
     checked={isSelected}
     onChange={() => toggleBookingSelection(booking.id)}
-    onClick={(e) => e.stopPropagation()}
+   onClick={(e) => e.stopPropagation()}
   />
   Select for Invoice / Receipt
 </label>
 
-  <Link
-    href={`/edit/${booking.id}`}
+<Link
+  href={`/edit/${booking.id}`}
+  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
+>
+  Edit
+</Link>
+
+{phone ? (
+  <a
+    href={telHref(phone)}
     className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
   >
-    Edit
-  </Link>
-
-  <Link
-    href={`/receipt/${booking.id}`}
-    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-  >
-    Receipt / Invoice
-  </Link>
-
-            {phone ? (
-              <a
-                href={telHref(phone)}
-                className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
-              >
                 Call
               </a>
             ) : null}
@@ -1394,6 +1413,8 @@ function toggleBookingSelection(id: string) {
 
 Passenger: ${name}
 Passenger Phone: ${displayOrDash(phone)}
+${booking.return_flight_number ? `Flight Number: ${booking.return_flight_number}
+` : ""}
 When: ${fmtDateTime(when)}
 
 From:
@@ -1454,7 +1475,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               disabled={!phone}
               className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Text customer
+              Text customer job details
             </button>
 
             {status === "Scheduled" ? (
@@ -1472,7 +1493,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 href={smsHref(phone)}
                 className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900"
               >
-                Text
+                Send Text to Customer
               </a>
             ) : null}
 
@@ -1822,6 +1843,26 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 </div>
               </div>
             )}
+          </section>
+        ) : completedFlash ? (
+          <section id="completed-job">
+            <div className="rounded-3xl border-4 border-green-500 bg-green-50 p-6 shadow-sm">
+              <div className="text-3xl font-bold text-green-700">
+                ✓ JOB COMPLETED
+              </div>
+
+              <div className="mt-3 text-lg font-semibold">
+                {completedFlash.passenger_name}
+              </div>
+
+              <div className="text-sm text-slate-600">
+                {completedFlash.pickup_address}
+              </div>
+
+              <div className="text-sm text-slate-600">
+                {completedFlash.dropoff_address}
+              </div>
+            </div>
           </section>
         ) : nextJob ? (
           <section id="next-job">

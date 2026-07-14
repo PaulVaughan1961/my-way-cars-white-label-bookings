@@ -71,10 +71,7 @@ console.log(
   customerData
 );
 
-alert(
-  "CUSTOMER: " +
-  JSON.stringify(customerData, null, 2)
-);
+
 
   console.log("CUSTOMER DATA LOADED:", customerData);
 
@@ -200,12 +197,12 @@ const total = bookings.reduce(
   </div>
 
 {account?.address ||
- customer?.home_address ||
- bookings?.[0]?.pickup_address ? (
+ bookings?.[0]?.pickup_address ||
+ customer?.home_address ? (
   <div className="mt-1 whitespace-pre-line">
     {account?.address ||
-     customer?.home_address ||
-     bookings?.[0]?.pickup_address}
+     bookings?.[0]?.pickup_address ||
+     customer?.home_address}
   </div>
 ) : (
   <div className="mt-1 text-red-600">
