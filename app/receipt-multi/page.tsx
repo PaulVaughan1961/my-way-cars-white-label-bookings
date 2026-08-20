@@ -24,16 +24,6 @@ const showPassengers =
 const [account, setAccount] = useState<any>(null);
 const [customer, setCustomer] = useState<any>(null);
 
-const debugAddress =
-  customer?.home_address ||
-  "CUSTOMER STATE IS NULL";
-console.log("CUSTOMER STATE:", customer);
-
-console.log("ACCOUNT STATE:", account);
-
-
-
-
 useEffect(() => {
   async function load() {
     const ids = idsParam
@@ -61,24 +51,6 @@ if (firstPassenger) {
     .eq("passenger_name", firstPassenger)
     .maybeSingle();
 setCustomer(customerData || null);
-console.log(
-  "SETTING CUSTOMER TO:",
-  customerData
-);
-
-console.log(
-  "SETTING CUSTOMER TO:",
-  customerData
-);
-
-
-
-  console.log("CUSTOMER DATA LOADED:", customerData);
-
-  console.log(
-    "CUSTOMER DATA LOADED:",
-    customerData
-  );
 }
 
     const accountBooking = bookingsLoaded.find(
@@ -102,9 +74,6 @@ console.log(
       .maybeSingle();
 
     setAccount(accountData || null);
-
-console.log("ACCOUNT DATA LOADED:", accountData);
-
   }
 
   load();
@@ -196,13 +165,9 @@ const total = bookings.reduce(
     {account?.account_name || billTo}
   </div>
 
-{account?.address ||
- bookings?.[0]?.pickup_address ||
- customer?.home_address ? (
+{account?.address || customer?.home_address ? (
   <div className="mt-1 whitespace-pre-line">
-    {account?.address ||
-     bookings?.[0]?.pickup_address ||
-     customer?.home_address}
+    {account?.address || customer?.home_address}
   </div>
 ) : (
   <div className="mt-1 text-red-600">

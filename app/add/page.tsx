@@ -29,6 +29,16 @@ type VehicleRow = {
   active?: boolean | null;
 };
 
+type CustomerRow = {
+  id: string;
+  passenger_name?: string | null;
+  passenger_phone?: string | null;
+  home_address?: string | null;
+  account_name?: string | null;
+};
+
+type HomeAddressChoice = "home" | "other";
+
 function buildVehicleDisplay(vehicle: VehicleRow): string {
   return [
     `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim(),
@@ -67,19 +77,55 @@ function nowHHMM() {
   return `${hh}:${mm}`;
 }
 
-function isAirportPickup(address: string) {
-  const value = address.toLowerCase();
+function getNonResidentialReason(address: string): string | null {
+  const value = address.trim().toLowerCase();
 
-  return (
-    value.includes("airport") ||
-    value.includes("terminal") ||
-    value.includes("heathrow") ||
-    value.includes("gatwick") ||
-    value.includes("stansted") ||
-    value.includes("luton") ||
-    value.includes("bristol") ||
-    value.includes("southampton")
-  );
+  if (!value) return null;
+
+  const checks: Array<{ reason: string; pattern: RegExp }> = [
+    {
+      reason: "an airport or airport terminal",
+      pattern:
+        /\b(airport|airfield|airport terminal|flight arrivals|flight departures|heathrow|gatwick|stansted|london luton|london city airport)\b/,
+    },
+    {
+      reason: "a hotel or other accommodation",
+      pattern:
+        /\b(hotel|motel|hostel|guest house|bed and breakfast|b&b|travelodge|premier inn|holiday inn|marriott|hilton|novotel|ibis)\b/,
+    },
+    {
+      reason: "a station or transport terminal",
+      pattern:
+        /\b(railway station|rail station|train station|coach station|bus station|tube station|underground station|ferry terminal|cruise terminal|seaport)\b|\bstation\b(?!\s+(road|street|lane|close|avenue|drive|way|court|gardens|terrace|house|cottage|view)\b)/,
+    },
+    {
+      reason: "a venue or visitor attraction",
+      pattern:
+        /\b(stadium|arena|theatre|cinema|museum|gallery|racecourse|conference centre|conference center|event venue|wedding venue|exhibition centre|exhibition center|leisure centre|leisure center|community centre|community center|village hall|town hall|golf club|country club)\b/,
+    },
+    {
+      reason: "a hospital or medical facility",
+      pattern:
+        /\b(hospital|medical centre|medical center|health centre|health center|clinic|surgery)\b/,
+    },
+    {
+      reason: "a school or college",
+      pattern:
+        /\b(school|college)\b(?!\s+(road|street|lane|close|avenue|drive|way|court|gardens|terrace|house|cottage|view)\b)|\b(university|academy|nursery)\b/,
+    },
+    {
+      reason: "a business or workplace",
+      pattern:
+        /\b(business park|industrial estate|trading estate|office|offices|warehouse|factory|distribution centre|distribution center)\b/,
+    },
+    {
+      reason: "a restaurant, pub or bar",
+      pattern:
+        /\b(restaurant|cafe|café|pub|public house|bar|nightclub)\b/,
+    },
+  ];
+
+  return checks.find((check) => check.pattern.test(value))?.reason ?? null;
 }
 export default function AddBookingPage() {
   const router = useRouter();
@@ -116,9 +162,12 @@ const [pickupDate, setPickupDate] = useState(
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
 
-  const [customerMatches, setCustomerMatches] = useState<any[]>([]);
+  const [customerMatches, setCustomerMatches] = useState<CustomerRow[]>([]);
   const [showCustomerMatches, setShowCustomerMatches] = useState(false);
   const [customerSelected, setCustomerSelected] = useState(false);
+  const [customerHomeAddress, setCustomerHomeAddress] = useState("");
+  const [homeAddressChoiceOverride, setHomeAddressChoiceOverride] =
+    useState<HomeAddressChoice | null>(null);
 
   const [hasReturn, setHasReturn] = useState(false);
   const [reverseReturn, setReverseReturn] = useState(true);
@@ -174,12 +223,21 @@ useEffect(() => {
       .limit(5);
 
     if (!error && data) {
-      setCustomerMatches(data);
+      setCustomerMatches(data as CustomerRow[]);
     }
   }
 
   searchCustomers();
 }, [passengerName, showCustomerMatches]);
+
+  const nonResidentialReason = useMemo(
+    () => getNonResidentialReason(pickupAddress),
+    [pickupAddress]
+  );
+  const homeAddressChoice =
+    homeAddressChoiceOverride ?? (nonResidentialReason ? "other" : "home");
+  const homeAddressChoiceOverridden = homeAddressChoiceOverride !== null;
+
   const canSave = useMemo(() => {
     return (
       passengerName.trim().length > 0 &&
@@ -283,20 +341,59 @@ local_authority: localAuthority || null,
         setSaving(false);
         return;
       }
-await supabase
-  .from("customers")
-  .upsert(
-    {
-      passenger_name: passengerName.trim(),
-      passenger_phone: passengerPhone.trim(),
-      home_address: undefined,
-      account_name: accountName.trim() || null,
-      last_booking_at: new Date().toISOString(),
-    } as never,
-    {
-      onConflict: "passenger_name",
-    }
-  );
+      const confirmedHomeAddress =
+        homeAddressChoice === "home"
+          ? pickupAddress.trim()
+          : customerHomeAddress.trim();
+
+      const customerRecord: Record<string, string | null> = {
+        passenger_name: passengerName.trim(),
+        passenger_phone: passengerPhone.trim(),
+        account_name: accountName.trim() || null,
+        last_booking_at: new Date().toISOString(),
+      };
+
+      // Omitting home_address preserves an existing customer's confirmed address
+      // and leaves a new customer blank instead of guessing from a one-off pickup.
+      if (confirmedHomeAddress) {
+        customerRecord.home_address = confirmedHomeAddress;
+      }
+
+      const customerLookup = await supabase
+        .from("customers")
+        .select("id")
+        .ilike("passenger_name", passengerName.trim())
+        .maybeSingle();
+
+      let customerWriteError = customerLookup.error;
+      const existingCustomer = customerLookup.data as { id: string } | null;
+
+      if (!customerLookup.error) {
+        if (existingCustomer?.id) {
+          const customerUpdates = { ...customerRecord };
+          delete customerUpdates.passenger_name;
+
+          const customerUpdate = await supabase
+            .from("customers")
+            .update(customerUpdates as never)
+            .eq("id", existingCustomer.id);
+
+          customerWriteError = customerUpdate.error;
+        } else {
+          const customerInsert = await supabase
+            .from("customers")
+            .insert(customerRecord as never);
+
+          customerWriteError = customerInsert.error;
+        }
+      }
+
+      if (customerWriteError) {
+        console.error(customerWriteError);
+        alert(
+          `Booking saved, but the customer record could not be updated: ${customerWriteError.message}`
+        );
+      }
 
 
       
@@ -396,6 +493,9 @@ value={passengerName}
 onChange={(e) => {
   setPassengerName(e.target.value);
   setShowCustomerMatches(true);
+  setCustomerSelected(false);
+  setCustomerHomeAddress("");
+  setHomeAddressChoiceOverride(null);
 }}
 placeholder="e.g. Bridget"
 autoComplete="name"
@@ -412,7 +512,9 @@ onClick={() => {
   setPassengerName(customer.passenger_name || "");
   setPassengerPhone(customer.passenger_phone || "");
   setPickupAddress(customer.home_address || "");
+  setCustomerHomeAddress(customer.home_address || "");
   setAccountName(customer.account_name || "");
+  setHomeAddressChoiceOverride(null);
 
   setTimeout(() => {
 setCustomerSelected(true);
@@ -484,6 +586,58 @@ setShowCustomerMatches(false);
               placeholder="e.g. 29 Culver Road, Winchester"
               autoComplete="street-address"
             />
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <label className="text-sm font-medium">
+              Is this the customer&apos;s home address?
+            </label>
+            <select
+              className="mt-2 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={homeAddressChoice}
+              onChange={(e) => {
+                setHomeAddressChoiceOverride(
+                  e.target.value as HomeAddressChoice
+                );
+              }}
+            >
+              <option value="home">Yes — save it as their home address</option>
+              <option value="other">No — this is a one-off pickup</option>
+            </select>
+
+            {nonResidentialReason &&
+              homeAddressChoice === "other" &&
+              !homeAddressChoiceOverridden && (
+                <p className="mt-2 text-sm text-amber-700">
+                  Automatically set to No because this looks like{" "}
+                  {nonResidentialReason}. You can override this if necessary.
+                </p>
+              )}
+
+            {homeAddressChoice === "home" ? (
+              <p className="mt-2 text-sm text-gray-600">
+                This address will be saved for this customer and used as their
+                address on invoices.
+              </p>
+            ) : (
+              <div className="mt-3">
+                <label className="text-sm font-medium">
+                  Customer home address (optional)
+                </label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                  value={customerHomeAddress}
+                  onChange={(e) => setCustomerHomeAddress(e.target.value)}
+                  placeholder="Enter it if known; otherwise leave blank"
+                  autoComplete="off"
+                />
+                <p className="mt-2 text-sm text-gray-600">
+                  {customerSelected
+                    ? "Leave this unchanged to keep the customer's existing home address."
+                    : "The pickup address will not be saved as the customer's home address."}
+                </p>
+              </div>
+            )}
           </div>
 
           <div>
