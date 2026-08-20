@@ -1722,12 +1722,18 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               >
                 Add booking
               </Link>
-              <Link
+<Link
   href="/calendar"
   className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900"
 >
   Calendar view
 </Link>
+              <Link
+                href="/customers"
+                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900"
+              >
+                Customers
+              </Link>
 
               <button
                 onClick={() => void onRefresh()}
