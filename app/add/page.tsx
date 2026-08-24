@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
 import { getNonResidentialReason } from "@/lib/addressClassification";
+import { normalizePhoneForMatching } from "@/lib/customerMatching";
 import { useRouter } from "next/navigation";
 
 const supabase = getSupabase();
@@ -113,9 +114,15 @@ const [pickupDate, setPickupDate] = useState(
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
 
-  const [customerMatches, setCustomerMatches] = useState<CustomerRow[]>([]);
+  const [customerDirectory, setCustomerDirectory] = useState<CustomerRow[]>([]);
+  const [customerDirectoryError, setCustomerDirectoryError] = useState("");
+  const [customerDirectoryLoaded, setCustomerDirectoryLoaded] = useState(false);
   const [showCustomerMatches, setShowCustomerMatches] = useState(false);
   const [customerSelected, setCustomerSelected] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    null
+  );
+  const [duplicatePhoneOverride, setDuplicatePhoneOverride] = useState(false);
   const [customerHomeAddress, setCustomerHomeAddress] = useState("");
   const [homeAddressChoiceOverride, setHomeAddressChoiceOverride] =
     useState<HomeAddressChoice | null>(null);
@@ -153,33 +160,64 @@ const { data: driverData, error: driverError } = await supabase
     if (!vehicleError) {
       setVehicles((vehicleData as VehicleRow[]) ?? []);
     }
+
+    const { data: customerData, error: customerError } = await supabase
+      .from("customers")
+      .select(
+        "id, passenger_name, passenger_phone, home_address, account_name"
+      )
+      .order("passenger_name", { ascending: true })
+      .limit(1000);
+
+    if (customerError) {
+      setCustomerDirectoryError(customerError.message);
+    } else {
+      setCustomerDirectory((customerData as CustomerRow[]) ?? []);
+      setCustomerDirectoryError("");
+    }
+    setCustomerDirectoryLoaded(true);
   }
 
   void loadData();
 }, []);
 
-useEffect(() => {
-  async function searchCustomers() {
-    if (!showCustomerMatches) return;
+  const customerMatches = useMemo(() => {
+    if (!showCustomerMatches) return [];
 
-    if (passengerName.trim().length < 2) {
-      setCustomerMatches([]);
-      return;
-    }
+    const needle = passengerName.trim().toLowerCase();
+    if (needle.length < 2) return [];
 
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .ilike("passenger_name", `%${passengerName.trim()}%`)
-      .limit(5);
+    return customerDirectory
+      .filter((customer) =>
+        (customer.passenger_name ?? "").toLowerCase().includes(needle)
+      )
+      .slice(0, 8);
+  }, [customerDirectory, passengerName, showCustomerMatches]);
 
-    if (!error && data) {
-      setCustomerMatches(data as CustomerRow[]);
-    }
-  }
+  const normalizedPassengerPhone = useMemo(
+    () => normalizePhoneForMatching(passengerPhone),
+    [passengerPhone]
+  );
 
-  searchCustomers();
-}, [passengerName, showCustomerMatches]);
+  const phoneMatches = useMemo(() => {
+    if (normalizedPassengerPhone.length < 6) return [];
+
+    return customerDirectory.filter(
+      (customer) =>
+        normalizePhoneForMatching(customer.passenger_phone) ===
+        normalizedPassengerPhone
+    );
+  }, [customerDirectory, normalizedPassengerPhone]);
+
+  const selectedCustomer = useMemo(
+    () =>
+      selectedCustomerId
+        ? customerDirectory.find(
+            (customer) => customer.id === selectedCustomerId
+          ) ?? null
+        : null,
+    [customerDirectory, selectedCustomerId]
+  );
 
   const nonResidentialReason = useMemo(
     () => getNonResidentialReason(pickupAddress),
@@ -216,9 +254,47 @@ useEffect(() => {
     router.push("/");
   }
 
+  function selectCustomer(customer: CustomerRow) {
+    setPassengerName(customer.passenger_name || "");
+    setPassengerPhone(customer.passenger_phone || "");
+    setPickupAddress(customer.home_address || "");
+    setCustomerHomeAddress(customer.home_address || "");
+    setAccountName(customer.account_name || "");
+    setHomeAddressChoiceOverride(null);
+    setSelectedCustomerId(customer.id);
+    setDuplicatePhoneOverride(false);
+    setCustomerSelected(true);
+    setShowCustomerMatches(false);
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSave || saving) return;
+
+    if (!customerDirectoryLoaded) {
+      alert(
+        "The customer list is still loading. Wait a moment, then save the booking again."
+      );
+      return;
+    }
+
+    if (customerDirectoryError) {
+      alert(
+        "Could not check the customer list for duplicates. Please refresh the page and try again before saving this booking."
+      );
+      return;
+    }
+
+    if (
+      phoneMatches.length > 0 &&
+      !selectedCustomerId &&
+      !duplicatePhoneOverride
+    ) {
+      alert(
+        "This phone number already belongs to an existing customer. Select the correct customer shown under the phone number, or confirm that this is a different customer."
+      );
+      return;
+    }
 
     if (hasReturn) {
       const outwardDateTime = isoFromDateTime(pickupDate, pickupTime);
@@ -310,33 +386,24 @@ local_authority: localAuthority || null,
         customerRecord.home_address = confirmedHomeAddress;
       }
 
-      const customerLookup = await supabase
-        .from("customers")
-        .select("id")
-        .ilike("passenger_name", passengerName.trim())
-        .maybeSingle();
+      let customerWriteError = null;
 
-      let customerWriteError = customerLookup.error;
-      const existingCustomer = customerLookup.data as { id: string } | null;
-
-      if (!customerLookup.error) {
-        if (existingCustomer?.id) {
+      if (selectedCustomerId) {
           const customerUpdates = { ...customerRecord };
           delete customerUpdates.passenger_name;
 
           const customerUpdate = await supabase
             .from("customers")
             .update(customerUpdates as never)
-            .eq("id", existingCustomer.id);
+            .eq("id", selectedCustomerId);
 
           customerWriteError = customerUpdate.error;
-        } else {
+      } else {
           const customerInsert = await supabase
             .from("customers")
             .insert(customerRecord as never);
 
           customerWriteError = customerInsert.error;
-        }
       }
 
       if (customerWriteError) {
@@ -445,6 +512,8 @@ onChange={(e) => {
   setPassengerName(e.target.value);
   setShowCustomerMatches(true);
   setCustomerSelected(false);
+  setSelectedCustomerId(null);
+  setDuplicatePhoneOverride(false);
   setCustomerHomeAddress("");
   setHomeAddressChoiceOverride(null);
 }}
@@ -458,21 +527,8 @@ autoComplete="name"
     {customerMatches.map((customer) => (
       <button
         type="button"
-        key={customer.id}
-onClick={() => {
-  setPassengerName(customer.passenger_name || "");
-  setPassengerPhone(customer.passenger_phone || "");
-  setPickupAddress(customer.home_address || "");
-  setCustomerHomeAddress(customer.home_address || "");
-  setAccountName(customer.account_name || "");
-  setHomeAddressChoiceOverride(null);
-
-  setTimeout(() => {
-setCustomerSelected(true);
-setCustomerMatches([]);
-setShowCustomerMatches(false);
-  }, 0);
-}}
+key={customer.id}
+onClick={() => selectCustomer(customer)}
         className="block w-full border-b border-gray-100 p-3 text-left hover:bg-gray-50"
       >
         <div className="font-medium">
@@ -482,6 +538,11 @@ setShowCustomerMatches(false);
         <div className="text-sm text-gray-500">
           {customer.passenger_phone}
         </div>
+        {customer.home_address && (
+          <div className="text-xs text-gray-500">
+            {customer.home_address}
+          </div>
+        )}
       </button>
     ))}
   </div>
@@ -500,11 +561,90 @@ setShowCustomerMatches(false);
             <input
               className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
               value={passengerPhone}
-              onChange={(e) => setPassengerPhone(e.target.value)}
+              onChange={(e) => {
+                setPassengerPhone(e.target.value);
+                setDuplicatePhoneOverride(false);
+              }}
               placeholder="e.g. 07700 900000"
               autoComplete="tel"
               inputMode="tel"
             />
+
+            {!customerDirectoryLoaded && (
+              <p className="mt-2 text-sm text-gray-500">
+                Checking the customer list for duplicates…
+              </p>
+            )}
+
+            {customerDirectoryError && (
+              <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                The customer list could not be checked for duplicates. Refresh
+                this page before saving a booking.
+              </div>
+            )}
+
+            {selectedCustomer && (
+              <div className="mt-2 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+                Using the existing customer record for{" "}
+                <strong>{selectedCustomer.passenger_name}</strong>. A duplicate
+                customer will not be created.
+              </div>
+            )}
+
+            {!selectedCustomer &&
+              phoneMatches.length > 0 &&
+              !duplicatePhoneOverride && (
+                <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  <div className="font-semibold">
+                    This phone number is already saved.
+                  </div>
+                  <p className="mt-1">
+                    Select the correct existing customer to prevent a duplicate.
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {phoneMatches.map((customer) => (
+                      <button
+                        type="button"
+                        key={customer.id}
+                        onClick={() => selectCustomer(customer)}
+                        className="block w-full rounded-lg border border-amber-300 bg-white p-2 text-left hover:bg-amber-100"
+                      >
+                        <span className="block font-medium">
+                          {customer.passenger_name || "Unnamed customer"}
+                        </span>
+                        <span className="block text-xs text-amber-900">
+                          {customer.passenger_phone || "No phone number"}
+                          {customer.home_address
+                            ? ` · ${customer.home_address}`
+                            : ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDuplicatePhoneOverride(true)}
+                    className="mt-3 text-sm font-medium underline"
+                  >
+                    This is a different customer using the same phone number
+                  </button>
+                </div>
+              )}
+
+            {!selectedCustomer &&
+              phoneMatches.length > 0 &&
+              duplicatePhoneOverride && (
+                <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                  Confirmed as a different customer using the same phone number.
+                  <button
+                    type="button"
+                    onClick={() => setDuplicatePhoneOverride(false)}
+                    className="ml-2 font-medium underline"
+                  >
+                    Review existing customers
+                  </button>
+                </div>
+              )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
