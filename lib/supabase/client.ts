@@ -1,8 +1,8 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
+let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null;
 
 export function getSupabase() {
   if (supabaseInstance) return supabaseInstance;
@@ -14,7 +14,7 @@ export function getSupabase() {
     throw new Error("Missing Supabase environment variables");
   }
 
-  supabaseInstance = createClient(url, anon);
+  supabaseInstance = createBrowserClient(url, anon);
 
   return supabaseInstance;
 }

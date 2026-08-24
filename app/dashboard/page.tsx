@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import OperatorLogoutButton from "@/app/components/OperatorLogoutButton";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
@@ -1748,6 +1749,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
               </button>
+              <OperatorLogoutButton />
             </div>
           </div>
         </div>

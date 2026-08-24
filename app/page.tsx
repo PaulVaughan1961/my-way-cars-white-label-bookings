@@ -15,10 +15,17 @@ export default function Home() {
         </p>
 
         <Link
-          href="/dashboard"
+          href="/operator-login"
           className="inline-block rounded-xl bg-black px-6 py-3 text-white font-medium hover:bg-gray-800 transition"
         >
-          Login
+          Operator login
+        </Link>
+
+        <Link
+          href="/request"
+          className="block text-sm font-medium text-blue-700 underline"
+        >
+          Request a booking
         </Link>
       </div>
     </main>
