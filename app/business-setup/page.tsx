@@ -39,15 +39,19 @@ export default function BusinessSetupPage() {
             </div>
           </Link>
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-100 p-6 shadow-sm">
-            <div className="text-xl font-bold text-slate-700">Drivers</div>
+          <Link
+            href="/drivers"
+            className="rounded-3xl border border-blue-200 bg-white p-6 shadow-sm transition hover:border-blue-400"
+          >
+            <div className="text-xl font-bold text-slate-900">Drivers</div>
             <p className="mt-2 text-sm text-slate-600">
-              Driver and vehicle setup will be added in the next update.
+              Add and update drivers, phone numbers, usual vehicles and
+              licensing authorities.
             </p>
-            <div className="mt-4 text-sm font-medium text-slate-500">
-              Coming next
+            <div className="mt-4 font-medium text-blue-700">
+              Manage drivers →
             </div>
-          </div>
+          </Link>
         </section>
       </div>
     </main>

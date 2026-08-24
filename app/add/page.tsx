@@ -886,7 +886,15 @@ onClick={() => selectCustomer(customer)}
           </div>
 
           <div>
-            <label className="text-sm font-medium">Driver</label>
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-medium">Driver</label>
+              <Link
+                href="/drivers"
+                className="text-sm font-medium text-blue-700 underline"
+              >
+                Add or edit drivers
+              </Link>
+            </div>
             <select
               className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
               value={driverName}
