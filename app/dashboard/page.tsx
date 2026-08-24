@@ -1734,6 +1734,12 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               >
                 Customers
               </Link>
+              <Link
+                href="/business-setup"
+                className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900"
+              >
+                Business setup
+              </Link>
 
               <button
                 onClick={() => void onRefresh()}

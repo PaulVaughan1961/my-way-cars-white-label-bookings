@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { getSupabase } from "@/lib/supabase/client";
 import { getNonResidentialReason } from "@/lib/addressClassification";
 import { normalizePhoneForMatching } from "@/lib/customerMatching";
@@ -37,6 +38,11 @@ type CustomerRow = {
   passenger_phone?: string | null;
   home_address?: string | null;
   account_name?: string | null;
+};
+
+type AccountRow = {
+  id: string;
+  account_name: string;
 };
 
 type HomeAddressChoice = "home" | "other";
@@ -85,6 +91,8 @@ export default function AddBookingPage() {
 
 
   const [accountName, setAccountName] = useState("");
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [accountDirectoryError, setAccountDirectoryError] = useState("");
 
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
@@ -159,6 +167,19 @@ const { data: driverData, error: driverError } = await supabase
 
     if (!vehicleError) {
       setVehicles((vehicleData as VehicleRow[]) ?? []);
+    }
+
+    const { data: accountData, error: accountError } = await supabase
+      .from("accounts")
+      .select("id, account_name")
+      .order("account_name", { ascending: true })
+      .limit(500);
+
+    if (accountError) {
+      setAccountDirectoryError(accountError.message);
+    } else {
+      setAccounts((accountData as AccountRow[]) ?? []);
+      setAccountDirectoryError("");
     }
 
     const { data: customerData, error: customerError } = await supabase
@@ -548,13 +569,55 @@ onClick={() => selectCustomer(customer)}
   </div>
 )}
           </div>
-          <input
-  type="text"
-  placeholder="Account / Business (optional)"
-  value={accountName}
-  onChange={(e) => setAccountName(e.target.value)}
-  className="w-full rounded-xl border px-3 py-2"
-/>
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-medium">
+                Account / Business (optional)
+              </label>
+              <Link
+                href="/accounts"
+                className="text-sm font-medium text-blue-700 underline"
+              >
+                Add or edit accounts
+              </Link>
+            </div>
+            <select
+              value={accountName}
+              onChange={(event) => setAccountName(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+            >
+              <option value="">No account — private customer</option>
+              {accountName &&
+                !accounts.some(
+                  (account) => account.account_name === accountName
+                ) && (
+                  <option value={accountName}>
+                    {accountName} (not in accounts list)
+                  </option>
+                )}
+              {accounts.map((account) => (
+                <option key={account.id} value={account.account_name}>
+                  {account.account_name}
+                </option>
+              ))}
+            </select>
+            {accountDirectoryError && (
+              <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                Accounts could not be loaded. Refresh this page before choosing
+                an account.
+              </div>
+            )}
+            {accountName &&
+              !accounts.some(
+                (account) => account.account_name === accountName
+              ) &&
+              !accountDirectoryError && (
+                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  This customer has an old account name that is not in the
+                  accounts list. Add the account or select the correct one.
+                </div>
+              )}
+          </div>
 
           <div>
             <label className="text-sm font-medium">Passenger phone</label>
