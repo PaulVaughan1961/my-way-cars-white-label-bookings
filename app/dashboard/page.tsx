@@ -1077,9 +1077,9 @@ function toggleBookingSelection(id: string) {
     return (
       <div
         onClick={() => {
-          if (forceExpanded) return;
-
-          cycleCardMode(booking.id);
+          if (!forceExpanded) {
+            cycleCardMode(booking.id);
+          }
 
           const groupId = booking.return_group_id;
           if (groupId) {

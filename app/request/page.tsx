@@ -67,6 +67,9 @@ export default function BookingRequestPage() {
   const [smallBags, setSmallBags] = useState("0");
 
   const [hasReturn, setHasReturn] = useState(false);
+  const [reverseReturnRoute, setReverseReturnRoute] = useState(true);
+  const [returnPickupAddress, setReturnPickupAddress] = useState("");
+  const [returnDropoffAddress, setReturnDropoffAddress] = useState("");
   const [returnDate, setReturnDate] = useState(initialDate);
   const [returnTime, setReturnTime] = useState(initialTime);
   const [returnFlightNumber, setReturnFlightNumber] = useState("");
@@ -90,6 +93,9 @@ export default function BookingRequestPage() {
     setLargeBags("0");
     setSmallBags("0");
     setHasReturn(false);
+    setReverseReturnRoute(true);
+    setReturnPickupAddress("");
+    setReturnDropoffAddress("");
     setReturnDate(freshDate);
     setReturnTime(freshTime);
     setReturnFlightNumber("");
@@ -169,8 +175,8 @@ export default function BookingRequestPage() {
 
       rows.push({
         ...sharedFields,
-        pickup_address: dropoffAddress.trim(),
-        dropoff_address: pickupAddress.trim(),
+        pickup_address: returnPickupAddress.trim(),
+        dropoff_address: returnDropoffAddress.trim(),
         pickup_datetime: returnDateTime,
         return_flight_number: returnFlightNumber.trim() || null,
         notes: returnNotes || null,
@@ -325,7 +331,12 @@ export default function BookingRequestPage() {
                 className={fieldClass}
                 placeholder="Full pickup address"
                 value={pickupAddress}
-                onChange={(e) => setPickupAddress(e.target.value)}
+                onChange={(e) => {
+                  setPickupAddress(e.target.value);
+                  if (reverseReturnRoute) {
+                    setReturnDropoffAddress(e.target.value);
+                  }
+                }}
               />
             </div>
 
@@ -339,7 +350,12 @@ export default function BookingRequestPage() {
                 className={fieldClass}
                 placeholder="Full destination address"
                 value={dropoffAddress}
-                onChange={(e) => setDropoffAddress(e.target.value)}
+                onChange={(e) => {
+                  setDropoffAddress(e.target.value);
+                  if (reverseReturnRoute) {
+                    setReturnPickupAddress(e.target.value);
+                  }
+                }}
               />
             </div>
 
@@ -442,6 +458,9 @@ export default function BookingRequestPage() {
                   if (e.target.checked) {
                     setReturnDate(pickupDate);
                     setReturnTime(pickupTime);
+                    setReverseReturnRoute(true);
+                    setReturnPickupAddress(dropoffAddress);
+                    setReturnDropoffAddress(pickupAddress);
                   }
                 }}
                 className="h-5 w-5"
@@ -451,7 +470,57 @@ export default function BookingRequestPage() {
 
             {hasReturn && (
               <div className="mt-4 space-y-4">
-                <p className="text-sm text-gray-600">The return will reverse the route above.</p>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-50 p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={reverseReturnRoute}
+                    onChange={(e) => {
+                      setReverseReturnRoute(e.target.checked);
+                      if (e.target.checked) {
+                        setReturnPickupAddress(dropoffAddress);
+                        setReturnDropoffAddress(pickupAddress);
+                      }
+                    }}
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span>
+                    <span className="block font-medium">Reverse the outward route</span>
+                    <span className="text-gray-600">
+                      Untick this to enter different return addresses.
+                    </span>
+                  </span>
+                </label>
+
+                <div>
+                  <label htmlFor="return-pickup-address" className="text-sm font-medium">
+                    Return pickup address
+                  </label>
+                  <input
+                    id="return-pickup-address"
+                    required
+                    className={fieldClass}
+                    placeholder="Full return pickup address"
+                    value={returnPickupAddress}
+                    readOnly={reverseReturnRoute}
+                    onChange={(e) => setReturnPickupAddress(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="return-dropoff-address" className="text-sm font-medium">
+                    Return drop-off address
+                  </label>
+                  <input
+                    id="return-dropoff-address"
+                    required
+                    className={fieldClass}
+                    placeholder="Full return destination address"
+                    value={returnDropoffAddress}
+                    readOnly={reverseReturnRoute}
+                    onChange={(e) => setReturnDropoffAddress(e.target.value)}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="return-date" className="text-sm font-medium">Return date</label>
