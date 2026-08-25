@@ -412,6 +412,7 @@ function DashboardContent() {
     string[]
   >([]);
   const [selectedReturnGroupId, setSelectedReturnGroupId] = useState<string | null>(null);
+  const [selectedReturnSourceId, setSelectedReturnSourceId] = useState<string | null>(null);
 const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
 
 const [showPassengerNames, setShowPassengerNames] =
@@ -834,8 +835,12 @@ const unpaidTotal = useMemo(() => {
   const linkedBookings = useMemo(() => {
     if (!selectedReturnGroupId) return [];
 
-    return bookings.filter((b) => b.return_group_id === selectedReturnGroupId);
-  }, [bookings, selectedReturnGroupId]);
+    return bookings.filter(
+      (b) =>
+        b.return_group_id === selectedReturnGroupId &&
+        b.id !== selectedReturnSourceId
+    );
+  }, [bookings, selectedReturnGroupId, selectedReturnSourceId]);
 
   const clashSummaryText = useMemo(() => {
     if (detectedClashes.length === 0) return "";
@@ -1072,11 +1077,14 @@ function toggleBookingSelection(id: string) {
     return (
       <div
         onClick={() => {
+          if (forceExpanded) return;
+
           cycleCardMode(booking.id);
 
           const groupId = booking.return_group_id;
           if (groupId) {
             setSelectedReturnGroupId(groupId);
+            setSelectedReturnSourceId(booking.id);
 
             requestAnimationFrame(() => {
               linkedSectionRef.current?.scrollIntoView({
@@ -1811,6 +1819,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                   });
 
                   setSelectedReturnGroupId(null);
+                  setSelectedReturnSourceId(null);
                 }}
                 className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
               >
