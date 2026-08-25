@@ -67,7 +67,7 @@ export default function BookingRequestPage() {
   const [smallBags, setSmallBags] = useState("0");
 
   const [hasReturn, setHasReturn] = useState(false);
-  const [reverseReturnRoute, setReverseReturnRoute] = useState(true);
+  const [reverseReturn, setReverseReturn] = useState(true);
   const [returnPickupAddress, setReturnPickupAddress] = useState("");
   const [returnDropoffAddress, setReturnDropoffAddress] = useState("");
   const [returnDate, setReturnDate] = useState(initialDate);
@@ -93,7 +93,7 @@ export default function BookingRequestPage() {
     setLargeBags("0");
     setSmallBags("0");
     setHasReturn(false);
-    setReverseReturnRoute(true);
+    setReverseReturn(true);
     setReturnPickupAddress("");
     setReturnDropoffAddress("");
     setReturnDate(freshDate);
@@ -118,13 +118,29 @@ export default function BookingRequestPage() {
     }
 
     let returnDateTime: string | null = null;
+    let resolvedReturnPickup = "";
+    let resolvedReturnDropoff = "";
 
     if (hasReturn) {
       returnDateTime = isoFromDateTime(returnDate, returnTime);
       const returnMs = new Date(returnDateTime).getTime();
 
+      resolvedReturnPickup = reverseReturn
+        ? dropoffAddress.trim()
+        : returnPickupAddress.trim();
+      resolvedReturnDropoff = reverseReturn
+        ? pickupAddress.trim()
+        : returnDropoffAddress.trim();
+
       if (Number.isNaN(returnMs) || returnMs <= outwardMs) {
         setErrorMessage("The return journey must be after the outward journey.");
+        return;
+      }
+
+      if (!resolvedReturnPickup || !resolvedReturnDropoff) {
+        setErrorMessage(
+          "Please enter both the return pickup address and return drop-off address."
+        );
         return;
       }
     }
@@ -175,8 +191,8 @@ export default function BookingRequestPage() {
 
       rows.push({
         ...sharedFields,
-        pickup_address: returnPickupAddress.trim(),
-        dropoff_address: returnDropoffAddress.trim(),
+        pickup_address: resolvedReturnPickup,
+        dropoff_address: resolvedReturnDropoff,
         pickup_datetime: returnDateTime,
         return_flight_number: returnFlightNumber.trim() || null,
         notes: returnNotes || null,
@@ -331,12 +347,7 @@ export default function BookingRequestPage() {
                 className={fieldClass}
                 placeholder="Full pickup address"
                 value={pickupAddress}
-                onChange={(e) => {
-                  setPickupAddress(e.target.value);
-                  if (reverseReturnRoute) {
-                    setReturnDropoffAddress(e.target.value);
-                  }
-                }}
+                onChange={(e) => setPickupAddress(e.target.value)}
               />
             </div>
 
@@ -350,12 +361,7 @@ export default function BookingRequestPage() {
                 className={fieldClass}
                 placeholder="Full destination address"
                 value={dropoffAddress}
-                onChange={(e) => {
-                  setDropoffAddress(e.target.value);
-                  if (reverseReturnRoute) {
-                    setReturnPickupAddress(e.target.value);
-                  }
-                }}
+                onChange={(e) => setDropoffAddress(e.target.value)}
               />
             </div>
 
@@ -456,9 +462,9 @@ export default function BookingRequestPage() {
                 onChange={(e) => {
                   setHasReturn(e.target.checked);
                   if (e.target.checked) {
+                    setReverseReturn(true);
                     setReturnDate(pickupDate);
                     setReturnTime(pickupTime);
-                    setReverseReturnRoute(true);
                     setReturnPickupAddress(dropoffAddress);
                     setReturnDropoffAddress(pickupAddress);
                   }
@@ -470,56 +476,61 @@ export default function BookingRequestPage() {
 
             {hasReturn && (
               <div className="mt-4 space-y-4">
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-50 p-3 text-sm">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-50 p-3">
                   <input
                     type="checkbox"
-                    checked={reverseReturnRoute}
+                    checked={reverseReturn}
                     onChange={(e) => {
-                      setReverseReturnRoute(e.target.checked);
-                      if (e.target.checked) {
+                      const checked = e.target.checked;
+                      setReverseReturn(checked);
+                      if (!checked) {
                         setReturnPickupAddress(dropoffAddress);
                         setReturnDropoffAddress(pickupAddress);
                       }
                     }}
-                    className="mt-0.5 h-4 w-4"
+                    className="mt-0.5 h-5 w-5"
                   />
                   <span>
-                    <span className="block font-medium">Reverse the outward route</span>
-                    <span className="text-gray-600">
-                      Untick this to enter different return addresses.
+                    <span className="block font-semibold">
+                      Return is the reverse of the outward journey
+                    </span>
+                    <span className="mt-1 block text-sm text-gray-600">
+                      Untick this if the return pickup or destination is different.
                     </span>
                   </span>
                 </label>
 
-                <div>
-                  <label htmlFor="return-pickup-address" className="text-sm font-medium">
-                    Return pickup address
-                  </label>
-                  <input
-                    id="return-pickup-address"
-                    required
-                    className={fieldClass}
-                    placeholder="Full return pickup address"
-                    value={returnPickupAddress}
-                    readOnly={reverseReturnRoute}
-                    onChange={(e) => setReturnPickupAddress(e.target.value)}
-                  />
-                </div>
+                {!reverseReturn && (
+                  <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <div>
+                      <label htmlFor="return-pickup-address" className="text-sm font-medium">
+                        Return pickup address
+                      </label>
+                      <input
+                        id="return-pickup-address"
+                        required
+                        className={fieldClass}
+                        placeholder="Full return pickup address"
+                        value={returnPickupAddress}
+                        onChange={(e) => setReturnPickupAddress(e.target.value)}
+                      />
+                    </div>
 
-                <div>
-                  <label htmlFor="return-dropoff-address" className="text-sm font-medium">
-                    Return drop-off address
-                  </label>
-                  <input
-                    id="return-dropoff-address"
-                    required
-                    className={fieldClass}
-                    placeholder="Full return destination address"
-                    value={returnDropoffAddress}
-                    readOnly={reverseReturnRoute}
-                    onChange={(e) => setReturnDropoffAddress(e.target.value)}
-                  />
-                </div>
+                    <div>
+                      <label htmlFor="return-dropoff-address" className="text-sm font-medium">
+                        Return drop-off address
+                      </label>
+                      <input
+                        id="return-dropoff-address"
+                        required
+                        className={fieldClass}
+                        placeholder="Full return destination address"
+                        value={returnDropoffAddress}
+                        onChange={(e) => setReturnDropoffAddress(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
