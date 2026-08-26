@@ -31,6 +31,10 @@ type BookingRow = {
   booking_type?: string | null;
   return_group_id?: string | null;
   return_flight_number?: string | null;
+  driver_assignment_status?: string | null;
+  driver_assigned_at?: string | null;
+  driver_response_at?: string | null;
+  driver_decline_reason?: string | null;
 
   lead_passenger?: string | null;
   customer_name?: string | null;
@@ -50,6 +54,15 @@ type BookingRow = {
   type?: string | null;
 
   [key: string]: unknown;
+};
+
+type DriverOption = {
+  id: string;
+  name: string;
+  driver_phone?: string | null;
+  default_vehicle?: string | null;
+  current_vehicle?: string | null;
+  active?: boolean | null;
 };
 
 type ClashRow = {
@@ -385,10 +398,15 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const focusBookingId = searchParams.get("focus");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [drivers, setDrivers] = useState<DriverOption[]>([]);
+  const [assignmentChoices, setAssignmentChoices] = useState<
+    Record<string, string>
+  >({});
   const clashSectionRef = useRef<HTMLDivElement | null>(null);
   const linkedSectionRef = useRef<HTMLDivElement | null>(null);
   const offendingBookingsRef = useRef<HTMLDivElement | null>(null);
   const editedBookingRef = useRef<HTMLDivElement | null>(null);
+  const bookingFiltersRef = useRef<HTMLDivElement | null>(null);
 
   function scrollToRefWithOffset(
     ref: React.RefObject<HTMLDivElement | null>,
@@ -448,9 +466,9 @@ const [showPassengerNames, setShowPassengerNames] =
     }
   }
 
-  async function loadBookings() {
+  async function loadBookings(showLoading = true) {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setErrorMessage("");
 
       const supabase = getSupabase();
@@ -468,8 +486,29 @@ const [showPassengerNames, setShowPassengerNames] =
         error instanceof Error ? error.message : "Failed to load bookings";
       setErrorMessage(message);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
+  }
+
+  async function loadDrivers() {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("drivers")
+      .select(
+        "id,name,driver_phone,default_vehicle,current_vehicle,active"
+      )
+      .order("name", { ascending: true });
+
+    if (error) {
+      setErrorMessage(`Could not load drivers: ${error.message}`);
+      return;
+    }
+
+    setDrivers(
+      ((data as DriverOption[]) ?? []).filter(
+        (driver) => driver.active !== false && driver.name?.trim()
+      )
+    );
   }
 
   async function onRefresh() {
@@ -477,6 +516,7 @@ const [showPassengerNames, setShowPassengerNames] =
       setRefreshing(true);
       await loadBookings();
       await loadReviewedClashes();
+      await loadDrivers();
     } finally {
       setRefreshing(false);
     }
@@ -506,6 +546,7 @@ useEffect(() => {
   useEffect(() => {
     void loadBookings();
     void loadReviewedClashes();
+    void loadDrivers();
 
     const supabase = getSupabase();
 
@@ -519,13 +560,22 @@ useEffect(() => {
           table: "bookings",
         },
         () => {
-          void loadBookings();
+          void loadBookings(false);
           void loadReviewedClashes();
         }
       )
       .subscribe();
 
+    // Supabase Realtime may be unavailable if replication is not enabled for
+    // this table. Polling provides a reliable fallback for dispatch responses.
+    const pollTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadBookings(false);
+      }
+    }, 5000);
+
     return () => {
+      window.clearInterval(pollTimer);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -592,6 +642,12 @@ const filteredBookings = useMemo(() => {
     result = result.filter((row) => {
       const when = getWhenMs(row);
       const status = (row.status ?? "Scheduled").toString();
+      const assignment = (row.driver_assignment_status ?? "").toString();
+
+      if (status === "Pending Approval") return true;
+      if (assignment === "Declined") return true;
+      if (assignment === "Awaiting response") return true;
+      if (status === "Scheduled" && !getDriver(row)) return true;
 
       return (
         !Number.isNaN(when) &&
@@ -919,6 +975,29 @@ status !== "Rejected"
 );
   }, [bookings]);
 
+  const dispatchAttentionCount = useMemo(
+    () =>
+      bookings.filter((booking) => {
+        const status = (booking.status ?? "Scheduled").toString();
+        const assignment = (
+          booking.driver_assignment_status ?? ""
+        ).toString();
+        if (
+          status === "Completed" ||
+          status === "Cancelled" ||
+          status === "Rejected"
+        ) {
+          return false;
+        }
+        return (
+          assignment === "Declined" ||
+          assignment === "Awaiting response" ||
+          (status === "Scheduled" && !getDriver(booking))
+        );
+      }).length,
+    [bookings]
+  );
+
 async function updateBooking(
   id: string,
   patch: Partial<BookingRow>
@@ -962,6 +1041,63 @@ if (patch.status === "Completed") {
         : "Failed to update booking";
 
     setErrorMessage(message);
+  } finally {
+    setBusyId(null);
+  }
+}
+
+async function assignBookingToDriver(
+  booking: BookingRow,
+  driverId: string
+) {
+  const selectedDriver = drivers.find((driver) => driver.id === driverId);
+  if (!selectedDriver) {
+    window.alert("Select a driver first.");
+    return;
+  }
+
+  const vehicle =
+    selectedDriver.current_vehicle?.trim() ||
+    selectedDriver.default_vehicle?.trim() ||
+    "";
+  const confirmed = window.confirm(
+    `Assign this booking to ${selectedDriver.name}${
+      vehicle ? ` in ${vehicle}` : ""
+    }? The driver will need to accept it.`
+  );
+  if (!confirmed) return;
+
+  try {
+    setBusyId(booking.id);
+    setErrorMessage("");
+    const patch: Partial<BookingRow> = {
+      driver_name: selectedDriver.name,
+      driver_phone: selectedDriver.driver_phone?.trim() || null,
+      vehicle: vehicle || null,
+      driver_assignment_status: "Awaiting response",
+      driver_assigned_at: new Date().toISOString(),
+      driver_response_at: null,
+      driver_decline_reason: null,
+    };
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from("bookings")
+      .update(patch as never)
+      .eq("id", booking.id);
+    if (error) throw error;
+
+    setBookings((current) =>
+      current.map((row) =>
+        row.id === booking.id ? { ...row, ...patch } : row
+      )
+    );
+    window.alert(
+      `Booking assigned to ${selectedDriver.name}. Awaiting driver response.`
+    );
+  } catch (error) {
+    setErrorMessage(
+      error instanceof Error ? error.message : "Could not assign the driver"
+    );
   } finally {
     setBusyId(null);
   }
@@ -1159,6 +1295,13 @@ function toggleBookingSelection(id: string) {
     const fare = getFare(booking);
     const status = (booking.status ?? "Scheduled").toString();
     const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
+    const driverAssignmentStatus = (
+      booking.driver_assignment_status ?? ""
+    ).toString();
+    const selectedDriverId =
+      assignmentChoices[booking.id] ??
+      drivers.find((option) => option.name === driver)?.id ??
+      "";
     const notes = cleanDisplayText(booking.notes);
     const via = cleanDisplayText(booking.via);
     const localAuthority = cleanDisplayText(booking.local_authority);
@@ -1195,6 +1338,10 @@ function toggleBookingSelection(id: string) {
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
             : status === "Pending Approval"
             ? "border-amber-500 bg-amber-50 shadow-lg ring-4 ring-amber-200"
+            : driverAssignmentStatus === "Declined"
+            ? "border-red-500 bg-red-50 shadow-lg ring-4 ring-red-200"
+            : driverAssignmentStatus === "Awaiting response"
+            ? "border-amber-400 bg-amber-50 shadow-md ring-2 ring-amber-200"
             : status === "POB"
             ? "border-amber-300 bg-amber-50 shadow-md"
             : (() => {
@@ -1220,6 +1367,19 @@ function toggleBookingSelection(id: string) {
       {status === "Pending Approval" ? (
         <span className="shrink-0 rounded-full bg-amber-500 px-2 py-1 text-xs font-black text-slate-950">
           NEW REQUEST
+        </span>
+      ) : null}
+      {driverAssignmentStatus === "Declined" ? (
+        <span className="shrink-0 rounded-full bg-red-600 px-2 py-1 text-xs font-black text-white">
+          DRIVER DECLINED
+        </span>
+      ) : driverAssignmentStatus === "Awaiting response" ? (
+        <span className="shrink-0 rounded-full bg-amber-200 px-2 py-1 text-xs font-bold text-amber-900">
+          AWAITING DRIVER
+        </span>
+      ) : driverAssignmentStatus === "Accepted" ? (
+        <span className="shrink-0 rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-800">
+          DRIVER ACCEPTED
         </span>
       ) : null}
       {booking.return_group_id ? (
@@ -1378,10 +1538,35 @@ function toggleBookingSelection(id: string) {
                 const whenMs = getWhenMs(booking);
                 const diff = whenMs - nowMs;
 
-                if (hasDriver) {
+                if (driverAssignmentStatus === "Declined") {
+                  return (
+                    <div className="mt-2 rounded-xl border-2 border-red-500 bg-red-50 p-3 text-sm font-bold text-red-800">
+                      DRIVER DECLINED — {driver || "assigned driver"}
+                      {booking.driver_decline_reason ? (
+                        <div className="mt-1 font-medium">
+                          Reason: {booking.driver_decline_reason}
+                        </div>
+                      ) : null}
+                      <div className="mt-1">Reassign this booking now.</div>
+                    </div>
+                  );
+                }
+
+                if (driverAssignmentStatus === "Awaiting response") {
+                  return (
+                    <div className="mt-2 rounded-xl border border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-800">
+                      Awaiting response from {driver || "driver"}
+                    </div>
+                  );
+                }
+
+                if (
+                  driverAssignmentStatus === "Accepted" ||
+                  (hasDriver && !driverAssignmentStatus)
+                ) {
                   return (
                     <div className="mt-2 rounded-xl border border-green-300 bg-green-50 p-2 text-sm font-semibold text-green-700">
-                      Driver assigned
+                      Driver accepted
                     </div>
                   );
                 }
@@ -1400,6 +1585,51 @@ function toggleBookingSelection(id: string) {
                   </div>
                 );
               })()}
+
+              {status === "Scheduled" ? (
+                <div
+                  className="mt-3 rounded-xl border border-slate-300 bg-slate-50 p-3"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="mb-2 text-sm font-bold text-slate-900">
+                    {driver ? "Reassign driver" : "Assign driver"}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <select
+                      value={selectedDriverId}
+                      onChange={(event) =>
+                        setAssignmentChoices((current) => ({
+                          ...current,
+                          [booking.id]: event.target.value,
+                        }))
+                      }
+                      className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Choose an active driver</option>
+                      {drivers.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                          {option.current_vehicle || option.default_vehicle
+                            ? ` — ${option.current_vehicle || option.default_vehicle}`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() =>
+                        void assignBookingToDriver(
+                          booking,
+                          selectedDriverId
+                        )
+                      }
+                      disabled={isBusy || !selectedDriverId}
+                      className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      {isBusy ? "Assigning..." : "Send to driver"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {expanded && (
@@ -1766,6 +1996,20 @@ ${vehicle || "To be confirmed"}${returnNote}`;
         </div>
       ) : null}
       <div className="mx-auto max-w-5xl space-y-6">
+        {dispatchAttentionCount > 0 ? (
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("Needs Action");
+              scrollToRefWithOffset(bookingFiltersRef, 24);
+            }}
+            className="w-full rounded-2xl border-2 border-red-500 bg-red-50 p-4 text-left font-bold text-red-800 shadow"
+          >
+            DRIVER ACTION REQUIRED — {dispatchAttentionCount} booking
+            {dispatchAttentionCount === 1 ? "" : "s"} need assignment or a
+            driver response. Tap to review.
+          </button>
+        ) : null}
         {selectedBookings.length > 0 && (
   <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
     <div className="font-semibold text-slate-900">
@@ -2242,7 +2486,10 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             </div>
           </div>
 
-          <div className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2">
+          <div
+            ref={bookingFiltersRef}
+            className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 bg-white py-2"
+          >
             {[
               "All",
               "Upcoming",
