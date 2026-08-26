@@ -465,8 +465,11 @@ export default function BookingRequestPage() {
                     setReverseReturn(true);
                     setReturnDate(pickupDate);
                     setReturnTime(pickupTime);
-                    setReturnPickupAddress(dropoffAddress);
-                    setReturnDropoffAddress(pickupAddress);
+                    setReturnPickupAddress("");
+                    setReturnDropoffAddress("");
+                  } else {
+                    setReturnPickupAddress("");
+                    setReturnDropoffAddress("");
                   }
                 }}
                 className="h-5 w-5"
@@ -483,10 +486,10 @@ export default function BookingRequestPage() {
                     onChange={(e) => {
                       const checked = e.target.checked;
                       setReverseReturn(checked);
-                      if (!checked) {
-                        setReturnPickupAddress(dropoffAddress);
-                        setReturnDropoffAddress(pickupAddress);
-                      }
+                      // Custom-return fields must always start empty. The reversed
+                      // addresses are resolved only when the form is submitted.
+                      setReturnPickupAddress("");
+                      setReturnDropoffAddress("");
                     }}
                     className="mt-0.5 h-5 w-5"
                   />
@@ -512,6 +515,7 @@ export default function BookingRequestPage() {
                         className={fieldClass}
                         placeholder="Full return pickup address"
                         value={returnPickupAddress}
+                        autoComplete="off"
                         onChange={(e) => setReturnPickupAddress(e.target.value)}
                       />
                     </div>
@@ -526,6 +530,7 @@ export default function BookingRequestPage() {
                         className={fieldClass}
                         placeholder="Full return destination address"
                         value={returnDropoffAddress}
+                        autoComplete="off"
                         onChange={(e) => setReturnDropoffAddress(e.target.value)}
                       />
                     </div>

@@ -371,7 +371,17 @@ function makeClashKey(a: string, b: string): string {
 
 function DashboardContent() {
   const [completedFlash, setCompletedFlash] =
-  useState<BookingRow | null>(null);
+  useState<BookingRow | null>(() => {
+    if (typeof window === "undefined") return null;
+    const saved = window.sessionStorage.getItem("myWayCarsCompletedFlash");
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved) as BookingRow;
+    } catch {
+      window.sessionStorage.removeItem("myWayCarsCompletedFlash");
+      return null;
+    }
+  });
   const searchParams = useSearchParams();
   const focusBookingId = searchParams.get("focus");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -937,10 +947,12 @@ if (patch.status === "Completed") {
     bookings.find((b) => b.id === id) ?? null;
 
   setCompletedFlash(completedBooking);
-
-  window.setTimeout(() => {
-    setCompletedFlash(null);
-  }, 1000);
+  if (completedBooking) {
+    window.sessionStorage.setItem(
+      "myWayCarsCompletedFlash",
+      JSON.stringify(completedBooking)
+    );
+  }
 }
 
   } catch (error) {
@@ -950,6 +962,104 @@ if (patch.status === "Completed") {
         : "Failed to update booking";
 
     setErrorMessage(message);
+  } finally {
+    setBusyId(null);
+  }
+}
+
+async function acceptBookingRequest(booking: BookingRow) {
+  try {
+    setBusyId(booking.id);
+    setErrorMessage("");
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Your operator session has expired. Please sign in again.");
+    }
+    const response = await fetch("/api/booking-requests/accept", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ bookingId: booking.id }),
+    });
+    const result = (await response.json()) as { error?: string; message?: string };
+    if (!response.ok) {
+      throw new Error(result.error || "Unable to accept booking request");
+    }
+    await loadBookings();
+    window.alert(result.message || "Booking request accepted.");
+  } catch (error) {
+    setErrorMessage(
+      error instanceof Error ? error.message : "Unable to accept booking request"
+    );
+  } finally {
+    setBusyId(null);
+  }
+}
+
+async function rejectBookingRequest(booking: BookingRow) {
+  const defaultReason =
+    "Unfortunately, we do not have availability for the requested journey.";
+  const enteredReason = window.prompt(
+    "Reason shown to the customer:",
+    defaultReason
+  );
+
+  if (enteredReason === null) return;
+
+  const reason = enteredReason.trim();
+  if (!reason) {
+    window.alert("Please enter a reason for rejecting the request.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    booking.return_group_id
+      ? "Reject only this journey leg and notify the customer? The linked journey will keep its current status."
+      : "Reject this booking request and notify the customer?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setBusyId(booking.id);
+    setErrorMessage("");
+
+    const supabase = getSupabase();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      throw new Error("Your operator session has expired. Please sign in again.");
+    }
+
+    const response = await fetch("/api/booking-requests/reject", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ bookingId: booking.id, reason }),
+    });
+
+    const result = (await response.json()) as {
+      error?: string;
+      message?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(result.error || "Unable to reject booking request");
+    }
+
+    await loadBookings();
+    window.alert(result.message || "Booking request rejected.");
+  } catch (error) {
+    setErrorMessage(
+      error instanceof Error ? error.message : "Unable to reject booking request"
+    );
   } finally {
     setBusyId(null);
   }
@@ -1049,7 +1159,6 @@ function toggleBookingSelection(id: string) {
     const fare = getFare(booking);
     const status = (booking.status ?? "Scheduled").toString();
     const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
-    const supabase = getSupabase();
     const notes = cleanDisplayText(booking.notes);
     const via = cleanDisplayText(booking.via);
     const localAuthority = cleanDisplayText(booking.local_authority);
@@ -1080,23 +1189,12 @@ function toggleBookingSelection(id: string) {
           if (!forceExpanded) {
             cycleCardMode(booking.id);
           }
-
-          const groupId = booking.return_group_id;
-          if (groupId) {
-            setSelectedReturnGroupId(groupId);
-            setSelectedReturnSourceId(booking.id);
-
-            requestAnimationFrame(() => {
-              linkedSectionRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            });
-          }
         }}
         className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
+            : status === "Pending Approval"
+            ? "border-amber-500 bg-amber-50 shadow-lg ring-4 ring-amber-200"
             : status === "POB"
             ? "border-amber-300 bg-amber-50 shadow-md"
             : (() => {
@@ -1119,6 +1217,11 @@ function toggleBookingSelection(id: string) {
   <div className="flex items-center justify-between gap-2 overflow-hidden text-sm text-slate-900">
 
     <div className="flex items-center gap-2 overflow-hidden">
+      {status === "Pending Approval" ? (
+        <span className="shrink-0 rounded-full bg-amber-500 px-2 py-1 text-xs font-black text-slate-950">
+          NEW REQUEST
+        </span>
+      ) : null}
       {booking.return_group_id ? (
         <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
           Linked
@@ -1179,6 +1282,11 @@ function toggleBookingSelection(id: string) {
 ) : (
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
+              {status === "Pending Approval" ? (
+                <div className="mb-3 rounded-xl bg-amber-500 px-4 py-2 text-center text-sm font-black tracking-wide text-slate-950 shadow">
+                  NEW BOOKING REQUEST — ACTION REQUIRED
+                </div>
+              ) : null}
               {highlightClash ? (
                 <div className="mb-2">
                   <span className="rounded-full bg-rose-600 px-2 py-1 text-xs font-bold text-white">
@@ -1528,41 +1636,30 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               </a>
             ) : null}
 {status === "Pending Approval" ? (
-  <div className="mb-3 flex gap-2">
+  <div className="mb-3 rounded-2xl border-2 border-amber-500 bg-amber-100 p-3 shadow-md">
+    <div className="mb-2 text-center text-xs font-black uppercase tracking-wide text-amber-950">
+      Accept or reject this request
+    </div>
+    <div className="flex gap-2">
     <button
-      onClick={async () => {
-        await supabase
-          .from("bookings")
-.update({
-  status: "Scheduled",
-} as never)
-          .eq("id", booking.id);
-
-        loadBookings();
-      }}
-      className="rounded-xl bg-green-600 px-3 py-2 text-sm font-medium text-white"
+      onClick={() => void acceptBookingRequest(booking)}
+      disabled={isBusy}
+      className="flex-1 rounded-xl bg-green-700 px-4 py-3 text-base font-bold text-white shadow disabled:opacity-60"
     >
-      Approve Request
+      {isBusy ? "Working..." : "ACCEPT REQUEST"}
     </button>
 
     <button
-      onClick={async () => {
-        await supabase
-          .from("bookings")
-.update({
-  status: "Rejected",
-} as never)
-          .eq("id", booking.id);
-
-        loadBookings();
-      }}
-      className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white"
+      onClick={() => void rejectBookingRequest(booking)}
+      disabled={isBusy}
+      className="flex-1 rounded-xl bg-red-700 px-4 py-3 text-base font-bold text-white shadow disabled:opacity-60"
     >
-      Reject Request
+      {isBusy ? "Working..." : "REJECT REQUEST"}
     </button>
+    </div>
   </div>
 ) : null}
-            {status !== "Completed" ? (
+            {status !== "Completed" && status !== "Rejected" ? (
               <button
                 onClick={() =>
                   void updateBooking(booking.id, {
@@ -1578,7 +1675,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               </button>
             ) : null}
 
-            {status !== "Completed" ? (
+            {status !== "Completed" && status !== "Rejected" ? (
               <button
                 onClick={() =>
                   void updateBooking(booking.id, {
@@ -1603,7 +1700,9 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               </button>
             ) : null}
 
-            {status !== "Cancelled" ? (
+            {status !== "Cancelled" &&
+            status !== "Rejected" &&
+            status !== "Completed" ? (
               <button
                 onClick={() => void onCancel(booking.id)}
                 disabled={isBusy}
@@ -1630,6 +1729,42 @@ ${vehicle || "To be confirmed"}${returnNote}`;
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
+      {completedFlash ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="completed-job-title"
+        >
+          <div className="w-full max-w-lg rounded-3xl border-4 border-green-500 bg-green-50 p-8 text-center shadow-2xl">
+            <div
+              id="completed-job-title"
+              className="text-3xl font-bold text-green-700"
+            >
+              ✓ JOB COMPLETED
+            </div>
+            <div className="mt-4 text-xl font-semibold">
+              {completedFlash.passenger_name}
+            </div>
+            <div className="mt-2 text-sm text-slate-700">
+              {completedFlash.pickup_address}
+            </div>
+            <div className="text-sm text-slate-700">
+              {completedFlash.dropoff_address}
+            </div>
+            <button
+              autoFocus
+              onClick={() => {
+                window.sessionStorage.removeItem("myWayCarsCompletedFlash");
+                setCompletedFlash(null);
+              }}
+              className="mt-6 rounded-xl bg-green-700 px-8 py-3 text-lg font-bold text-white shadow"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto max-w-5xl space-y-6">
         {selectedBookings.length > 0 && (
   <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
@@ -1866,26 +2001,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 </div>
               </div>
             )}
-          </section>
-        ) : completedFlash ? (
-          <section id="completed-job">
-            <div className="rounded-3xl border-4 border-green-500 bg-green-50 p-6 shadow-sm">
-              <div className="text-3xl font-bold text-green-700">
-                ✓ JOB COMPLETED
-              </div>
-
-              <div className="mt-3 text-lg font-semibold">
-                {completedFlash.passenger_name}
-              </div>
-
-              <div className="text-sm text-slate-600">
-                {completedFlash.pickup_address}
-              </div>
-
-              <div className="text-sm text-slate-600">
-                {completedFlash.dropoff_address}
-              </div>
-            </div>
           </section>
         ) : nextJob ? (
           <section id="next-job">
