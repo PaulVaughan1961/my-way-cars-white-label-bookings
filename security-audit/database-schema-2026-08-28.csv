@@ -1,0 +1,83 @@
+table_name,ordinal_position,column_name,data_type,udt_name,is_nullable,column_default
+accounts,1,id,uuid,uuid,NO,gen_random_uuid()
+accounts,2,account_name,text,text,NO,null
+accounts,3,invoice_email,text,text,YES,null
+accounts,4,contact_name,text,text,YES,null
+accounts,5,phone,text,text,YES,null
+accounts,6,address,text,text,YES,null
+accounts,7,payment_terms,text,text,YES,'30 Days'::text
+accounts,8,active,boolean,bool,YES,true
+accounts,9,created_at,timestamp with time zone,timestamptz,YES,now()
+bookings,1,id,uuid,uuid,NO,gen_random_uuid()
+bookings,2,created_at,timestamp with time zone,timestamptz,NO,now()
+bookings,3,passenger_name,text,text,YES,null
+bookings,4,passenger_phone,text,text,YES,null
+bookings,5,pickup_address,text,text,YES,null
+bookings,6,dropoff_address,text,text,YES,null
+bookings,7,pickup_datetime,timestamp without time zone,timestamp,YES,null
+bookings,8,distance_miles,numeric,numeric,YES,null
+bookings,9,fare,numeric,numeric,YES,null
+bookings,10,payment_status,text,text,YES,null
+bookings,11,status,text,text,YES,null
+bookings,12,notes,text,text,YES,null
+bookings,13,passengers,bigint,int8,YES,null
+bookings,14,bags_large,bigint,int8,YES,null
+bookings,15,bags_small,bigint,int8,YES,null
+bookings,16,via,text,text,YES,null
+bookings,17,local_authority,text,text,YES,null
+bookings,18,driver_name,text,text,YES,null
+bookings,19,vehicle,text,text,YES,null
+bookings,20,booking_type,text,text,YES,null
+bookings,21,return_datetime,timestamp without time zone,timestamp,YES,null
+bookings,22,return_notes,text,text,YES,null
+bookings,23,return_group_id,text,text,YES,null
+bookings,24,driver_phone,text,text,YES,null
+bookings,25,return_flight_number,text,text,YES,null
+bookings,26,return_driver_notes,text,text,YES,null
+bookings,27,account_name,text,text,YES,null
+bookings,28,driver_assignment_status,text,text,YES,null
+bookings,29,driver_assigned_at,timestamp with time zone,timestamptz,YES,null
+bookings,30,driver_response_at,timestamp with time zone,timestamptz,YES,null
+bookings,31,driver_decline_reason,text,text,YES,null
+clash_reviews,1,id,uuid,uuid,NO,gen_random_uuid()
+clash_reviews,2,clash_key,text,text,NO,null
+clash_reviews,3,booking_a_id,uuid,uuid,NO,null
+clash_reviews,4,booking_b_id,uuid,uuid,NO,null
+clash_reviews,5,reviewed_at,timestamp with time zone,timestamptz,NO,now()
+clash_reviews,6,review_notes,text,text,YES,null
+customers,1,id,uuid,uuid,NO,gen_random_uuid()
+customers,2,created_at,timestamp with time zone,timestamptz,NO,now()
+customers,3,passenger_name,text,text,YES,null
+customers,4,passenger_phone,text,text,YES,null
+customers,5,home_address,text,text,YES,null
+customers,6,account_name,text,text,YES,null
+customers,7,last_booking_at,timestamp with time zone,timestamptz,YES,null
+drivers,1,id,uuid,uuid,NO,gen_random_uuid()
+drivers,2,name,text,text,NO,null
+drivers,3,driver_phone,text,text,YES,null
+drivers,4,default_vehicle,text,text,YES,null
+drivers,5,default_authority,text,text,YES,null
+drivers,6,active,boolean,bool,YES,true
+drivers,7,current_vehicle,text,text,YES,null
+drivers,8,current_authority,text,text,YES,null
+drivers,10,driver_id,uuid,uuid,YES,null
+drivers,11,email,text,text,YES,null
+drivers,12,role,text,text,NO,'driver'::text
+drivers,13,is_active,boolean,bool,NO,true
+drivers,14,created_at,timestamp with time zone,timestamptz,NO,now()
+drivers,15,auth_user_id,uuid,uuid,YES,null
+licensing_authorities,1,id,uuid,uuid,NO,gen_random_uuid()
+licensing_authorities,2,name,text,text,NO,null
+licensing_authorities,3,active,boolean,bool,YES,true
+operator_users,1,user_id,uuid,uuid,NO,null
+operator_users,2,email,text,text,NO,null
+operator_users,3,created_at,timestamp with time zone,timestamptz,NO,now()
+vehicles,1,id,uuid,uuid,NO,gen_random_uuid()
+vehicles,2,name,text,text,NO,null
+vehicles,3,registration,text,text,YES,null
+vehicles,4,authority,text,text,YES,null
+vehicles,5,active,boolean,bool,YES,true
+vehicles,6,make,text,text,YES,null
+vehicles,7,model,text,text,YES,null
+vehicles,8,council,text,text,YES,null
+vehicles,9,plate_number,text,text,YES,null

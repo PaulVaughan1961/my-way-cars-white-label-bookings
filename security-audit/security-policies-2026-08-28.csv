@@ -1,0 +1,47 @@
+schemaname,tablename,policyname,permissive,roles,cmd,using_expression,check_expression
+public,accounts,operator full access,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))","(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))"
+public,bookings,driver can read assigned bookings,PERMISSIVE,{authenticated},SELECT,"(EXISTS ( SELECT 1
+   FROM drivers
+  WHERE (((drivers.auth_user_id = auth.uid()) OR (lower(COALESCE(drivers.email, ''::text)) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text)))) AND (drivers.name = bookings.driver_name))))",null
+public,bookings,driver can update assigned bookings,PERMISSIVE,{authenticated},UPDATE,"(EXISTS ( SELECT 1
+   FROM drivers
+  WHERE (((drivers.auth_user_id = auth.uid()) OR (lower(COALESCE(drivers.email, ''::text)) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text)))) AND (drivers.name = bookings.driver_name))))","(EXISTS ( SELECT 1
+   FROM drivers
+  WHERE (((drivers.auth_user_id = auth.uid()) OR (lower(COALESCE(drivers.email, ''::text)) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text)))) AND (drivers.name = bookings.driver_name))))"
+public,bookings,operator full access,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))","(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))"
+public,bookings,public can submit pending request,PERMISSIVE,{anon},INSERT,null,((status = 'Pending Approval'::text) AND (payment_status = 'Unpaid'::text) AND (driver_name IS NULL) AND (driver_phone IS NULL) AND (vehicle IS NULL))
+public,clash_reviews,operator full access,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))","(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))"
+public,customers,operator full access,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))","(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))"
+public,drivers,driver can read own record,PERMISSIVE,{authenticated},SELECT,"((auth_user_id = auth.uid()) OR (lower(COALESCE(email, ''::text)) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text))))",null
+public,drivers,operator full access,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))","(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))"
+public,licensing_authorities,operator full access,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))","(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))"
+public,operator_users,operator can read own access record,PERMISSIVE,{authenticated},SELECT,(auth.uid() = user_id),null
+public,vehicles,operator full access,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))","(EXISTS ( SELECT 1
+   FROM operator_users
+  WHERE (operator_users.user_id = auth.uid())))"

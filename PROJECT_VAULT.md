@@ -271,3 +271,56 @@ Do not store passwords, API keys, tokens, customer data or unredacted database e
 
 > Preserve the current live application/database checkpoint, then document the actual live Supabase schema and active Row Level Security policies. Do not modify the live database yet.
 
+### 28 August 2026 — Live database security inventory
+
+**Decisions**
+
+- Kept the session strictly read-only; no database objects, policies or records were changed.
+- Confirmed that no database migration will be attempted until a recoverable data backup exists.
+- Kept High reasoning mode active for the security phase.
+
+**Live findings**
+
+- The Supabase project is on the Free plan and has no scheduled database backups.
+- Eight public tables are present: accounts, bookings, clash_reviews, customers, drivers, licensing_authorities, operator_users and vehicles.
+- All eight public tables have Row Level Security enabled.
+- Twelve active policies were recorded.
+- The live policies match the supplied source security file.
+- The current policies separate operators from drivers but do not separate one operator business from another.
+- The driver update policy applies to an assigned booking as a whole and is broader than the permitted driver actions required for commercial use.
+- The public pending-request insert policy is active for anonymous users.
+- The live public schema contains 82 columns.
+- The database contains 29 recorded constraints and indexes.
+- No custom functions or triggers exist in the public schema.
+- `pickup_datetime` and the legacy `return_datetime` are stored as timestamps without a time zone.
+- Both the legacy return fields and the newer `return_group_id` model exist in the live bookings table.
+
+**Evidence stored in `security-audit/`**
+
+- `security-policies-2026-08-28.csv`
+- `database-schema-2026-08-28.csv`
+- `database-constraints-indexes-2026-08-28.csv`
+- `database-row-counts-2026-08-28.csv`
+
+These evidence files contain structure, policy definitions and counts only. They do not contain passenger records.
+
+**Tests and results**
+
+- Active-policy query: passed; 12 rows returned.
+- Schema-column query: passed; 82 rows returned.
+- Constraint and index query: passed; 29 rows returned.
+- Function and trigger query: passed; 0 rows returned.
+- Exact table-count query: passed; results exported for pre/post-migration comparison.
+
+**Live actions**
+
+- Read-only SQL queries only.
+- No schema, policy, configuration or data changes.
+
+**Unresolved release blocker**
+
+> The live database does not currently have a managed or independently tested recoverable backup.
+
+**Next exact task**
+
+> Establish and test a secure database backup method. Then design the business, membership and feature-entitlement model on paper and in migration files without applying it to production.
