@@ -324,3 +324,44 @@ These evidence files contain structure, policy definitions and counts only. They
 **Next exact task**
 
 > Establish and test a secure database backup method. Then design the business, membership and feature-entitlement model on paper and in migration files without applying it to production.
+
+### 28 August 2026 — Independent database backup created
+
+**Decisions**
+
+- Kept the live production database unchanged.
+- Stored the sensitive backup outside the Git repository.
+- Created two identical copies: one local copy and one private OneDrive copy.
+- Did not store or record the database password in the project, terminal history or audit evidence.
+
+**Backup details**
+
+- Format: PostgreSQL custom archive.
+- Tool: `pg_dump` 18.4 supplied with pgAdmin 4 version 9.17.
+- Filename: `my-way-cars-database-2026-08-28.backup`.
+- Local location: `Documents\My Way Cars Secure Backups\`.
+- Private cloud location: `OneDrive\My Way Cars Secure Backups\`.
+- Size: 308,533 bytes.
+- SHA-256: `32D42EFFB1C5E946AA23A96F705A4AC13E1B421B1F7BC3DA260D3EE204AEC899`.
+
+**Tests and results**
+
+- Connected successfully to the Supabase session pooler over port 5432.
+- Archive created without an error on the successful attempt.
+- `pg_restore --list` read the archive successfully.
+- Data sections were confirmed for all eight public application tables: accounts, bookings, clash_reviews, customers, drivers, licensing_authorities, operator_users and vehicles.
+- The local and OneDrive copies produced the same SHA-256 fingerprint.
+- A full restore into an isolated test database has not yet been performed.
+
+**Live actions**
+
+- Read access was used to create the dump.
+- No schema, policy, configuration or record was changed.
+
+**Remaining backup release blocker**
+
+> The independent backup exists and has passed archive-integrity checks, but recovery is not yet proven until it has been restored into an isolated test database and the restored row counts have been verified.
+
+**Next exact task**
+
+> Restore this archive into an isolated temporary database, compare the eight public-table row counts with the recorded live counts, and document the result. Do not restore into production.

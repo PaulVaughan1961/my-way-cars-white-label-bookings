@@ -23,4 +23,8 @@ The inspection also confirmed that the public schema has no custom functions or 
 
 ## Current blocker
 
-The Supabase project was on the Free plan at this checkpoint and had no scheduled backups. No database migration is authorised until a secure backup method has been established and tested.
+The Supabase project was on the Free plan at this checkpoint and had no scheduled backups.
+
+On 28 August 2026, an independent PostgreSQL custom-format backup was created outside the repository. Its local and private OneDrive copies have the matching SHA-256 fingerprint `32D42EFFB1C5E946AA23A96F705A4AC13E1B421B1F7BC3DA260D3EE204AEC899`. The archive is readable and contains data sections for all eight public application tables.
+
+The remaining release blocker is an isolated restore test with row-count verification. No database migration is authorised until that restore test passes.
