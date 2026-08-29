@@ -317,13 +317,15 @@ These evidence files contain structure, policy definitions and counts only. They
 - Read-only SQL queries only.
 - No schema, policy, configuration or data changes.
 
-**Unresolved release blocker**
+**Database recovery checkpoint — PASSED (28 August 2026)**
 
-> The live database does not currently have a managed or independently tested recoverable backup.
+> A full production backup was restored into the isolated `my-way-cars-restore-test` project. All 8 application tables, row counts, 82 columns, 12 security policies, 29 constraints/indexes and the operator authentication link were verified. Production was not changed.
+
+**Result:** The database backup is recoverable.
 
 **Next exact task**
 
-> Establish and test a secure database backup method. Then design the business, membership and feature-entitlement model on paper and in migration files without applying it to production.
+> Review and harden the live database access policies.
 
 ### 28 August 2026 — Independent database backup created
 
