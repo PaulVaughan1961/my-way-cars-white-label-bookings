@@ -73,6 +73,9 @@ export default function BookingRequestPage() {
   const [returnDate, setReturnDate] = useState(initialDate);
   const [returnTime, setReturnTime] = useState(initialTime);
   const [returnFlightNumber, setReturnFlightNumber] = useState("");
+  const [returnPassengers, setReturnPassengers] = useState("1");
+  const [returnLargeBags, setReturnLargeBags] = useState("0");
+  const [returnSmallBags, setReturnSmallBags] = useState("0");
 
   const [notes, setNotes] = useState("");
 
@@ -99,6 +102,9 @@ export default function BookingRequestPage() {
     setReturnDate(freshDate);
     setReturnTime(freshTime);
     setReturnFlightNumber("");
+    setReturnPassengers("1");
+    setReturnLargeBags("0");
+    setReturnSmallBags("0");
     setNotes("");
     setErrorMessage("");
   }
@@ -191,6 +197,9 @@ export default function BookingRequestPage() {
 
       rows.push({
         ...sharedFields,
+        passengers: Number(returnPassengers || 1),
+        bags_large: Number(returnLargeBags || 0),
+        bags_small: Number(returnSmallBags || 0),
         pickup_address: resolvedReturnPickup,
         dropoff_address: resolvedReturnDropoff,
         pickup_datetime: returnDateTime,
@@ -465,6 +474,9 @@ export default function BookingRequestPage() {
                     setReverseReturn(true);
                     setReturnDate(pickupDate);
                     setReturnTime(pickupTime);
+                    setReturnPassengers(passengers || "1");
+                    setReturnLargeBags(largeBags || "0");
+                    setReturnSmallBags(smallBags || "0");
                     setReturnPickupAddress("");
                     setReturnDropoffAddress("");
                   } else {
@@ -533,9 +545,82 @@ export default function BookingRequestPage() {
                         autoComplete="off"
                         onChange={(e) => setReturnDropoffAddress(e.target.value)}
                       />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReturnDropoffAddress(pickupAddress.trim())
+                        }
+                        className="mt-2 rounded-lg bg-blue-100 px-3 py-2 text-xs font-semibold text-blue-800"
+                      >
+                        Return to my original pickup address
+                      </button>
                     </div>
                   </div>
                 )}
+
+                <div className="rounded-xl bg-gray-50 p-3">
+                  <div className="mb-2 text-sm font-semibold">
+                    Return passengers and luggage
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label htmlFor="return-passengers" className="text-xs font-medium">
+                        Passengers
+                      </label>
+                      <input
+                        id="return-passengers"
+                        required
+                        type="number"
+                        min="1"
+                        max="99"
+                        className={fieldClass}
+                        value={returnPassengers}
+                        onChange={(e) => setReturnPassengers(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="return-large-bags" className="text-xs font-medium">
+                        Large bags
+                      </label>
+                      <input
+                        id="return-large-bags"
+                        required
+                        type="number"
+                        min="0"
+                        max="99"
+                        className={fieldClass}
+                        value={returnLargeBags}
+                        onChange={(e) => setReturnLargeBags(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="return-small-bags" className="text-xs font-medium">
+                        Small bags
+                      </label>
+                      <input
+                        id="return-small-bags"
+                        required
+                        type="number"
+                        min="0"
+                        max="99"
+                        className={fieldClass}
+                        value={returnSmallBags}
+                        onChange={(e) => setReturnSmallBags(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReturnPassengers(passengers || "1");
+                      setReturnLargeBags(largeBags || "0");
+                      setReturnSmallBags(smallBags || "0");
+                    }}
+                    className="mt-2 text-xs font-semibold text-blue-700 underline"
+                  >
+                    Copy outward passenger and luggage figures
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

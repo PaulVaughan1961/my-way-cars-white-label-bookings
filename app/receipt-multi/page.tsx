@@ -84,8 +84,9 @@ if (bookings.length === 0) {
 }
 
 const isReceipt = type === "receipt";
+const isSummary = type === "summary";
 
-const documentNumber = `${isReceipt ? "R" : "INV"}-${Date.now()}`;
+const documentNumber = `${isReceipt ? "R" : isSummary ? "BOOK" : "INV"}-${Date.now()}`;
 
 const issueDate = new Date().toLocaleDateString("en-GB");
 
@@ -140,13 +141,13 @@ const total = bookings.reduce(
         </div>
 
         <h2 className="mb-4 text-3xl font-semibold">
-          {isReceipt ? "Receipt" : "Invoice"}
+          {isReceipt ? "Receipt" : isSummary ? "Booking Summary" : "Invoice"}
         </h2>
 
         <div className="mb-3">
           <div>
             <strong>
-              {isReceipt ? "Receipt #" : "Invoice #"}
+              {isReceipt ? "Receipt #" : isSummary ? "Reference #" : "Invoice #"}
             </strong>{" "}
             {documentNumber}
           </div>
@@ -158,22 +159,22 @@ const total = bookings.reduce(
 
 <div className="mb-4">
   <div className="mb-2 font-semibold">
-    {isReceipt ? "Customer:" : "Bill To:"}
+    {isReceipt || isSummary ? "Customer:" : "Bill To:"}
   </div>
 
   <div>
     {account?.account_name || billTo}
   </div>
 
-{account?.address || customer?.home_address ? (
+{!isSummary && (account?.address || customer?.home_address) ? (
   <div className="mt-1 whitespace-pre-line">
     {account?.address || customer?.home_address}
   </div>
-) : (
+) : !isSummary ? (
   <div className="mt-1 text-red-600">
     No address found
   </div>
-)}
+) : null}
 </div>
         <div className="mb-4">
           <div className="mb-2 font-semibold">
@@ -197,9 +198,11 @@ const total = bookings.reduce(
       Journey
     </th>
 
-    <th className="py-2 text-right w-28">
-      Fare
-    </th>
+    {!isSummary && (
+      <th className="py-2 text-right w-28">
+        Fare
+      </th>
+    )}
   </tr>
 </thead>
 
@@ -223,7 +226,14 @@ const total = bookings.reduce(
 
 {showPassengers && (
   <td className="py-4 align-top">
-    {booking.passenger_name}
+    <div>{booking.passenger_name}</div>
+    {isSummary && (
+      <div className="mt-2 text-xs text-gray-600">
+        <div>Passengers: {booking.passengers ?? "—"}</div>
+        <div>Large bags: {booking.bags_large ?? "—"}</div>
+        <div>Small bags: {booking.bags_small ?? "—"}</div>
+      </div>
+    )}
   </td>
 )}
 
@@ -250,14 +260,28 @@ const total = bookings.reduce(
                         </div>
                       </div>
 
+                      {isSummary && booking.return_flight_number ? (
+                        <div>
+                          <span className="font-semibold">FLIGHT:</span>{" "}
+                          {booking.return_flight_number}
+                        </div>
+                      ) : null}
+
+                      {isSummary && booking.notes ? (
+                        <div>
+                          <span className="font-semibold">NOTES:</span>{" "}
+                          <span className="whitespace-pre-line">{booking.notes}</span>
+                        </div>
+                      ) : null}
+
                     </div>
                   </td>
 
-                  <td className="py-4 text-right align-top">
-                    £{Number(
-                      booking.fare || 0
-                    ).toFixed(2)}
-                  </td>
+                  {!isSummary && (
+                    <td className="py-4 text-right align-top">
+                      £{Number(booking.fare || 0).toFixed(2)}
+                    </td>
+                  )}
 
                 </tr>
               ))}
@@ -265,13 +289,13 @@ const total = bookings.reduce(
           </table>
         </div>
 
-        <div className="mb-10 text-xl font-bold">
+        {!isSummary && <div className="mb-10 text-xl font-bold">
           {isReceipt
             ? `Total Price Paid: £${total.toFixed(2)}`
             : `Total For This Invoice: £${total.toFixed(2)}`}
-        </div>
+        </div>}
 
-        {!isReceipt && (
+        {!isReceipt && !isSummary && (
           <div className="mb-10 text-sm">
             <div>Please make payment to</div>
             <div>Monzo Business Account</div>
@@ -282,14 +306,16 @@ const total = bookings.reduce(
         )}
 
         <div className="mb-10 italic">
-          Thank you for choosing My Way Cars
+          {isSummary
+            ? "Please check these journey details and contact My Way Cars if anything needs changing."
+            : "Thank you for choosing My Way Cars"}
         </div>
 
         <button
           onClick={() => window.print()}
           className="w-full rounded-xl bg-black py-3 text-white print:hidden"
         >
-          Print
+          {isSummary ? "Print or Save as PDF" : "Print"}
         </button>
 
       </div>

@@ -141,7 +141,10 @@ const [pickupDate, setPickupDate] = useState(
   const [returnTime, setReturnTime] = useState("17:30");
   const [returnFlightNumber, setReturnFlightNumber] = useState("");
   const [returnPickupAddress, setReturnPickupAddress] = useState("");
-const [returnDropoffAddress, setReturnDropoffAddress] = useState("");
+  const [returnDropoffAddress, setReturnDropoffAddress] = useState("");
+  const [returnPax, setReturnPax] = useState("1");
+  const [returnBagsLarge, setReturnBagsLarge] = useState<number>(0);
+  const [returnBagsSmall, setReturnBagsSmall] = useState<number>(0);
   const [returnNotes, setReturnNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -272,7 +275,7 @@ const { data: driverData, error: driverError } = await supabase
   ]);
 
   function onCancel() {
-    router.push("/");
+    router.push("/dashboard");
   }
 
   function selectCustomer(customer: CustomerRow) {
@@ -380,6 +383,7 @@ local_authority: localAuthority || null,
     vehicle: vehicle || null,
     booking_type: bookingType || null,
     account_name: accountName.trim() || null,
+    return_group_id: returnGroupId,
   } as never,
 ]);
 
@@ -463,12 +467,12 @@ const returnInsert = await supabase.from("bookings").insert([
     payment_status: "Unpaid",
     created_at: new Date().toISOString(),
 
-    passengers: pax === "" ? 1 : Number(pax),
+    passengers: returnPax === "" ? 1 : Number(returnPax),
 
     via: via.trim() || null,
 
-    bags_large: bagsLarge,
-    bags_small: bagsSmall,
+    bags_large: returnBagsLarge,
+    bags_small: returnBagsSmall,
 
     local_authority: localAuthority.trim() || null,
 
@@ -500,7 +504,8 @@ if (returnInsert.error) {
 
 
 
-router.push("/");
+router.replace("/dashboard");
+router.refresh();
 setSaving(false);
 
     } catch (err) {
@@ -1026,7 +1031,15 @@ onClick={() => selectCustomer(customer)}
               <input
                 type="checkbox"
                 checked={hasReturn}
-                onChange={(e) => setHasReturn(e.target.checked)}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setHasReturn(checked);
+                  if (checked) {
+                    setReturnPax(pax || "1");
+                    setReturnBagsLarge(bagsLarge);
+                    setReturnBagsSmall(bagsSmall);
+                  }
+                }}
               />
               Return journey?
             </label>
@@ -1072,14 +1085,14 @@ Reverse pickup/dropoff for return
   </div>
 </div>
 
-{!reverseReturn && (
+	{!reverseReturn && (
   <>
-    <div>
+	    <div>
       <label className="text-sm font-medium">
         Return pickup address
       </label>
 
-      <input
+	      <input
         className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
         value={returnPickupAddress}
         onChange={(e) => setReturnPickupAddress(e.target.value)}
@@ -1096,11 +1109,81 @@ Reverse pickup/dropoff for return
         className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
         value={returnDropoffAddress}
         onChange={(e) => setReturnDropoffAddress(e.target.value)}
-        placeholder="e.g. 29 Culver Road, Winchester"
-      />
-    </div>
-  </>
-)}
+	        placeholder="e.g. 29 Culver Road, Winchester"
+	      />
+	      <div className="mt-2 flex flex-wrap gap-2">
+	        <button
+	          type="button"
+	          onClick={() => setReturnDropoffAddress(pickupAddress.trim())}
+	          className="rounded-lg bg-blue-100 px-3 py-2 text-xs font-semibold text-blue-800"
+	        >
+	          Use outward pickup address
+	        </button>
+	        {customerHomeAddress.trim() &&
+	        customerHomeAddress.trim() !== pickupAddress.trim() ? (
+	          <button
+	            type="button"
+	            onClick={() =>
+	              setReturnDropoffAddress(customerHomeAddress.trim())
+	            }
+	            className="rounded-lg bg-green-100 px-3 py-2 text-xs font-semibold text-green-800"
+	          >
+	            Use saved home address
+	          </button>
+	        ) : null}
+	      </div>
+	    </div>
+	  </>
+	)}
+
+	<div className="rounded-xl bg-gray-50 p-3">
+	  <div className="mb-2 text-sm font-semibold">
+	    Return passengers and luggage
+	  </div>
+	  <div className="grid grid-cols-3 gap-3">
+	    <div>
+	      <label className="text-xs font-medium">Passengers</label>
+	      <input
+	        type="number"
+	        min={1}
+	        className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3"
+	        value={returnPax}
+	        onChange={(e) => setReturnPax(e.target.value)}
+	      />
+	    </div>
+	    <div>
+	      <label className="text-xs font-medium">Large bags</label>
+	      <input
+	        type="number"
+	        min={0}
+	        className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3"
+	        value={returnBagsLarge}
+	        onChange={(e) => setReturnBagsLarge(Number(e.target.value || 0))}
+	      />
+	    </div>
+	    <div>
+	      <label className="text-xs font-medium">Small bags</label>
+	      <input
+	        type="number"
+	        min={0}
+	        className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3"
+	        value={returnBagsSmall}
+	        onChange={(e) => setReturnBagsSmall(Number(e.target.value || 0))}
+	      />
+	    </div>
+	  </div>
+	  <button
+	    type="button"
+	    onClick={() => {
+	      setReturnPax(pax || "1");
+	      setReturnBagsLarge(bagsLarge);
+	      setReturnBagsSmall(bagsSmall);
+	    }}
+	    className="mt-2 text-xs font-semibold text-blue-700 underline"
+	  >
+	    Copy outward passenger and luggage figures
+	  </button>
+	</div>
 
 <div>
   <label className="text-sm font-medium">

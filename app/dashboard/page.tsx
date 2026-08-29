@@ -383,18 +383,7 @@ function makeClashKey(a: string, b: string): string {
 }
 
 function DashboardContent() {
-  const [completedFlash, setCompletedFlash] =
-  useState<BookingRow | null>(() => {
-    if (typeof window === "undefined") return null;
-    const saved = window.sessionStorage.getItem("myWayCarsCompletedFlash");
-    if (!saved) return null;
-    try {
-      return JSON.parse(saved) as BookingRow;
-    } catch {
-      window.sessionStorage.removeItem("myWayCarsCompletedFlash");
-      return null;
-    }
-  });
+  const [completedFlash, setCompletedFlash] = useState<BookingRow | null>(null);
   const searchParams = useSearchParams();
   const focusBookingId = searchParams.get("focus");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -434,13 +423,12 @@ function DashboardContent() {
   const [cardModes, setCardModes] = useState<
     Record<string, "compact" | "normal" | "full">
   >({});
-  const [nowMs, setNowMs] = useState(Date.now());
+  const [nowMs, setNowMs] = useState(0);
   const [reviewedClashKeys, setReviewedClashKeys] = useState<string[]>([]);
   const [selectedClashBookingIds, setSelectedClashBookingIds] = useState<
     string[]
   >([]);
   const [selectedReturnGroupId, setSelectedReturnGroupId] = useState<string | null>(null);
-  const [selectedReturnSourceId, setSelectedReturnSourceId] = useState<string | null>(null);
 const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
 
 const [showPassengerNames, setShowPassengerNames] =
@@ -523,6 +511,15 @@ const [showPassengerNames, setShowPassengerNames] =
   }
 
 useEffect(() => {
+  const savedFlash = window.sessionStorage.getItem("myWayCarsCompletedFlash");
+  if (savedFlash) {
+    try {
+      setCompletedFlash(JSON.parse(savedFlash) as BookingRow);
+    } catch {
+      window.sessionStorage.removeItem("myWayCarsCompletedFlash");
+    }
+  }
+
   const saved = localStorage.getItem(
     "showPassengerNames"
   );
@@ -581,6 +578,7 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
+    setNowMs(Date.now());
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
     }, 60000);
@@ -901,12 +899,15 @@ const unpaidTotal = useMemo(() => {
   const linkedBookings = useMemo(() => {
     if (!selectedReturnGroupId) return [];
 
-    return bookings.filter(
-      (b) =>
-        b.return_group_id === selectedReturnGroupId &&
-        b.id !== selectedReturnSourceId
-    );
-  }, [bookings, selectedReturnGroupId, selectedReturnSourceId]);
+    return bookings
+      .filter((b) => b.return_group_id === selectedReturnGroupId)
+      .sort((a, b) => getWhenMs(a) - getWhenMs(b));
+  }, [bookings, selectedReturnGroupId]);
+
+  function openLinkedBookings(returnGroupId: string) {
+    setSelectedReturnGroupId(returnGroupId);
+    window.setTimeout(() => scrollToRefWithOffset(linkedSectionRef, 24), 0);
+  }
 
   const clashSummaryText = useMemo(() => {
     if (detectedClashes.length === 0) return "";
@@ -1383,9 +1384,17 @@ function toggleBookingSelection(id: string) {
         </span>
       ) : null}
       {booking.return_group_id ? (
-        <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            openLinkedBookings(booking.return_group_id!);
+          }}
+          className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-200"
+          title="Open both linked journeys"
+        >
           Linked
-        </span>
+        </button>
       ) : null}
 
       <div className="truncate">
@@ -1464,9 +1473,17 @@ function toggleBookingSelection(id: string) {
               )}
 
 {booking.return_group_id ? (
-  <div className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
+  <button
+    type="button"
+    onClick={(event) => {
+      event.stopPropagation();
+      openLinkedBookings(booking.return_group_id!);
+    }}
+    className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-200"
+    title="Open both linked journeys"
+  >
     Linked return booking
-  </div>
+  </button>
 ) : null}
 
 {booking.return_flight_number ? (
@@ -1731,7 +1748,7 @@ function toggleBookingSelection(id: string) {
     onChange={() => toggleBookingSelection(booking.id)}
    onClick={(e) => e.stopPropagation()}
   />
-  Select for Invoice / Receipt
+	  Select for document
 </label>
 
 <Link
@@ -2065,6 +2082,18 @@ ${vehicle || "To be confirmed"}${returnNote}`;
   Generate Receipt
 </button>
 
+<button
+  onClick={() => {
+    const ids = selectedBookings.join(",");
+    window.location.href =
+      `/receipt-multi?ids=${ids}` +
+      `&type=summary&showPassengers=true`;
+  }}
+  className="rounded-xl bg-purple-700 px-4 py-2 text-sm font-medium text-white"
+>
+  Booking Summary / PDF
+</button>
+
       <button
         onClick={() => setSelectedBookings([])}
         className="rounded-xl bg-slate-500 px-4 py-2 text-sm font-medium text-white"
@@ -2086,19 +2115,19 @@ ${vehicle || "To be confirmed"}${returnNote}`;
   </p>
 
   <div className="mt-2 text-sm font-medium text-slate-700">
-    {new Date(nowMs).toLocaleDateString("en-GB", {
+    {nowMs ? new Date(nowMs).toLocaleDateString("en-GB", {
       weekday: "long",
       day: "2-digit",
       month: "long",
       year: "numeric",
-    })}
+    }) : ""}
   </div>
 
   <div className="text-lg font-bold text-slate-900">
-    {new Date(nowMs).toLocaleTimeString("en-GB", {
+    {nowMs ? new Date(nowMs).toLocaleTimeString("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
-    })}
+    }) : ""}
   </div>
 </div>
 
@@ -2198,7 +2227,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                   });
 
                   setSelectedReturnGroupId(null);
-                  setSelectedReturnSourceId(null);
                 }}
                 className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
               >

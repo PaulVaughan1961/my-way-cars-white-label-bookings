@@ -30,6 +30,12 @@ type BookingRow = {
   return_datetime?: string | null;
   return_flight_number?: string | null;
   return_notes?: string | null;
+  return_group_id?: string | null;
+  driver_phone?: string | null;
+  driver_assignment_status?: string | null;
+  driver_assigned_at?: string | null;
+  driver_response_at?: string | null;
+  driver_decline_reason?: string | null;
 };
 
 type DriverRow = {
@@ -130,11 +136,13 @@ const [reverseReturn, setReverseReturn] = useState(true);
   const [drivers, setDrivers] = useState<DriverRow[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRow[]>([]);
   const [driverName, setDriverName] = useState("");
+  const [originalDriverName, setOriginalDriverName] = useState("");
 
   const [vehicle, setVehicle] = useState("");
   const [bookingType, setBookingType] = useState("");
   const [status, setStatus] = useState("Scheduled");
   const [paymentStatus, setPaymentStatus] = useState("Unpaid");
+  const [isLinkedBooking, setIsLinkedBooking] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -200,10 +208,12 @@ const { data: driverData, error: driverError } = await supabase
         setNotes(row.notes ?? "");
         setLocalAuthority(row.local_authority ?? "");
         setDriverName(row.driver_name ?? "");
+        setOriginalDriverName(row.driver_name ?? "");
         setVehicle(row.vehicle ?? "");
         setBookingType(row.booking_type ?? "");
         setStatus((row.status ?? "Scheduled").toString());
         setPaymentStatus((row.payment_status ?? "Unpaid").toString());
+        setIsLinkedBooking(Boolean(row.return_group_id));
         setHasReturn(!!row.return_datetime);
         setReturnDate(localDateFromIso(row.return_datetime));
         setReturnTime(localTimeFromIso(row.return_datetime));
@@ -240,7 +250,7 @@ const { data: driverData, error: driverError } = await supabase
   ]);
 
   function onCancel() {
-    router.push("/");
+    router.push("/dashboard");
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -267,6 +277,8 @@ const selectedDriver = drivers.find(
 );
 
 const driverPhone = selectedDriver?.driver_phone?.trim() || null;
+const driverChanged =
+  driverName.trim().toLowerCase() !== originalDriverName.trim().toLowerCase();
 
 const payload = {
   passenger_name: passengerName.trim(),
@@ -293,6 +305,14 @@ notes: notes.trim() || null,
     : null,
 return_flight_number: returnFlightNumber.trim() || null,
   return_notes: hasReturn ? returnNotes.trim() || null : null,
+  ...(driverChanged
+    ? {
+        driver_assignment_status: null,
+        driver_assigned_at: null,
+        driver_response_at: null,
+        driver_decline_reason: null,
+      }
+    : {}),
 };
 
       const { error } = await supabase
@@ -417,6 +437,21 @@ router.push(`/dashboard?focus=${id}`);
               value={dropoffAddress}
               onChange={(e) => setDropoffAddress(e.target.value)}
             />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">
+              Flight number <span className="font-normal text-gray-500">(if applicable)</span>
+            </label>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+              value={returnFlightNumber}
+              onChange={(e) => setReturnFlightNumber(e.target.value)}
+              placeholder="e.g. BA123"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Use this for an airport pickup, including a return leg entered earlier.
+            </p>
           </div>
 
           <div>
@@ -624,6 +659,7 @@ router.push(`/dashboard?focus=${id}`);
             </div>
           </div>
 
+{!isLinkedBooking && (
 <div className="border-t border-gray-200 pt-4">
   <label className="flex items-center gap-2 text-sm font-medium">
     <input
@@ -659,16 +695,6 @@ router.push(`/dashboard?focus=${id}`);
       </div>
 
       <div>
-        <label className="text-sm font-medium">Return flight number</label>
-        <input
-          className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
-          value={returnFlightNumber}
-          onChange={(e) => setReturnFlightNumber(e.target.value)}
-          placeholder="e.g. BA123"
-        />
-      </div>
-
-      <div>
         <label className="text-sm font-medium">Driver notes (return)</label>
         <textarea
           className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
@@ -681,6 +707,7 @@ router.push(`/dashboard?focus=${id}`);
     </div>
   )}
 </div>
+)}
 
           <button
             type="submit"
