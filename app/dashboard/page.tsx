@@ -388,6 +388,7 @@ function DashboardContent() {
   const focusBookingId = searchParams.get("focus");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [drivers, setDrivers] = useState<DriverOption[]>([]);
+  const [allDrivers, setAllDrivers] = useState<DriverOption[]>([]);
   const [assignmentChoices, setAssignmentChoices] = useState<
     Record<string, string>
   >({});
@@ -492,10 +493,13 @@ const [showPassengerNames, setShowPassengerNames] =
       return;
     }
 
+    const loadedDrivers = ((data as DriverOption[]) ?? []).filter((driver) =>
+      driver.name?.trim()
+    );
+
+    setAllDrivers(loadedDrivers);
     setDrivers(
-      ((data as DriverOption[]) ?? []).filter(
-        (driver) => driver.active !== false && driver.name?.trim()
-      )
+      loadedDrivers.filter((driver) => driver.active !== false)
     );
   }
 
@@ -590,6 +594,23 @@ const filteredBookings = useMemo(() => {
   const now = Date.now();
   const needle = searchTerm.trim().toLowerCase();
   const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
+  const matchingDriverNames = new Set<string>();
+  const matchingDriverPhones = new Set<string>();
+
+  if (needle) {
+    allDrivers.forEach((driver) => {
+      const driverName = driver.name.trim().toLowerCase();
+      const driverPhone = (driver.driver_phone ?? "").replace(/\D/g, "");
+      const matchesName = driverName.includes(needle);
+      const matchesPhone =
+        !!normalisedNeedle && driverPhone.includes(normalisedNeedle);
+
+      if (matchesName || matchesPhone) {
+        matchingDriverNames.add(driverName);
+        if (driverPhone) matchingDriverPhones.add(driverPhone);
+      }
+    });
+  }
 
   const sorted = [...bookings].sort((a, b) => {
     const aTime = getWhenMs(a);
@@ -706,13 +727,38 @@ const filteredBookings = useMemo(() => {
       .toLowerCase();
 
     const normalisedHaystack = haystack.replace(/[^\dA-Za-z]/g, "");
+    const bookingDriverName = getDriver(row).trim().toLowerCase();
+    const bookingDriverPhone = getDriverPhone(row).replace(/\D/g, "");
+    const matchesDriverRecord =
+      matchingDriverNames.has(bookingDriverName) ||
+      (!!bookingDriverPhone && matchingDriverPhones.has(bookingDriverPhone));
 
     return (
       haystack.includes(needle) ||
-      normalisedHaystack.includes(normalisedNeedle)
+      normalisedHaystack.includes(normalisedNeedle) ||
+      matchesDriverRecord
     );
   });
-}, [bookings, statusFilter, searchTerm]);
+}, [allDrivers, bookings, statusFilter, searchTerm]);
+
+const matchedDriverSearch = useMemo(() => {
+  const needle = searchTerm.trim().toLowerCase();
+  if (!needle) return null;
+
+  const normalisedNeedle = needle.replace(/\D/g, "");
+
+  return (
+    allDrivers.find((driver) => {
+      const driverName = driver.name.trim().toLowerCase();
+      const driverPhone = (driver.driver_phone ?? "").replace(/\D/g, "");
+
+      return (
+        driverName.includes(needle) ||
+        (!!normalisedNeedle && driverPhone.includes(normalisedNeedle))
+      );
+    }) ?? null
+  );
+}, [allDrivers, searchTerm]);
 
 const unpaidTotal = useMemo(() => {
   return bookings.reduce((sum, row) => {
@@ -2506,11 +2552,22 @@ ${vehicle || "To be confirmed"}${returnNote}`;
 
               <input
                 type="text"
-                placeholder="Search by name, phone, pickup, dropoff or notes"
+                list="booking-driver-suggestions"
+                placeholder="Search by passenger, driver, phone, address or notes"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSearchTerm(value);
+
+                  if (value.trim()) setStatusFilter("All");
+                }}
                 className="w-full rounded-2xl border-2 border-slate-300 bg-white py-3 pl-10 pr-4 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
               />
+              <datalist id="booking-driver-suggestions">
+                {allDrivers.map((driver) => (
+                  <option key={driver.id} value={driver.name} />
+                ))}
+              </datalist>
             </div>
           </div>
 
@@ -2551,7 +2608,11 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           {loading ? (
             <div className="text-sm text-slate-600">Loading bookings...</div>
           ) : filteredBookings.length === 0 ? (
-            <div className="text-sm text-slate-600">No bookings found.</div>
+            <div className="text-sm text-slate-600">
+              {matchedDriverSearch
+                ? `No booking cards are assigned to ${matchedDriverSearch.name}. Older jobs can only be found where that driver's name or phone number was saved on the booking.`
+                : "No bookings found."}
+            </div>
           ) : (
             <div className="space-y-4">
               {filteredBookings.map((booking) => (
