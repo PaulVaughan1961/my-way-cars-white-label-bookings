@@ -2552,7 +2552,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
 
               <input
                 type="text"
-                list="booking-driver-suggestions"
                 placeholder="Search by passenger, driver, phone, address or notes"
                 value={searchTerm}
                 onChange={(e) => {
@@ -2563,11 +2562,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 }}
                 className="w-full rounded-2xl border-2 border-slate-300 bg-white py-3 pl-10 pr-4 text-base shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-500"
               />
-              <datalist id="booking-driver-suggestions">
-                {allDrivers.map((driver) => (
-                  <option key={driver.id} value={driver.name} />
-                ))}
-              </datalist>
             </div>
           </div>
 
