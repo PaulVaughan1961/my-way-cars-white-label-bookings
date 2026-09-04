@@ -105,6 +105,7 @@ const [pickupDate, setPickupDate] = useState(
   const [pickupAddress, setPickupAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
   const [via, setVia] = useState("");
+  const [outboundFlightNumber, setOutboundFlightNumber] = useState("");
 
   const [pax, setPax] = useState("1");
   const [bagsLarge, setBagsLarge] = useState<number>(0);
@@ -247,6 +248,9 @@ const { data: driverData, error: driverError } = await supabase
     () => getNonResidentialReason(pickupAddress),
     [pickupAddress]
   );
+  const outboundNeedsFlightNumber =
+    bookingType === "Airport" &&
+    nonResidentialReason === "an airport or airport terminal";
   const homeAddressChoice =
     homeAddressChoiceOverride ?? (nonResidentialReason ? "other" : "home");
   const homeAddressChoiceOverridden = homeAddressChoiceOverride !== null;
@@ -382,6 +386,9 @@ local_authority: localAuthority || null,
     driver_phone: driverPhone || null,
     vehicle: vehicle || null,
     booking_type: bookingType || null,
+    return_flight_number: outboundNeedsFlightNumber
+      ? outboundFlightNumber.trim() || null
+      : null,
     account_name: accountName.trim() || null,
     return_group_id: returnGroupId,
   } as never,
@@ -1014,6 +1021,19 @@ onClick={() => selectCustomer(customer)}
               <option value="Seaport">Seaport</option>
             </select>
           </div>
+
+          {outboundNeedsFlightNumber ? (
+            <div>
+              <label className="text-sm font-medium">Flight number</label>
+              <input
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:ring-2 focus:ring-gray-200"
+                value={outboundFlightNumber}
+                onChange={(e) => setOutboundFlightNumber(e.target.value)}
+                placeholder="e.g. BA123"
+                autoComplete="off"
+              />
+            </div>
+          ) : null}
 
           <div>
             <label className="text-sm font-medium">Notes (optional)</label>
