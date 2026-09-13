@@ -37,6 +37,16 @@ type Driver = {
   active?: boolean | null;
 };
 
+type DriverBookingAction =
+  | "accept"
+  | "decline"
+  | "on_my_way"
+  | "pob"
+  | "complete_paid"
+  | "complete_unpaid"
+  | "mark_paid"
+  | "mark_unpaid";
+
 export default function DriverDashboardPage() {
   const supabase = getSupabase();
   const router = useRouter();
@@ -163,20 +173,31 @@ const driver = driverData as Driver | null;
     router.refresh();
   }
 
-  async function updatePaymentStatus(
+  async function runDriverBookingAction(
     jobId: string,
-    paymentStatus: string
+    action: DriverBookingAction,
+    declineReason: string | null = null
   ) {
+    const { error } = await supabase.rpc("driver_booking_action", {
+      requested_booking_id: jobId,
+      requested_action: action,
+      requested_decline_reason: declineReason,
+    });
+
+    return error;
+  }
+
+  async function updatePaymentStatus(jobId: string, paymentStatus: string) {
     const confirmed = window.confirm(
       `Are you sure you want to mark this job as ${paymentStatus}?`
     );
 
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("bookings")
-  .update({ payment_status: paymentStatus } as never)
-      .eq("id", jobId);
+    const error = await runDriverBookingAction(
+      jobId,
+      paymentStatus === "Paid" ? "mark_paid" : "mark_unpaid"
+    );
 
     if (error) {
       alert("Failed to update payment status");
@@ -192,17 +213,14 @@ const driver = driverData as Driver | null;
     );
   }
 
-  async function updateJobStatus(jobId: string, newStatus: string) {
+  async function markPassengerOnBoard(jobId: string) {
     const confirmed = window.confirm(
-      `Are you sure you want to change this job status to ${newStatus}?`
+      "Are you sure you want to mark this job POB?"
     );
 
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("bookings")
-   .update({ status: newStatus } as never)
-      .eq("id", jobId);
+    const error = await runDriverBookingAction(jobId, "pob");
 
     if (error) {
       alert("Failed to update booking status");
@@ -211,7 +229,7 @@ const driver = driverData as Driver | null;
 
     setJobs((prevJobs) =>
       prevJobs.map((job) =>
-        job.id === jobId ? { ...job, status: newStatus } : job
+        job.id === jobId ? { ...job, status: "POB" } : job
       )
     );
   }
@@ -237,15 +255,11 @@ const driver = driverData as Driver | null;
     );
     if (!confirmed) return;
 
-    const patch = {
-      driver_assignment_status: response,
-      driver_response_at: new Date().toISOString(),
-      driver_decline_reason: declineReason,
-    };
-    const { error } = await supabase
-      .from("bookings")
-      .update(patch as never)
-      .eq("id", jobId);
+    const error = await runDriverBookingAction(
+      jobId,
+      response === "Accepted" ? "accept" : "decline",
+      declineReason
+    );
 
     if (error) {
       window.alert(`Could not send your response: ${error.message}`);
@@ -258,7 +272,14 @@ const driver = driverData as Driver | null;
     } else {
       setJobs((current) =>
         current.map((job) =>
-          job.id === jobId ? { ...job, ...patch } : job
+          job.id === jobId
+            ? {
+                ...job,
+                driver_assignment_status: response,
+                driver_response_at: new Date().toISOString(),
+                driver_decline_reason: declineReason,
+              }
+            : job
         )
       );
       setExpandedJobIds((current) =>
@@ -276,13 +297,10 @@ const driver = driverData as Driver | null;
     );
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("bookings")
-      .update({
-        status: "Completed",
-        payment_status: paid ? "Paid" : "Unpaid",
-      } as never)
-      .eq("id", jobId);
+    const error = await runDriverBookingAction(
+      jobId,
+      paid ? "complete_paid" : "complete_unpaid"
+    );
 
     if (error) {
       window.alert(`Could not complete the job: ${error.message}`);
@@ -340,10 +358,7 @@ ${driverFirstName}`;
     // The text is for the customer; the saved status is for the operator.
     // Both need to happen when the driver presses "On My Way".
     void (async () => {
-      const { error } = await supabase
-        .from("bookings")
-        .update({ status: "On My Way" } as never)
-        .eq("id", jobId);
+      const error = await runDriverBookingAction(jobId, "on_my_way");
 
       if (error) {
         window.alert(
@@ -523,7 +538,7 @@ ${driverFirstName}`;
                 ) : null}
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <button
-                    onClick={() => updateJobStatus(job.id, "POB")}
+                    onClick={() => void markPassengerOnBoard(job.id)}
                     className="rounded-lg bg-blue-600 px-3 py-3 text-sm font-semibold text-white"
                   >
                     POB
@@ -558,12 +573,6 @@ ${driverFirstName}`;
                     className="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white"
                   >
                     Dropoff Map
-                  </button>
-                  <button
-                    onClick={() => updateJobStatus(job.id, "Scheduled")}
-                    className="rounded-lg bg-slate-500 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    Reset Status
                   </button>
                   <button
                     onClick={() => void completeJob(job.id, false)}

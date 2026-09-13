@@ -2,9 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { getSupabase } from "@/lib/supabase/client";
-
-const supabase = getSupabase();
 
 function todayYYYYMMDD() {
   const d = new Date();
@@ -25,24 +22,6 @@ function isoFromDateTime(dateStr: string, timeStr: string) {
   return `${dateStr}T${timeStr}:00`;
 }
 
-function buildNotes({
-  email,
-  flightNumber,
-  customerNotes,
-}: {
-  email: string;
-  flightNumber: string;
-  customerNotes: string;
-}) {
-  return [
-    email.trim() ? `Customer email: ${email.trim()}` : "",
-    flightNumber.trim() ? `Flight number: ${flightNumber.trim()}` : "",
-    customerNotes.trim() ? `Customer notes: ${customerNotes.trim()}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
 export default function BookingRequestPage() {
   const initialDate = todayYYYYMMDD();
   const initialTime = nowHHMM();
@@ -50,6 +29,7 @@ export default function BookingRequestPage() {
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [website, setWebsite] = useState("");
 
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
@@ -106,6 +86,7 @@ export default function BookingRequestPage() {
     setReturnLargeBags("0");
     setReturnSmallBags("0");
     setNotes("");
+    setWebsite("");
     setErrorMessage("");
   }
 
@@ -153,74 +134,63 @@ export default function BookingRequestPage() {
 
     setSaving(true);
 
-    const returnGroupId = hasReturn
-      ? `REQUEST-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      : null;
-
-    const sharedFields = {
-      passenger_name: passengerName.trim(),
-      passenger_phone: passengerPhone.trim(),
-      passengers: Number(passengers || 1),
-      bags_large: Number(largeBags || 0),
-      bags_small: Number(smallBags || 0),
-      account_name: accountName.trim() || null,
-      status: "Pending Approval",
-      payment_status: "Unpaid",
-      driver_name: null,
-      driver_phone: null,
-      vehicle: null,
-      return_group_id: returnGroupId,
+    const payload = {
+      website,
+      passengerName: passengerName.trim(),
+      passengerPhone: passengerPhone.trim(),
+      passengerEmail: passengerEmail.trim(),
+      accountName: accountName.trim(),
+      notes: notes.trim(),
+      outward: {
+        pickupAddress: pickupAddress.trim(),
+        dropoffAddress: dropoffAddress.trim(),
+        pickupDateTime: outwardDateTime,
+        flightNumber: flightNumber.trim(),
+        passengers: Number(passengers || 1),
+        largeBags: Number(largeBags || 0),
+        smallBags: Number(smallBags || 0),
+      },
+      returnJourney:
+        hasReturn && returnDateTime
+          ? {
+              pickupAddress: resolvedReturnPickup,
+              dropoffAddress: resolvedReturnDropoff,
+              pickupDateTime: returnDateTime,
+              flightNumber: returnFlightNumber.trim(),
+              passengers: Number(returnPassengers || 1),
+              largeBags: Number(returnLargeBags || 0),
+              smallBags: Number(returnSmallBags || 0),
+            }
+          : null,
     };
 
-    const outwardNotes = buildNotes({
-      email: passengerEmail,
-      flightNumber,
-      customerNotes: notes,
-    });
-
-    const rows: Record<string, unknown>[] = [
-      {
-        ...sharedFields,
-        pickup_address: pickupAddress.trim(),
-        dropoff_address: dropoffAddress.trim(),
-        pickup_datetime: outwardDateTime,
-        notes: outwardNotes || null,
-      },
-    ];
-
-    if (hasReturn && returnDateTime) {
-      const returnNotes = buildNotes({
-        email: passengerEmail,
-        flightNumber: returnFlightNumber,
-        customerNotes: notes,
+    try {
+      const response = await fetch("/api/booking-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
 
-      rows.push({
-        ...sharedFields,
-        passengers: Number(returnPassengers || 1),
-        bags_large: Number(returnLargeBags || 0),
-        bags_small: Number(returnSmallBags || 0),
-        pickup_address: resolvedReturnPickup,
-        dropoff_address: resolvedReturnDropoff,
-        pickup_datetime: returnDateTime,
-        return_flight_number: returnFlightNumber.trim() || null,
-        notes: returnNotes || null,
-      });
-    }
+      if (!response.ok) {
+        setErrorMessage(
+          result.error ||
+            "Your request could not be sent. Please try again or contact My Way Cars."
+        );
+        return;
+      }
 
-    const insert = await supabase.from("bookings").insert(rows as never);
-
-    setSaving(false);
-
-    if (insert.error) {
+      resetForm();
+      setSubmitted(true);
+    } catch {
       setErrorMessage(
         "Your request could not be sent. Please try again or contact My Way Cars."
       );
-      return;
+    } finally {
+      setSaving(false);
     }
-
-    resetForm();
-    setSubmitted(true);
   }
 
   if (submitted) {
@@ -276,6 +246,20 @@ export default function BookingRequestPage() {
           onSubmit={submitRequest}
           className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow"
         >
+          <div
+            aria-hidden="true"
+            className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+          >
+            <label htmlFor="website">Website</label>
+            <input
+              id="website"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={(event) => setWebsite(event.target.value)}
+            />
+          </div>
           <section className="space-y-4">
             <h2 className="font-semibold">Your details</h2>
 
