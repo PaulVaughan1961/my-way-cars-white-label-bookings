@@ -386,6 +386,7 @@ function DashboardContent() {
   const [completedFlash, setCompletedFlash] = useState<BookingRow | null>(null);
   const searchParams = useSearchParams();
   const focusBookingId = searchParams.get("focus");
+  const [businessDisplayName, setBusinessDisplayName] = useState("My Way Cars");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [drivers, setDrivers] = useState<DriverOption[]>([]);
   const [allDrivers, setAllDrivers] = useState<DriverOption[]>([]);
@@ -479,6 +480,26 @@ const [showPassengerNames, setShowPassengerNames] =
     }
   }
 
+  async function loadBusinessDisplayName() {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("business_profiles")
+      .select("display_name")
+      .single();
+
+    if (error) {
+      console.error("Could not load business display name:", error.message);
+      return;
+    }
+
+    const displayName =
+      typeof data?.display_name === "string" ? data.display_name.trim() : "";
+
+    if (displayName) {
+      setBusinessDisplayName(displayName);
+    }
+  }
+
   async function loadDrivers() {
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -545,6 +566,7 @@ useEffect(() => {
 }, [focusBookingId, loading, bookings.length]);
 
   useEffect(() => {
+    void loadBusinessDisplayName();
     void loadBookings();
     void loadReviewedClashes();
     void loadDrivers();
@@ -2153,7 +2175,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 <div>
   <h1 className="text-2xl font-bold text-slate-900">
-    My Way Cars
+    {businessDisplayName}
   </h1>
 
   <p className="text-sm text-slate-600">
