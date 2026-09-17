@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { usePublicBusinessName } from "@/lib/usePublicBusinessName";
 
 function todayYYYYMMDD() {
   const d = new Date();
@@ -23,6 +24,7 @@ function isoFromDateTime(dateStr: string, timeStr: string) {
 }
 
 export default function BookingRequestPage() {
+  const businessName = usePublicBusinessName();
   const initialDate = todayYYYYMMDD();
   const initialTime = nowHHMM();
 
@@ -177,7 +179,7 @@ export default function BookingRequestPage() {
       if (!response.ok) {
         setErrorMessage(
           result.error ||
-            "Your request could not be sent. Please try again or contact My Way Cars."
+            `Your request could not be sent. Please try again or contact ${businessName}.`
         );
         return;
       }
@@ -186,7 +188,7 @@ export default function BookingRequestPage() {
       setSubmitted(true);
     } catch {
       setErrorMessage(
-        "Your request could not be sent. Please try again or contact My Way Cars."
+        `Your request could not be sent. Please try again or contact ${businessName}.`
       );
     } finally {
       setSaving(false);
@@ -200,11 +202,11 @@ export default function BookingRequestPage() {
           <div className="mb-3 text-4xl" aria-hidden="true">✓</div>
           <h1 className="text-2xl font-bold">Request received</h1>
           <p className="mt-3 text-gray-700">
-            Thank you. My Way Cars will check availability and contact you
+            Thank you. {businessName} will check availability and contact you
             shortly.
           </p>
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            This is a booking request and is not confirmed until My Way Cars
+            This is a booking request and is not confirmed until {businessName}
             contacts you.
           </div>
           <button
@@ -218,7 +220,7 @@ export default function BookingRequestPage() {
             href="/"
             className="mt-4 block text-center text-sm text-blue-700 underline"
           >
-            Back to My Way Cars
+            Back to {businessName}
           </Link>
         </div>
       </main>
@@ -234,7 +236,7 @@ export default function BookingRequestPage() {
         <div className="mb-4">
           <h1 className="text-2xl font-bold">Request a journey</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Send your journey details and My Way Cars will confirm availability
+            Send your journey details and {businessName} will confirm availability
             and price.
           </p>
           <p className="mt-2 text-sm font-medium text-amber-800">

@@ -6,6 +6,10 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabase/client";
+import {
+  isMyWayCarsBusiness,
+  loadBusinessName,
+} from "@/lib/businessBranding";
 
 const supabase = getSupabase();
 
@@ -14,6 +18,7 @@ export default function ReceiptPage() {
   const id = params?.id as string;
 
   const [booking, setBooking] = useState<any>(null);
+  const [businessName, setBusinessName] = useState("Your operator");
 
   useEffect(() => {
     async function load() {
@@ -23,6 +28,11 @@ export default function ReceiptPage() {
         .eq("id", id)
         .single();
 
+      const loadedBusinessName = await loadBusinessName(
+        supabase,
+        "Your operator"
+      );
+      setBusinessName(loadedBusinessName);
       setBooking(data);
     }
 
@@ -40,6 +50,7 @@ const documentNumber = isReceipt
 const issueDate = new Date().toLocaleDateString("en-GB");
 
 const journeyLine = `${booking.pickup_address} → ${booking.dropoff_address}`;
+const isMyWayCars = isMyWayCarsBusiness(businessName);
 
   return (
 <main className="min-h-screen bg-white p-6">
@@ -47,23 +58,29 @@ const journeyLine = `${booking.pickup_address} → ${booking.dropoff_address}`;
 
     <div className="flex justify-between items-start mb-10">
 <div>
-  <Image
-    src="/logo.png"
-    alt="My Way Cars"
-    width={300}
-    height={100}
-    priority
-  />
+  {isMyWayCars ? (
+    <Image
+      src="/logo.png"
+      alt={businessName}
+      width={300}
+      height={100}
+      priority
+    />
+  ) : null}
 </div>
 
       <div className="text-right text-sm">
-        <div>MY WAY CARS</div>
-        <div>8 Kennet House</div>
-        <div>19 The High Street</div>
-        <div>Hungerford RG17 0NL</div>
-        <div>07792042081</div>
-        <div>hello@mywaycars.co.uk</div>
-        <div>www.mywaycars.co.uk</div>
+        <div>{businessName.toUpperCase()}</div>
+        {isMyWayCars ? (
+          <>
+            <div>8 Kennet House</div>
+            <div>19 The High Street</div>
+            <div>Hungerford RG17 0NL</div>
+            <div>07792042081</div>
+            <div>hello@mywaycars.co.uk</div>
+            <div>www.mywaycars.co.uk</div>
+          </>
+        ) : null}
       </div>
     </div>
 
@@ -115,15 +132,21 @@ const journeyLine = `${booking.pickup_address} → ${booking.dropoff_address}`;
     {!isReceipt && (
       <div className="mb-10 text-sm">
         <div>Please make payment to</div>
-        <div>Monzo Business Account</div>
-        <div>Account Name: My Way Cars Ltd</div>
-        <div>Account Number: 45791393</div>
-        <div>Sort Code: 04-00-03</div>
+        {isMyWayCars ? (
+          <>
+            <div>Monzo Business Account</div>
+            <div>Account Name: My Way Cars Ltd</div>
+            <div>Account Number: 45791393</div>
+            <div>Sort Code: 04-00-03</div>
+          </>
+        ) : (
+          <div>Please contact {businessName} for payment details.</div>
+        )}
       </div>
     )}
 
     <div className="italic mb-10">
-      Thank you for choosing My Way Cars
+      Thank you for choosing {businessName}
     </div>
 
     <button

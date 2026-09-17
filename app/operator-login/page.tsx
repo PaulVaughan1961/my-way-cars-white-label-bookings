@@ -236,7 +236,7 @@ function OperatorLoginForm() {
         className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Way Cars</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Operator Portal</h1>
           <p className="mt-1 text-sm text-slate-600">Operator login</p>
         </div>
 

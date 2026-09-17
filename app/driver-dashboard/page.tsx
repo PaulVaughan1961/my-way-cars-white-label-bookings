@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase/client";
+import {
+  DEFAULT_BUSINESS_NAME,
+  loadBusinessName,
+} from "@/lib/businessBranding";
 
 type Booking = {
   id: string;
@@ -54,6 +58,7 @@ export default function DriverDashboardPage() {
   const [email, setEmail] = useState("Loading...");
   const [status, setStatus] = useState("Checking...");
   const [driverName, setDriverName] = useState("");
+  const [businessName, setBusinessName] = useState(DEFAULT_BUSINESS_NAME);
   const [jobs, setJobs] = useState<Booking[]>([]);
   const [expandedJobIds, setExpandedJobIds] = useState<string[]>([]);
   const [showPastJobs, setShowPastJobs] = useState(false);
@@ -130,6 +135,7 @@ const driver = driverData as Driver | null;
       setEmail(user.email);
       setDriverName(driver.name);
       setStatus("Access confirmed");
+      setBusinessName(await loadBusinessName(supabase, "Your operator"));
 
       await refreshAssignedJobs(driver.name);
       bookingChannel = supabase
@@ -335,7 +341,7 @@ const driver = driverData as Driver | null;
     const driverFirstName =
       currentDriverName?.split(" ")[0] || "Driver";
 
-    const message = `Hello ${firstName}, this is ${driverFirstName}, I'm your My Way Cars driver. I just wanted to inform you that I am on my way to ${pickup} and will see you soon.
+    const message = `Hello ${firstName}, this is ${driverFirstName}, I'm your ${businessName} driver. I just wanted to inform you that I am on my way to ${pickup} and will see you soon.
 
 Regards
 ${driverFirstName}`;
@@ -606,7 +612,7 @@ ${driverFirstName}`;
       <div className="mx-auto max-w-3xl space-y-4">
         <header className="flex items-center justify-between gap-4 rounded-2xl bg-slate-950 p-4 text-white shadow-sm">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold">Driver Dashboard</h1>
+            <h1 className="text-xl font-bold">{businessName} Driver Dashboard</h1>
             <p className="truncate text-sm text-slate-300">{driverName || email}</p>
             <p className="mt-1 text-xs font-semibold text-green-300">● {status}</p>
           </div>

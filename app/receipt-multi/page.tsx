@@ -6,6 +6,10 @@ import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabase/client";
+import {
+  isMyWayCarsBusiness,
+  loadBusinessName,
+} from "@/lib/businessBranding";
 
 const supabase = getSupabase();
 
@@ -23,6 +27,7 @@ const showPassengers =
 
 const [account, setAccount] = useState<any>(null);
 const [customer, setCustomer] = useState<any>(null);
+const [businessName, setBusinessName] = useState("Your operator");
 
 useEffect(() => {
   async function load() {
@@ -40,6 +45,11 @@ useEffect(() => {
 
     const bookingsLoaded = (bookingData || []) as any[];
 
+    const loadedBusinessName = await loadBusinessName(
+      supabase,
+      "Your operator"
+    );
+    setBusinessName(loadedBusinessName);
     setBookings(bookingsLoaded);
     const firstPassenger =
   bookingsLoaded[0]?.passenger_name;
@@ -107,6 +117,7 @@ const total = bookings.reduce(
   (sum, booking) => sum + Number(booking.fare || 0),
   0
 );
+const isMyWayCars = isMyWayCarsBusiness(businessName);
 
   const sortedBookings = [...bookings].sort(
     (a, b) =>
@@ -120,23 +131,29 @@ const total = bookings.reduce(
 
         <div className="mb-4 flex items-start justify-between">
           <div>
-<Image
-  src="/logo.png"
-  alt="My Way Cars"
-  width={180}
-  height={60}
-  priority
-/>
+{isMyWayCars ? (
+  <Image
+    src="/logo.png"
+    alt={businessName}
+    width={180}
+    height={60}
+    priority
+  />
+) : null}
           </div>
 
           <div className="text-right text-sm">
-            <div>MY WAY CARS</div>
-            <div>8 Kennet House</div>
-            <div>19 The High Street</div>
-            <div>Hungerford RG17 0NL</div>
-            <div>07792042081</div>
-            <div>hello@mywaycars.co.uk</div>
-            <div>www.mywaycars.co.uk</div>
+            <div>{businessName.toUpperCase()}</div>
+            {isMyWayCars ? (
+              <>
+                <div>8 Kennet House</div>
+                <div>19 The High Street</div>
+                <div>Hungerford RG17 0NL</div>
+                <div>07792042081</div>
+                <div>hello@mywaycars.co.uk</div>
+                <div>www.mywaycars.co.uk</div>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -298,17 +315,23 @@ const total = bookings.reduce(
         {!isReceipt && !isSummary && (
           <div className="mb-10 text-sm">
             <div>Please make payment to</div>
-            <div>Monzo Business Account</div>
-            <div>Account Name: My Way Cars Ltd</div>
-            <div>Account Number: 45791393</div>
-            <div>Sort Code: 04-00-03</div>
+            {isMyWayCars ? (
+              <>
+                <div>Monzo Business Account</div>
+                <div>Account Name: My Way Cars Ltd</div>
+                <div>Account Number: 45791393</div>
+                <div>Sort Code: 04-00-03</div>
+              </>
+            ) : (
+              <div>Please contact {businessName} for payment details.</div>
+            )}
           </div>
         )}
 
         <div className="mb-10 italic">
           {isSummary
-            ? "Please check these journey details and contact My Way Cars if anything needs changing."
-            : "Thank you for choosing My Way Cars"}
+            ? `Please check these journey details and contact ${businessName} if anything needs changing.`
+            : `Thank you for choosing ${businessName}`}
         </div>
 
         <button

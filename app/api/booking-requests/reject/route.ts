@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { customerEmail, escapeHtml, notifyCustomer } from "@/lib/bookingRequestNotifications";
+import { loadBusinessName } from "@/lib/businessBranding";
 
 type RequestBody = { bookingId?: string; reason?: string };
 type BookingRequest = {
@@ -48,6 +49,10 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Your operator session has expired." }, { status: 401 });
     const { data: operator } = await supabase.from("operator_users").select("user_id").eq("user_id", user.id).maybeSingle();
     if (!operator) return NextResponse.json({ error: "Operator access required" }, { status: 403 });
+    const businessName = await loadBusinessName(
+      supabase,
+      "Your transport operator"
+    );
 
     const body = (await request.json()) as RequestBody;
     const bookingId = body.bookingId?.trim();
@@ -88,9 +93,9 @@ export async function POST(request: Request) {
     const notice = await notifyCustomer({
       phone: selected.passenger_phone,
       email: customerEmail(selected.notes),
-      subject: "My Way Cars booking request update",
-      plainText: `My Way Cars: Unfortunately, we cannot help with your ${label}: ${detail}. Reason: ${reason}.${continuation}`,
-      html: `<p>Dear ${escapeHtml(passenger)},</p><p>Unfortunately, we cannot help with your <strong>${escapeHtml(label)}</strong>.</p><p>${escapeHtml(detail)}</p><p><strong>Reason:</strong> ${escapeHtml(reason)}</p><p>${escapeHtml(continuation.trim())}</p><p>Kind regards,<br>My Way Cars</p>`,
+      subject: `${businessName} booking request update`,
+      plainText: `${businessName}: Unfortunately, we cannot help with your ${label}: ${detail}. Reason: ${reason}.${continuation}`,
+      html: `<p>Dear ${escapeHtml(passenger)},</p><p>Unfortunately, we cannot help with your <strong>${escapeHtml(label)}</strong>.</p><p>${escapeHtml(detail)}</p><p><strong>Reason:</strong> ${escapeHtml(reason)}</p><p>${escapeHtml(continuation.trim())}</p><p>Kind regards,<br>${escapeHtml(businessName)}</p>`,
     });
     await supabase.from("bookings").update({
       notes: appendAudit(rejectedNotes, `Customer notification: ${notice.detail}`),

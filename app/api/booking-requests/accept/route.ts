@@ -5,6 +5,7 @@ import {
   escapeHtml,
   notifyCustomer,
 } from "@/lib/bookingRequestNotifications";
+import { loadBusinessName } from "@/lib/businessBranding";
 
 type BookingRequest = {
   id: string;
@@ -75,6 +76,10 @@ export async function POST(request: Request) {
     if (!operator) {
       return NextResponse.json({ error: "Operator access required" }, { status: 403 });
     }
+    const businessName = await loadBusinessName(
+      supabase,
+      "Your transport operator"
+    );
 
     const { bookingId } = (await request.json()) as { bookingId?: string };
     if (!bookingId) {
@@ -120,14 +125,14 @@ export async function POST(request: Request) {
         ? " Both parts of your return booking are now confirmed."
         : "";
     const detail = journeyDescription(selected);
-    const plainText = `My Way Cars: Your ${label} is confirmed: ${detail}.${suffix} We will send driver details separately.`;
+    const plainText = `${businessName}: Your ${label} is confirmed: ${detail}.${suffix} We will send driver details separately.`;
     const passenger = selected.passenger_name?.trim() || "Customer";
     const notice = await notifyCustomer({
       phone: selected.passenger_phone,
       email: customerEmail(selected.notes),
-      subject: "My Way Cars booking confirmation",
+      subject: `${businessName} booking confirmation`,
       plainText,
-      html: `<p>Dear ${escapeHtml(passenger)},</p><p>Your <strong>${escapeHtml(label)}</strong> is confirmed.</p><p>${escapeHtml(detail)}</p><p>${escapeHtml(suffix.trim())}</p><p>We will send driver details separately.</p><p>Kind regards,<br>My Way Cars</p>`,
+      html: `<p>Dear ${escapeHtml(passenger)},</p><p>Your <strong>${escapeHtml(label)}</strong> is confirmed.</p><p>${escapeHtml(detail)}</p><p>${escapeHtml(suffix.trim())}</p><p>We will send driver details separately.</p><p>Kind regards,<br>${escapeHtml(businessName)}</p>`,
     });
 
     await supabase

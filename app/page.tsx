@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { usePublicBusinessName } from "@/lib/usePublicBusinessName";
 
 export default function Home() {
+  const businessName = usePublicBusinessName();
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-100">
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold text-gray-900">
-          My Way Cars
+          {businessName}
         </h1>
 
         <p className="text-lg text-gray-600">

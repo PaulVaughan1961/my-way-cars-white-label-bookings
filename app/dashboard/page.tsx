@@ -5,6 +5,10 @@ import OperatorLogoutButton from "@/app/components/OperatorLogoutButton";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
+import {
+  DEFAULT_BUSINESS_NAME,
+  loadBusinessName,
+} from "@/lib/businessBranding";
 
 type BookingRow = {
   id: string;
@@ -77,7 +81,10 @@ type ClashRow = {
   strong: boolean;
 };
 
-function buildDriverMessage(booking: any) {
+function buildDriverMessage(
+  booking: any,
+  businessName = DEFAULT_BUSINESS_NAME
+) {
   const passenger =
     booking.leadPassenger ??
     booking.lead_passenger ??
@@ -117,7 +124,7 @@ function buildDriverMessage(booking: any) {
 
   const notes = booking.notes ?? booking.outbound_notes ?? "None";
 
-  return `My Way Cars
+  return `${businessName}
 
 Passenger: ${passenger}
 Date: ${date}
@@ -386,7 +393,9 @@ function DashboardContent() {
   const [completedFlash, setCompletedFlash] = useState<BookingRow | null>(null);
   const searchParams = useSearchParams();
   const focusBookingId = searchParams.get("focus");
-  const [businessDisplayName, setBusinessDisplayName] = useState("My Way Cars");
+  const [businessDisplayName, setBusinessDisplayName] = useState(
+    DEFAULT_BUSINESS_NAME
+  );
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [drivers, setDrivers] = useState<DriverOption[]>([]);
   const [allDrivers, setAllDrivers] = useState<DriverOption[]>([]);
@@ -482,22 +491,7 @@ const [showPassengerNames, setShowPassengerNames] =
 
   async function loadBusinessDisplayName() {
     const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("business_profiles")
-      .select("display_name")
-      .single();
-
-    if (error) {
-      console.error("Could not load business display name:", error.message);
-      return;
-    }
-
-    const displayName =
-      typeof data?.display_name === "string" ? data.display_name.trim() : "";
-
-    if (displayName) {
-      setBusinessDisplayName(displayName);
-    }
+    setBusinessDisplayName(await loadBusinessName(supabase));
   }
 
   async function loadDrivers() {
@@ -1841,7 +1835,7 @@ function toggleBookingSelection(id: string) {
 
                 if (!driverPhone) return;
 
-                const message = `MY WAY CARS
+                const message = `${businessDisplayName.toUpperCase()}
 
 Passenger: ${name}
 Passenger Phone: ${displayOrDash(phone)}
@@ -1880,7 +1874,7 @@ ${cleanDisplayText(notes) || "None"}`;
 Please note: The driver for your return journey may be different. Full return details will be confirmed separately.`
                   : "";
 
-                const customerMessage = `MY WAY CARS
+                const customerMessage = `${businessDisplayName.toUpperCase()}
 
 Your booking is confirmed.
 

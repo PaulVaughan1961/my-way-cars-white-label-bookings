@@ -73,7 +73,7 @@ export default function OperatorResetPage() {
             Choose a new password
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            My Way Cars operator account
+            Operator account
           </p>
         </div>
 
