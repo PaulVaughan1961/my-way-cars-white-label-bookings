@@ -6,15 +6,20 @@ import {
   normaliseBusinessName,
 } from "@/lib/businessBranding";
 
-export function usePublicBusinessName() {
-  const [businessName, setBusinessName] = useState(DEFAULT_BUSINESS_NAME);
+export function usePublicBusinessName(businessSlug = "") {
+  const [businessName, setBusinessName] = useState(
+    businessSlug ? "Your transport operator" : DEFAULT_BUSINESS_NAME
+  );
 
   useEffect(() => {
     let active = true;
 
     async function load() {
       try {
-        const response = await fetch("/api/booking-requests", {
+        const query = businessSlug
+          ? `?business=${encodeURIComponent(businessSlug)}`
+          : "";
+        const response = await fetch(`/api/booking-requests${query}`, {
           cache: "no-store",
         });
         if (!response.ok) return;
@@ -29,7 +34,7 @@ export function usePublicBusinessName() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [businessSlug]);
 
   return businessName;
 }

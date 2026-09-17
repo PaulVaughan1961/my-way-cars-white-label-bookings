@@ -50,25 +50,49 @@ function serverClient(url: string, secretKey: string) {
   });
 }
 
-async function publicBusinessName(
-  supabase: ReturnType<typeof serverClient>,
-  businessId: string
-) {
-  const { data, error } = await supabase
-    .from("business_profiles")
-    .select("display_name")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Public business branding lookup failed:", error.message);
-    return DEFAULT_BUSINESS_NAME;
-  }
-
-  return normaliseBusinessName(data?.display_name);
+function validBusinessSlug(value: unknown) {
+  if (typeof value !== "string") return "";
+  const slug = value.trim().toLowerCase();
+  return /^[a-z0-9](?:[a-z0-9-]{1,78}[a-z0-9])?$/.test(slug)
+    ? slug
+    : "";
 }
 
-export async function GET() {
+async function resolvePublicBusiness(
+  supabase: ReturnType<typeof serverClient>,
+  fallbackBusinessId: string | undefined,
+  requestedSlug: unknown
+) {
+  const slug = validBusinessSlug(requestedSlug);
+  if (requestedSlug && !slug) return null;
+
+  const { data, error } = await supabase
+    .rpc("resolve_public_booking_business", {
+      requested_slug: slug || null,
+      fallback_business_id: fallbackBusinessId || null,
+    })
+    .maybeSingle();
+  if (error || !data) {
+    if (error) {
+      console.error("Public booking business lookup failed:", {
+        code: error.code,
+        message: error.message,
+      });
+    }
+    return null;
+  }
+  const result = data as {
+    business_id?: unknown;
+    display_name?: unknown;
+  };
+  if (!result.business_id) return null;
+  return {
+    businessId: String(result.business_id),
+    displayName: normaliseBusinessName(result.display_name),
+  };
+}
+
+export async function GET(request: Request) {
   const { url, secretKey, businessId } = publicBookingConfig();
 
   if (!url || !secretKey || !businessId) {
@@ -76,8 +100,19 @@ export async function GET() {
   }
 
   const supabase = serverClient(url, secretKey);
-  const displayName = await publicBusinessName(supabase, businessId);
-  return NextResponse.json({ displayName });
+  const requestedSlug = new URL(request.url).searchParams.get("business");
+  const resolved = await resolvePublicBusiness(
+    supabase,
+    businessId,
+    requestedSlug
+  );
+  if (!resolved) {
+    return NextResponse.json(
+      { error: "Public booking requests are not available." },
+      { status: 404 }
+    );
+  }
+  return NextResponse.json({ displayName: resolved.displayName });
 }
 
 export async function POST(request: Request) {
@@ -119,10 +154,23 @@ export async function POST(request: Request) {
     }
 
     const supabase = serverClient(url, secretKey);
-    const businessName = await publicBusinessName(supabase, businessId);
+    const requestedSlug = payload.businessSlug;
+    delete payload.businessSlug;
+    const resolved = await resolvePublicBusiness(
+      supabase,
+      businessId,
+      requestedSlug
+    );
+    if (!resolved) {
+      return NextResponse.json(
+        { error: "Public booking requests are not available." },
+        { status: 404 }
+      );
+    }
+    const businessName = resolved.displayName;
 
     const { error } = await supabase.rpc("submit_public_booking_request", {
-      requested_business_id: businessId,
+      requested_business_id: resolved.businessId,
       request_source_key: clientSource(request, secretKey),
       request_payload: payload,
     });
@@ -141,7 +189,7 @@ export async function POST(request: Request) {
     console.error("Public booking request route failed:", error);
     return NextResponse.json(
       {
-        error: `Your request could not be sent. Please try again or contact ${DEFAULT_BUSINESS_NAME}.`,
+        error: "Your request could not be sent. Please try again or contact your transport operator.",
       },
       { status: 400 }
     );

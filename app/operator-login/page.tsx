@@ -74,6 +74,7 @@ function OperatorLoginForm() {
   const searchParams = useSearchParams();
   const supabase = getSupabase();
   const urlReason = searchParams.get("error");
+  const registered = searchParams.get("registered") === "1";
   const urlErrorMessage =
     urlReason === "temporary-service"
       ? "The login service could not verify your access. Please wait a moment and try again."
@@ -95,6 +96,11 @@ function OperatorLoginForm() {
     errorMessage || (!hasInteracted ? urlErrorMessage : "");
   const displayedRetryPath =
     retryPath || (!hasInteracted ? urlRetryPath : "");
+  const displayedNoticeMessage =
+    noticeMessage ||
+    (!hasInteracted && registered
+      ? "Your email has been confirmed. Sign in to finish setting up your business."
+      : "");
 
   async function checkOperator(userId: string) {
     return withTimeout(async () =>
@@ -158,8 +164,8 @@ function OperatorLoginForm() {
       }
 
       if (!operatorResult.data) {
-        await supabase.auth.signOut();
-        setErrorMessage("This account does not have operator access.");
+        router.replace("/operator-onboarding");
+        router.refresh();
         return;
       }
 
@@ -270,9 +276,9 @@ function OperatorLoginForm() {
           </div>
         )}
 
-        {noticeMessage && (
+        {displayedNoticeMessage && (
           <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-            {noticeMessage}
+            {displayedNoticeMessage}
           </div>
         )}
 
@@ -303,6 +309,13 @@ function OperatorLoginForm() {
         >
           Forgotten your password?
         </button>
+
+        <a
+          href="/operator-register"
+          className="block text-center text-sm font-medium text-blue-700 underline"
+        >
+          Create an operator account
+        </a>
       </form>
     </main>
   );

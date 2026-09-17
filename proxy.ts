@@ -131,6 +131,10 @@ export async function proxy(request: NextRequest) {
       return loginRedirect(request, response, undefined, true);
     }
 
+    if (request.nextUrl.pathname.startsWith("/operator-onboarding")) {
+      return response;
+    }
+
     async function checkOperator() {
       return withTimeout(async () =>
         await supabase
@@ -174,6 +178,7 @@ export const config = {
     "/accounts/:path*",
     "/drivers/:path*",
     "/business-setup/:path*",
+    "/operator-onboarding/:path*",
     "/receipt/:path*",
     "/receipt-multi/:path*",
   ],

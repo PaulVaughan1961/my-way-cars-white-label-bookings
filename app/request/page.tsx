@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePublicBusinessName } from "@/lib/usePublicBusinessName";
 
 function todayYYYYMMDD() {
@@ -23,8 +24,10 @@ function isoFromDateTime(dateStr: string, timeStr: string) {
   return `${dateStr}T${timeStr}:00`;
 }
 
-export default function BookingRequestPage() {
-  const businessName = usePublicBusinessName();
+function BookingRequestForm() {
+  const searchParams = useSearchParams();
+  const businessSlug = searchParams.get("business")?.trim() ?? "";
+  const businessName = usePublicBusinessName(businessSlug);
   const initialDate = todayYYYYMMDD();
   const initialTime = nowHHMM();
 
@@ -137,6 +140,7 @@ export default function BookingRequestPage() {
     setSaving(true);
 
     const payload = {
+      businessSlug: businessSlug || undefined,
       website,
       passengerName: passengerName.trim(),
       passengerPhone: passengerPhone.trim(),
@@ -216,12 +220,14 @@ export default function BookingRequestPage() {
           >
             Make another request
           </button>
-          <Link
-            href="/"
-            className="mt-4 block text-center text-sm text-blue-700 underline"
-          >
-            Back to {businessName}
-          </Link>
+          {!businessSlug && (
+            <Link
+              href="/"
+              className="mt-4 block text-center text-sm text-blue-700 underline"
+            >
+              Back to {businessName}
+            </Link>
+          )}
         </div>
       </main>
     );
@@ -683,5 +689,21 @@ export default function BookingRequestPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function BookingRequestPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-700 shadow">
+            Loading booking form…
+          </div>
+        </main>
+      }
+    >
+      <BookingRequestForm />
+    </Suspense>
   );
 }
