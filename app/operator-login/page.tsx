@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabase/client";
 
@@ -45,10 +45,16 @@ function isCredentialError(error: unknown) {
     (error as { message?: unknown }).message ?? ""
   ).toLowerCase();
 
-  return (
-    message.includes("invalid login credentials") ||
-    message.includes("email not confirmed")
-  );
+  return message.includes("invalid login credentials");
+}
+
+function isEmailNotConfirmedError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const message = String(
+    (error as { message?: unknown }).message ?? ""
+  ).toLowerCase();
+
+  return message.includes("email not confirmed");
 }
 
 function reportLoginFailure(stage: string, error: unknown) {
@@ -74,9 +80,25 @@ function OperatorLoginForm() {
   const searchParams = useSearchParams();
   const supabase = getSupabase();
   const urlReason = searchParams.get("error");
-  const registered = searchParams.get("registered") === "1";
+  const urlErrorCode = searchParams.get("error_code");
+  const urlErrorDescription = searchParams.get("error_description") ?? "";
+  const verificationComplete =
+    searchParams.get("verification") === "complete" ||
+    searchParams.get("registered") === "1";
+  const confirmationFailed =
+    urlReason === "access_denied" ||
+    urlErrorCode === "otp_expired" ||
+    urlErrorDescription.toLowerCase().includes("expired") ||
+    urlErrorDescription.toLowerCase().includes("invalid");
+  const confirmationExpired =
+    urlErrorCode === "otp_expired" ||
+    urlErrorDescription.toLowerCase().includes("expired");
   const urlErrorMessage =
-    urlReason === "temporary-service"
+    confirmationFailed
+      ? confirmationExpired
+        ? "This verification link is invalid or has expired. Enter your email address and request a new link."
+        : "Email verification could not be completed. Enter your email address and request a new link."
+      : urlReason === "temporary-service"
       ? "The login service could not verify your access. Please wait a moment and try again."
       : urlReason === "not-operator"
         ? "This account does not have operator access."
@@ -90,6 +112,7 @@ function OperatorLoginForm() {
   const [errorMessage, setErrorMessage] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [retryPath, setRetryPath] = useState("");
+  const [showVerificationResend, setShowVerificationResend] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [loading, setLoading] = useState(false);
   const displayedErrorMessage =
@@ -98,9 +121,20 @@ function OperatorLoginForm() {
     retryPath || (!hasInteracted ? urlRetryPath : "");
   const displayedNoticeMessage =
     noticeMessage ||
-    (!hasInteracted && registered
-      ? "Your email has been confirmed. Sign in to finish setting up your business."
+    (!hasInteracted && verificationComplete && !confirmationFailed
+      ? "Email verification completed. Sign in to finish setting up your business."
       : "");
+  const displayedVerificationResend =
+    showVerificationResend || (!hasInteracted && confirmationFailed);
+
+  useEffect(() => {
+    const pendingEmail = window.sessionStorage.getItem(
+      "pendingOperatorEmail"
+    );
+    if (pendingEmail) {
+      setEmail((current) => current || pendingEmail);
+    }
+  }, []);
 
   async function checkOperator(userId: string) {
     return withTimeout(async () =>
@@ -121,6 +155,7 @@ function OperatorLoginForm() {
     setErrorMessage("");
     setNoticeMessage("");
     setRetryPath("");
+    setShowVerificationResend(false);
 
     try {
       const loginResult = await withTimeout(() =>
@@ -135,13 +170,22 @@ function OperatorLoginForm() {
           reportLoginFailure("password-sign-in", loginResult.error);
         }
 
-        setErrorMessage(
-          isCredentialError(loginResult.error)
-            ? "The email address or password is incorrect."
-            : "The login service is temporarily unavailable. Please wait a moment and try again."
-        );
+        if (isEmailNotConfirmedError(loginResult.error)) {
+          setErrorMessage(
+            "This email address has not been verified. Request a new verification link below."
+          );
+          setShowVerificationResend(true);
+        } else {
+          setErrorMessage(
+            isCredentialError(loginResult.error)
+              ? "The email address or password is incorrect."
+              : "The login service is temporarily unavailable. Please wait a moment and try again."
+          );
+        }
         return;
       }
+
+      window.sessionStorage.removeItem("pendingOperatorEmail");
 
       let operatorResult = await checkOperator(loginResult.data.user.id);
 
@@ -235,6 +279,56 @@ function OperatorLoginForm() {
     }
   }
 
+  async function resendVerification() {
+    setHasInteracted(true);
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setErrorMessage("Enter your email address first.");
+      setShowVerificationResend(true);
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage("");
+    setNoticeMessage("");
+    setRetryPath("");
+
+    try {
+      const result = await withTimeout(() =>
+        supabase.auth.resend({
+          type: "signup",
+          email: cleanEmail,
+          options: {
+            emailRedirectTo: `${window.location.origin}/operator-login?verification=complete`,
+          },
+        })
+      );
+
+      if (result.error) {
+        reportLoginFailure("verification-resend", result.error);
+        setErrorMessage(
+          "A new verification email could not be sent. Please wait a moment and try again."
+        );
+        setShowVerificationResend(true);
+        return;
+      }
+
+      window.sessionStorage.setItem("pendingOperatorEmail", cleanEmail);
+      setShowVerificationResend(false);
+      setNoticeMessage(
+        "A new verification email has been sent. Check your inbox and use the newest link."
+      );
+    } catch (error) {
+      reportLoginFailure("verification-resend-request", error);
+      setErrorMessage(
+        "The verification service took too long to respond. Please try again."
+      );
+      setShowVerificationResend(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <form
@@ -280,6 +374,17 @@ function OperatorLoginForm() {
           <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
             {displayedNoticeMessage}
           </div>
+        )}
+
+        {displayedVerificationResend && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void resendVerification()}
+            className="w-full rounded-xl border border-slate-900 px-4 py-3 font-medium text-slate-900 disabled:opacity-60"
+          >
+            Resend verification email
+          </button>
         )}
 
         {displayedRetryPath && (

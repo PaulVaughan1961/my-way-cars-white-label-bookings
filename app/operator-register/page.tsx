@@ -83,10 +83,15 @@ export default function OperatorRegisterPage() {
       }
 
       if (result.data.session) {
+        window.sessionStorage.removeItem("pendingOperatorEmail");
         router.replace("/operator-onboarding");
         router.refresh();
         return;
       }
+      window.sessionStorage.setItem(
+        "pendingOperatorEmail",
+        form.email.trim()
+      );
       setEmailSent(true);
     } catch {
       setErrorMessage("Registration is temporarily unavailable. Please try again.");
