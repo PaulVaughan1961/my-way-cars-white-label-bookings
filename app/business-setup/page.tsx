@@ -97,6 +97,10 @@ export default function BusinessSetupPage() {
               <div className="font-semibold text-amber-900">Next: drivers and vehicles</div>
               <p className="mt-1 text-sm text-amber-800">Add the people and vehicles used for bookings.</p>
             </div>
+            <Link href="/subscription" className="rounded-2xl border border-blue-200 bg-blue-50 p-4 transition hover:border-blue-400">
+              <div className="font-semibold text-blue-900">Trial and subscription</div>
+              <p className="mt-1 text-sm text-blue-800">Add your payment method and manage billing securely with Stripe.</p>
+            </Link>
           </div>
         </section>
 

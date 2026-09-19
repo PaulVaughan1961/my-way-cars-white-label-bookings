@@ -81,6 +81,20 @@ function loginRedirect(
   return redirect;
 }
 
+function subscriptionRedirect(
+  request: NextRequest,
+  cookieResponse: NextResponse
+) {
+  const subscriptionUrl = request.nextUrl.clone();
+  subscriptionUrl.pathname = "/subscription";
+  subscriptionUrl.search = "";
+  const redirect = NextResponse.redirect(subscriptionUrl);
+  cookieResponse.cookies.getAll().forEach((cookie) => {
+    redirect.cookies.set(cookie);
+  });
+  return redirect;
+}
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -161,6 +175,36 @@ export async function proxy(request: NextRequest) {
       return loginRedirect(request, response, "not-operator");
     }
 
+    if (request.nextUrl.pathname.startsWith("/subscription")) {
+      return response;
+    }
+
+    async function checkSubscription() {
+      return withTimeout(async () =>
+        await supabase
+          .rpc("get_current_subscription_status")
+          .maybeSingle()
+      );
+    }
+
+    let subscriptionResult = await checkSubscription();
+    if (subscriptionResult.error) {
+      await waitBeforeRetry();
+      subscriptionResult = await checkSubscription();
+    }
+
+    if (subscriptionResult.error) {
+      reportAuthFailure("subscription-check", subscriptionResult.error);
+      return loginRedirect(request, response, "temporary-service", true);
+    }
+
+    const subscription = subscriptionResult.data as {
+      access_mode?: "full" | "read_only" | "blocked";
+    } | null;
+    if (!subscription || subscription.access_mode !== "full") {
+      return subscriptionRedirect(request, response);
+    }
+
     return response;
   } catch (error) {
     reportAuthFailure("request", error);
@@ -178,6 +222,7 @@ export const config = {
     "/accounts/:path*",
     "/drivers/:path*",
     "/business-setup/:path*",
+    "/subscription/:path*",
     "/operator-onboarding/:path*",
     "/receipt/:path*",
     "/receipt-multi/:path*",
