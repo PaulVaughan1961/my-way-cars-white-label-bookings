@@ -100,6 +100,10 @@ export async function POST(request: Request) {
     if (!session.url) throw new Error("BILLING_UNAVAILABLE");
     return NextResponse.json({ url: session.url });
   } catch (error) {
+    console.error("Stripe checkout failed:", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : String(error),
+    });
     const response = billingErrorResponse(error);
     return NextResponse.json(
       { error: response.message },
