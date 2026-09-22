@@ -38,6 +38,14 @@ function remainingDays(value: string | null) {
 }
 
 function statusCopy(status: SubscriptionStatus) {
+  if (status.planKey === "legacy_full") {
+    return {
+      heading: "Permanent access included",
+      detail: "This business has full access with no subscription expiry.",
+      colour: "border-green-200 bg-green-50 text-green-900",
+    };
+  }
+
   const days = remainingDays(status.trialEndsAt);
   if (status.status === "trialing" && days !== null && days > 0) {
     return {
@@ -156,8 +164,10 @@ function SubscriptionPageContent() {
   }
 
   const copy = status ? statusCopy(status) : null;
+  const isLegacyAccess = status?.planKey === "legacy_full";
   const canStartCheckout =
     status &&
+    !isLegacyAccess &&
     (!status.hasStripeSubscription ||
       ["cancelled", "read_only", "unpaid"].includes(status.status));
 
@@ -169,7 +179,9 @@ function SubscriptionPageContent() {
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Subscription</h1>
               <p className="mt-1 text-sm text-slate-600">
-                Manage your trial, payment method and Stripe subscription.
+                {isLegacyAccess
+                  ? "Review your included permanent access."
+                  : "Manage your trial, payment method and Stripe subscription."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -206,18 +218,23 @@ function SubscriptionPageContent() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-slate-100 p-4">
                 <div className="text-sm text-slate-500">Plan</div>
-                <div className="mt-1 font-semibold text-slate-900">My Way Cars monthly</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {isLegacyAccess ? "Permanent included access" : "My Way Cars monthly"}
+                </div>
               </div>
               <div className="rounded-2xl bg-slate-100 p-4">
-                <div className="text-sm text-slate-500">Stripe status</div>
+                <div className="text-sm text-slate-500">
+                  {isLegacyAccess ? "Access status" : "Stripe status"}
+                </div>
                 <div className="mt-1 font-semibold capitalize text-slate-900">
-                  {status.status.replaceAll("_", " ")}
+                  {isLegacyAccess ? "Included" : status.status.replaceAll("_", " ")}
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              {!canStartCheckout ? (
+              {!isLegacyAccess && (
+                !canStartCheckout ? (
                 <button type="button" onClick={() => void openBilling("portal")} disabled={Boolean(action)} className="rounded-xl bg-slate-900 px-5 py-3 font-medium text-white disabled:opacity-60">
                   {action === "portal" ? "Opening Stripe…" : "Manage billing"}
                 </button>
@@ -229,15 +246,18 @@ function SubscriptionPageContent() {
                       ? "Restart subscription"
                       : "Set up subscription"}
                 </button>
+                )
               )}
               <button type="button" onClick={() => void loadStatus()} disabled={Boolean(action)} className="rounded-xl bg-slate-200 px-5 py-3 font-medium text-slate-900 disabled:opacity-60">
                 Refresh status
               </button>
             </div>
 
-            <p className="text-sm text-slate-600">
-              Card details are entered on Stripe&apos;s secure checkout and are not stored by My Way Cars.
-            </p>
+            {!isLegacyAccess && (
+              <p className="text-sm text-slate-600">
+                Card details are entered on Stripe&apos;s secure checkout and are not stored by My Way Cars.
+              </p>
+            )}
           </section>
         ) : null}
       </div>
