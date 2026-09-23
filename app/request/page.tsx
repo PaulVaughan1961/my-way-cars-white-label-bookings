@@ -220,14 +220,21 @@ function BookingRequestForm() {
           >
             Make another request
           </button>
-          {!businessSlug && (
+          {businessSlug === "my-way-cars" ? (
+            <a
+              href="https://www.hungerfordtaxis.com/"
+              className="mt-4 block text-center text-sm font-semibold text-blue-700 underline"
+            >
+              Return to My Way Cars website
+            </a>
+          ) : !businessSlug ? (
             <Link
               href="/"
               className="mt-4 block text-center text-sm text-blue-700 underline"
             >
               Back to {businessName}
             </Link>
-          )}
+          ) : null}
         </div>
       </main>
     );
