@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase/client";
 
@@ -10,6 +10,38 @@ const supabase = getSupabase();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    let redirecting = false;
+
+    async function restoreExistingSession() {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (!active || error || !user?.email) return;
+
+        const { data: driver, error: driverError } = await supabase
+          .from("drivers")
+          .select("*")
+          .eq("email", user.email)
+          .maybeSingle();
+        if (!active || driverError || !driver) return;
+        if (driver.is_active === false || driver.active === false) return;
+
+        redirecting = true;
+        router.replace("/driver-dashboard");
+        router.refresh();
+      } catch {
+        // A temporary network error must not clear the existing session.
+      } finally {
+        if (active && !redirecting) setCheckingSession(false);
+      }
+    }
+
+    void restoreExistingSession();
+    return () => { active = false; };
+  }, [router, supabase]);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,6 +57,14 @@ const supabase = getSupabase();
       router.push("/driver-dashboard");
       router.refresh();
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-slate-700">Checking your sign-in...</p>
+      </main>
+    );
   }
 
   return (

@@ -115,6 +115,7 @@ function OperatorLoginForm() {
   const [showVerificationResend, setShowVerificationResend] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const displayedErrorMessage =
     errorMessage || (!hasInteracted ? urlErrorMessage : "");
   const displayedRetryPath =
@@ -279,6 +280,70 @@ function OperatorLoginForm() {
     }
   }
 
+  useEffect(() => {
+    let active = true;
+    let redirecting = false;
+
+    async function restoreExistingSession() {
+      const nextPath = safeNextPath(
+        new URLSearchParams(window.location.search).get("next")
+      );
+
+      try {
+        const { data: { session }, error: sessionError } = await withTimeout(
+          () => supabase.auth.getSession()
+        );
+        if (!active) return;
+        if (sessionError) throw sessionError;
+        if (!session) return;
+
+        // The stored session can be stale. Verify it before entering a
+        // protected operator page or choosing a business workspace.
+        const { data: { user }, error: userError } = await withTimeout(
+          () => supabase.auth.getUser()
+        );
+        if (!active) return;
+        if (userError) throw userError;
+        if (!user) return;
+        const userId = user.id;
+
+        async function checkCurrentOperator() {
+          return withTimeout(async () =>
+            await supabase
+              .from("operator_users")
+              .select("user_id")
+              .eq("user_id", userId)
+              .maybeSingle()
+          );
+        }
+
+        let operatorResult = await checkCurrentOperator();
+        if (operatorResult.error) {
+          await waitBeforeRetry();
+          operatorResult = await checkCurrentOperator();
+        }
+        if (!active) return;
+        if (operatorResult.error) throw operatorResult.error;
+
+        redirecting = true;
+        router.replace(operatorResult.data ? nextPath : "/operator-onboarding");
+        router.refresh();
+      } catch (error) {
+        if (!active) return;
+        reportLoginFailure("restore-session", error);
+        setErrorMessage(
+          "We couldn't check your existing sign-in. Try again before entering your password."
+        );
+        setRetryPath(nextPath);
+      } finally {
+        if (active && !redirecting) setCheckingSession(false);
+      }
+    }
+
+    void restoreExistingSession();
+    return () => { active = false; };
+  }, [router, supabase]);
+
   async function resendVerification() {
     setHasInteracted(true);
     const cleanEmail = email.trim();
@@ -327,6 +392,14 @@ function OperatorLoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <p className="text-slate-700">Checking your sign-in...</p>
+      </main>
+    );
   }
 
   return (
