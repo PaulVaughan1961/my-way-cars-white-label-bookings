@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 
 const REQUEST_TIMEOUT_MS = 12000;
@@ -255,8 +256,24 @@ function OperatorLoginForm() {
     setRetryPath("");
 
     try {
+      // A reset email may be opened on another device or in another browser.
+      // Use an isolated implicit-flow client for the request so the link does
+      // not depend on a PKCE verifier stored in the requesting browser.
+      const recoveryClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          auth: {
+            flowType: "implicit",
+            storageKey: "operator-password-reset-request",
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        }
+      );
       const result = await withTimeout(() =>
-        supabase.auth.resetPasswordForEmail(cleanEmail, {
+        recoveryClient.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: `${window.location.origin}/operator-reset`,
         })
       );
