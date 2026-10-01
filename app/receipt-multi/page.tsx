@@ -28,6 +28,10 @@ const showPassengers =
 const [account, setAccount] = useState<any>(null);
 const [customer, setCustomer] = useState<any>(null);
 const [businessName, setBusinessName] = useState("Your operator");
+const [billingDocument, setBillingDocument] = useState<any>(null);
+const [documentError, setDocumentError] = useState("");
+const [updatingDocument, setUpdatingDocument] = useState(false);
+const [summaryReference] = useState(() => `BOOK-${Date.now()}`);
 
 useEffect(() => {
   async function load() {
@@ -51,6 +55,50 @@ useEffect(() => {
     );
     setBusinessName(loadedBusinessName);
     setBookings(bookingsLoaded);
+
+    if (type === "invoice" || type === "receipt") {
+      setBillingDocument(null);
+      setDocumentError("");
+
+      const { data: documentData, error: documentRpcError } =
+        await (supabase as any)
+          .rpc("get_or_create_billing_document", {
+            requested_type: type,
+            requested_booking_ids: ids,
+          })
+          .maybeSingle();
+
+      if (documentRpcError || !documentData) {
+        setDocumentError(
+          documentRpcError?.message ||
+            "Unable to create or load this billing document."
+        );
+        return;
+      }
+
+      const { data: storedDocument, error: storedDocumentError } =
+        await supabase
+          .from("billing_documents")
+          .select(
+            "id, document_number, issue_date, status, payment_status, total_amount, sent_at, paid_at, payment_method"
+          )
+          .eq("id", documentData.document_id)
+          .single();
+
+      if (storedDocumentError || !storedDocument) {
+        setDocumentError(
+          storedDocumentError?.message ||
+            "Unable to load the saved billing document."
+        );
+        return;
+      }
+
+      setBillingDocument({
+        ...storedDocument,
+        document_id: storedDocument.id,
+        document_status: storedDocument.status,
+      });
+    }
     const firstPassenger =
   bookingsLoaded[0]?.passenger_name;
 
@@ -87,7 +135,7 @@ setCustomer(customerData || null);
   }
 
   load();
-}, [idsParam]);
+}, [idsParam, type]);
 
 if (bookings.length === 0) {
   return <div className="p-6">Loading...</div>;
@@ -96,9 +144,111 @@ if (bookings.length === 0) {
 const isReceipt = type === "receipt";
 const isSummary = type === "summary";
 
-const documentNumber = `${isReceipt ? "R" : isSummary ? "BOOK" : "INV"}-${Date.now()}`;
+if (!isSummary && documentError) {
+  return (
+    <div className="mx-auto max-w-2xl p-6">
+      <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">
+        <div className="font-semibold">Document could not be loaded</div>
+        <div className="mt-2 text-sm">{documentError}</div>
+      </div>
+    </div>
+  );
+}
 
-const issueDate = new Date().toLocaleDateString("en-GB");
+if (!isSummary && !billingDocument) {
+  return <div className="p-6">Loading document...</div>;
+}
+
+async function markDocumentSent() {
+  if (!billingDocument?.document_id || updatingDocument) return;
+
+  const ok = window.confirm(
+    `Mark this ${isReceipt ? "receipt" : "invoice"} as sent?`
+  );
+
+  if (!ok) return;
+
+  setUpdatingDocument(true);
+
+  try {
+    const sentAt = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from("billing_documents")
+      .update({
+        status: "sent",
+        sent_at: sentAt,
+      })
+      .eq("id", billingDocument.document_id)
+      .select("status, sent_at")
+      .single();
+
+    if (error) throw error;
+
+    setBillingDocument((current: any) => ({
+      ...current,
+      document_status: data.status,
+      status: data.status,
+      sent_at: data.sent_at,
+    }));
+  } catch (error) {
+    window.alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to mark this document as sent."
+    );
+  } finally {
+    setUpdatingDocument(false);
+  }
+}
+
+async function markDocumentPaid() {
+  if (!billingDocument?.document_id || updatingDocument) return;
+
+  const ok = window.confirm(
+    "Mark this invoice and its linked booking(s) as paid?"
+  );
+
+  if (!ok) return;
+
+  setUpdatingDocument(true);
+
+  try {
+    const { data, error } = await (supabase as any)
+      .rpc("mark_billing_document_paid", {
+        requested_document_id: billingDocument.document_id,
+      })
+      .maybeSingle();
+
+    if (error || !data) {
+      throw error || new Error("Unable to mark invoice as paid.");
+    }
+
+    setBillingDocument((current: any) => ({
+      ...current,
+      payment_status: data.payment_status,
+      paid_at: data.paid_at,
+    }));
+  } catch (error) {
+    window.alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to mark invoice as paid."
+    );
+  } finally {
+    setUpdatingDocument(false);
+  }
+}
+
+const documentNumber = isSummary
+  ? summaryReference
+  : billingDocument.document_number;
+
+const issueDate = isSummary
+  ? new Date().toLocaleDateString("en-GB")
+  : new Date(
+      `${billingDocument.issue_date}T00:00:00`
+    ).toLocaleDateString("en-GB");
 
 const bookingAccountName =
   bookings.find(
@@ -172,6 +322,46 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
           <div>
             <strong>Date Issued:</strong> {issueDate}
           </div>
+
+          {!isSummary ? (
+            <div className="mt-2 print:hidden">
+              <strong>Status:</strong>{" "}
+              <span
+                className={
+                  billingDocument.document_status === "sent"
+                    ? "font-semibold text-green-700"
+                    : "font-semibold text-amber-700"
+                }
+              >
+                {billingDocument.document_status === "sent"
+                  ? "Sent"
+                  : "Created"}
+              </span>
+
+              {billingDocument.sent_at ? (
+                <span className="ml-2 text-gray-600">
+                  {new Date(billingDocument.sent_at).toLocaleString("en-GB")}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {!isSummary ? (
+            <div className="mt-2 print:hidden">
+              <strong>Payment:</strong>{" "}
+              <span
+                className={
+                  billingDocument.payment_status === "paid"
+                    ? "font-semibold text-green-700"
+                    : "font-semibold text-red-700"
+                }
+              >
+                {billingDocument.payment_status === "paid"
+                  ? "Paid"
+                  : "Unpaid"}
+              </span>
+            </div>
+          ) : null}
         </div>
 
 <div className="mb-4">
@@ -334,12 +524,35 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
             : `Thank you for choosing ${businessName}`}
         </div>
 
-        <button
-          onClick={() => window.print()}
-          className="w-full rounded-xl bg-black py-3 text-white print:hidden"
-        >
-          {isSummary ? "Print or Save as PDF" : "Print"}
-        </button>
+        <div className="flex gap-3 print:hidden">
+          {!isSummary &&
+          !isReceipt &&
+          billingDocument.payment_status !== "paid" ? (
+            <button
+              onClick={markDocumentPaid}
+              disabled={updatingDocument}
+              className="flex-1 rounded-xl bg-blue-700 py-3 text-white disabled:opacity-50"
+            >
+              {updatingDocument ? "Saving..." : "Mark as Paid"}
+            </button>
+          ) : null}
+          {!isSummary && billingDocument.document_status !== "sent" ? (
+            <button
+              onClick={markDocumentSent}
+              disabled={updatingDocument}
+              className="flex-1 rounded-xl bg-green-700 py-3 text-white disabled:opacity-50"
+            >
+              {updatingDocument ? "Saving..." : "Mark as Sent"}
+            </button>
+          ) : null}
+
+          <button
+            onClick={() => window.print()}
+            className="flex-1 rounded-xl bg-black py-3 text-white"
+          >
+            {isSummary ? "Print or Save as PDF" : "Print"}
+          </button>
+        </div>
 
       </div>
     </main>
