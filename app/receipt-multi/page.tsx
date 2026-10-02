@@ -591,7 +591,7 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
 
                   {!isSummary && (
                     <td className="py-4 text-right align-top">
-                      Â£{Number(booking.fare || 0).toFixed(2)}
+                      £{Number(booking.fare || 0).toFixed(2)}
                     </td>
                   )}
 
@@ -603,8 +603,8 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
 
         {!isSummary && <div className="mb-10 text-xl font-bold">
           {isReceipt
-            ? `Total Price Paid: Â£${total.toFixed(2)}`
-            : `Total For This Invoice: Â£${total.toFixed(2)}`}
+            ? `Total Price Paid: £${total.toFixed(2)}`
+            : `Total For This Invoice: £${total.toFixed(2)}`}
         </div>}
 
         {!isReceipt && !isSummary && (
