@@ -1065,6 +1065,20 @@ async function updateBooking(
   id: string,
   patch: Partial<BookingRow>
 ) {
+  if (patch.status === "Completed") {
+    const booking = bookings.find((row) => row.id === id);
+    const pickupMs = booking?.pickup_datetime
+      ? new Date(booking.pickup_datetime).getTime()
+      : Number.NaN;
+
+    if (pickupMs > Date.now()) {
+      const confirmed = window.confirm(
+        `WARNING: This journey has not happened yet.\n\nScheduled pickup: ${new Date(pickupMs).toLocaleString()}\n\nYou are about to mark this booking Completed and ${patch.payment_status === "Paid" ? "Paid" : "Unpaid"} before its scheduled pickup. It will disappear from Upcoming jobs.\n\nAre you sure you want to complete it early? Select OK to confirm, or Cancel to keep the booking unchanged.`
+      );
+      if (!confirmed) return;
+    }
+  }
+
   try {
     setBusyId(id);
     setErrorMessage("");
