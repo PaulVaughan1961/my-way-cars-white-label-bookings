@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -117,42 +117,49 @@ export default function BillingPage() {
     return map;
   }, [links]);
 
-  const activeReceiptDocumentIds = useMemo(
-    () =>
-      new Set(
-        documents
-          .filter(
-            (doc) =>
-              doc.document_type === "receipt" &&
-              doc.status !== "void" &&
-              doc.status !== "superseded"
-          )
-          .map((doc) => doc.id)
-      ),
-    [documents]
-  );
+  const activeReceiptBookingSets = useMemo(() => {
+    const sets = new Set<string>();
 
-  const bookingIdsWithReceipt = useMemo(() => {
-    const ids = new Set<string>();
+    for (const document of documents) {
+      if (
+        document.document_type !== "receipt" ||
+        document.status === "void" ||
+        document.status === "superseded"
+      ) {
+        continue;
+      }
 
-    for (const row of links) {
-      if (activeReceiptDocumentIds.has(row.document_id)) {
-        ids.add(row.booking_id);
+      const ids = bookingIdsByDocument.get(document.id) || [];
+
+      if (ids.length > 0) {
+        sets.add([...ids].sort().join(","));
       }
     }
 
-    return ids;
-  }, [links, activeReceiptDocumentIds]);
+    return sets;
+  }, [documents, bookingIdsByDocument]);
 
   const paidBookingsNeedingReceipt = useMemo(
     () =>
-      paidBookings.filter(
-        (booking) =>
-          booking.status !== "Cancelled" &&
-          booking.status !== "Rejected" &&
-          !bookingIdsWithReceipt.has(booking.id)
-      ),
-    [paidBookings, bookingIdsWithReceipt]
+      documents.filter((document) => {
+        if (
+          document.document_type !== "invoice" ||
+          document.payment_status !== "paid" ||
+          document.status === "void" ||
+          document.status === "superseded"
+        ) {
+          return false;
+        }
+
+        const ids = bookingIdsByDocument.get(document.id) || [];
+
+        if (ids.length === 0) return false;
+
+        return !activeReceiptBookingSets.has(
+          [...ids].sort().join(",")
+        );
+      }),
+    [documents, bookingIdsByDocument, activeReceiptBookingSets]
   );
 
   const activeDocuments = useMemo(
@@ -309,55 +316,54 @@ export default function BillingPage() {
 
         {filter === "receipts-needed" ? (
           <section className="rounded-3xl border bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-bold">Paid jobs needing a receipt</h2>
+            <h2 className="text-xl font-bold">
+              Paid invoices needing a receipt
+            </h2>
 
             {paidBookingsNeedingReceipt.length === 0 ? (
               <p className="mt-4 text-sm text-slate-600">
-                No paid bookings currently need a receipt.
+                No paid invoices currently need a receipt.
               </p>
             ) : (
               <div className="mt-4 space-y-3">
-                {paidBookingsNeedingReceipt.map((booking) => (
-                  <div
-                    key={booking.id}
-                    className="rounded-2xl border p-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">
-                          {booking.passenger_name || "Customer"}
+                {paidBookingsNeedingReceipt.map((invoice) => {
+                  const ids = bookingIdsByDocument.get(invoice.id) || [];
+
+                  return (
+                    <div
+                      key={invoice.id}
+                      className="rounded-2xl border p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">
+                            {invoice.document_number}
+                          </div>
+
+                          <div className="mt-1 text-sm text-slate-600">
+                            Paid invoice
+                            {" · "}
+                            {ids.length} booking
+                            {ids.length === 1 ? "" : "s"}
+                          </div>
+
+                          <div className="mt-2 font-semibold">
+                            {money(invoice.total_amount)}
+                          </div>
                         </div>
 
-                        <div className="mt-1 text-sm text-slate-600">
-                          {booking.pickup_datetime
-                            ? new Date(
-                                booking.pickup_datetime
-                              ).toLocaleString("en-GB")
-                            : "No journey date"}
-                        </div>
-
-                        <div className="mt-2 text-sm">
-                          {booking.pickup_address || "No pickup address"}
-                          {" → "}
-                          {booking.dropoff_address || "No dropoff address"}
-                        </div>
-
-                        <div className="mt-2 font-semibold">
-                          {money(booking.fare)}
-                        </div>
+                        <Link
+                          href={`/receipt-multi?ids=${encodeURIComponent(
+                            ids.join(",")
+                          )}&type=receipt`}
+                          className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white"
+                        >
+                          Create receipt
+                        </Link>
                       </div>
-
-                      <Link
-                        href={`/receipt-multi?ids=${encodeURIComponent(
-                          booking.id
-                        )}&type=receipt`}
-                        className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white"
-                      >
-                        Create receipt
-                      </Link>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
