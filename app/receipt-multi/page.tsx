@@ -80,7 +80,7 @@ useEffect(() => {
         await supabase
           .from("billing_documents")
           .select(
-            "id, document_number, issue_date, status, payment_status, total_amount, sent_at, paid_at, payment_method"
+            "id, document_number, issue_date, status, payment_status, total_amount, sent_at, paid_at, payment_method, document_snapshot"
           )
           .eq("id", documentData.document_id)
           .single();
@@ -90,6 +90,75 @@ useEffect(() => {
           storedDocumentError?.message ||
             "Unable to load the saved billing document."
         );
+        return;
+      }
+
+      const frozenDocumentSnapshot =
+        storedDocument.document_snapshot &&
+        typeof storedDocument.document_snapshot === "object"
+          ? (storedDocument.document_snapshot as any)
+          : null;
+
+      if (storedDocument.status === "sent") {
+        const { data: frozenRows, error: frozenRowsError } =
+          await supabase
+            .from("billing_document_bookings")
+            .select("line_position, booking_snapshot")
+            .eq("document_id", storedDocument.id)
+            .order("line_position", { ascending: true });
+
+        if (frozenRowsError) {
+          setDocumentError(
+            frozenRowsError.message ||
+              "Unable to load the frozen billing document."
+          );
+          return;
+        }
+
+        const frozenBookings = (frozenRows || [])
+          .map((row: any) => row.booking_snapshot)
+          .filter(Boolean);
+
+        if (frozenBookings.length === 0) {
+          setDocumentError(
+            "This sent billing document has no frozen booking snapshot."
+          );
+          return;
+        }
+
+        setBookings(frozenBookings);
+
+        if (frozenDocumentSnapshot?.business_name) {
+          setBusinessName(frozenDocumentSnapshot.business_name);
+        }
+
+        setAccount(
+          frozenDocumentSnapshot?.bill_to_name ||
+          frozenDocumentSnapshot?.bill_to_address
+            ? {
+                account_name:
+                  frozenDocumentSnapshot?.bill_to_name || null,
+                address:
+                  frozenDocumentSnapshot?.bill_to_address || null,
+              }
+            : null
+        );
+
+        setCustomer(
+          frozenDocumentSnapshot?.bill_to_address
+            ? {
+                home_address:
+                  frozenDocumentSnapshot.bill_to_address,
+              }
+            : null
+        );
+
+        setBillingDocument({
+          ...storedDocument,
+          document_id: storedDocument.id,
+          document_status: storedDocument.status,
+        });
+
         return;
       }
 
@@ -171,25 +240,61 @@ async function markDocumentSent() {
   setUpdatingDocument(true);
 
   try {
-    const sentAt = new Date().toISOString();
+    const documentSnapshot = {
+      business_name: businessName,
+      bill_to_name: account?.account_name || billTo,
+      bill_to_address:
+        account?.address || customer?.home_address || null,
+      show_passengers: showPassengers,
+      issuer: isMyWayCars
+        ? {
+            name: businessName,
+            address: [
+              "8 Kennet House",
+              "19 The High Street",
+              "Hungerford RG17 0NL",
+            ],
+            phone: "07792042081",
+            email: "hello@mywaycars.co.uk",
+            website: "www.mywaycars.co.uk",
+          }
+        : {
+            name: businessName,
+          },
+      payment_details:
+        !isReceipt && isMyWayCars
+          ? {
+              bank: "Monzo Business Account",
+              account_name: "My Way Cars Ltd",
+              account_number: "45791393",
+              sort_code: "04-00-03",
+            }
+          : null,
+    };
 
-    const { data, error } = await supabase
-      .from("billing_documents")
-      .update({
-        status: "sent",
-        sent_at: sentAt,
-      })
-      .eq("id", billingDocument.document_id)
-      .select("status, sent_at")
-      .single();
+    const { data, error } = await supabase.rpc(
+      "mark_billing_document_sent",
+      {
+        requested_document_id: billingDocument.document_id,
+        requested_document_snapshot: documentSnapshot,
+      }
+    );
 
     if (error) throw error;
 
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (!result) {
+      throw new Error("No document was returned after marking it sent.");
+    }
+
     setBillingDocument((current: any) => ({
       ...current,
-      document_status: data.status,
-      status: data.status,
-      sent_at: data.sent_at,
+      document_status: result.document_status,
+      status: result.document_status,
+      sent_at: result.document_sent_at,
+      total_amount: result.document_total_amount,
+      document_snapshot: result.frozen_snapshot,
     }));
   } catch (error) {
     window.alert(
@@ -436,9 +541,9 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
     <div>{booking.passenger_name}</div>
     {isSummary && (
       <div className="mt-2 text-xs text-gray-600">
-        <div>Passengers: {booking.passengers ?? "—"}</div>
-        <div>Large bags: {booking.bags_large ?? "—"}</div>
-        <div>Small bags: {booking.bags_small ?? "—"}</div>
+        <div>Passengers: {booking.passengers ?? "â€”"}</div>
+        <div>Large bags: {booking.bags_large ?? "â€”"}</div>
+        <div>Small bags: {booking.bags_small ?? "â€”"}</div>
       </div>
     )}
   </td>
@@ -486,7 +591,7 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
 
                   {!isSummary && (
                     <td className="py-4 text-right align-top">
-                      £{Number(booking.fare || 0).toFixed(2)}
+                      Â£{Number(booking.fare || 0).toFixed(2)}
                     </td>
                   )}
 
@@ -498,8 +603,8 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
 
         {!isSummary && <div className="mb-10 text-xl font-bold">
           {isReceipt
-            ? `Total Price Paid: £${total.toFixed(2)}`
-            : `Total For This Invoice: £${total.toFixed(2)}`}
+            ? `Total Price Paid: Â£${total.toFixed(2)}`
+            : `Total For This Invoice: Â£${total.toFixed(2)}`}
         </div>}
 
         {!isReceipt && !isSummary && (
