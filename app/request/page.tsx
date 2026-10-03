@@ -1,3 +1,5 @@
+import { Suspense as CustomerInstallSuspense } from "react";
+import CustomerPhoneInstall from "./CustomerPhoneInstall";
 import type { Metadata } from "next";
 import BookingRequestClient from "./BookingRequestClient";
 
@@ -35,5 +37,12 @@ export async function generateMetadata({
 }
 
 export default function BookingRequestPage() {
-  return <BookingRequestClient />;
+  return (
+    <>
+      <CustomerInstallSuspense fallback={null}>
+        <CustomerPhoneInstall />
+      </CustomerInstallSuspense>
+      <BookingRequestClient />
+    </>
+  );
 }
