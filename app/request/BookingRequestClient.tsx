@@ -1,4 +1,5 @@
 "use client";
+import BookingRequestFinished from "./BookingRequestFinished";
 
 import Link from "next/link";
 import { Suspense, useState } from "react";
@@ -235,6 +236,7 @@ function BookingRequestForm() {
               Back to {businessName}
             </Link>
           ) : null}
+        <BookingRequestFinished />
         </div>
       </main>
     );
