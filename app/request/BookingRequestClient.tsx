@@ -211,8 +211,7 @@ function BookingRequestForm() {
             shortly.
           </p>
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            This is a booking request and is not confirmed until {businessName}
-            contacts you.
+            This is a booking request and is not confirmed until {businessName}{" "}contacts you.
           </div>
           <button
             type="button"
