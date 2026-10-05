@@ -9,6 +9,7 @@ function env() {
     anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     secretKey:
       process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+    fallbackBusinessId: process.env.PUBLIC_BOOKING_BUSINESS_ID,
   };
 }
 
@@ -22,11 +23,15 @@ function privilegedClient(url: string, key: string) {
   });
 }
 
+function cleanString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
 async function operatorContext(request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return { error: "Not signed in", status: 401 as const };
 
-  const { url, anonKey, secretKey } = env();
+  const { url, anonKey, secretKey, fallbackBusinessId } = env();
   if (!url || !anonKey || !secretKey) {
     return { error: "Supabase is not configured", status: 500 as const };
   }
@@ -44,28 +49,67 @@ async function operatorContext(request: Request) {
     return { error: "Your operator session has expired.", status: 401 as const };
   }
 
-  const privileged = privilegedClient(url, secretKey);
-  const { data: operator, error } = await privileged
+  // Verify operator access using the same authenticated/RLS-aware pattern
+  // already used elsewhere in the application.
+  const { data: operator, error: operatorError } = await authClient
     .from("operator_users")
     .select("*")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (error || !operator) {
+  if (operatorError || !operator) {
     return { error: "Operator access required", status: 403 as const };
   }
 
-  const row = operator as Record<string, unknown>;
-  const rawBusinessId = row.business_id ?? row.account_id ?? row.tenant_id;
+  // Resolve the operator's own business through business_profiles under RLS.
+  // This avoids guessing that an operator_users account/tenant field is the
+  // same identifier used by public booking/review business resolution.
+  const { data: profile, error: profileError } = await authClient
+    .from("business_profiles")
+    .select("*")
+    .single();
+
+  if (profileError || !profile) {
+    return {
+      error: "Could not resolve this operator's business.",
+      status: 500 as const,
+    };
+  }
+
+  const privileged = privilegedClient(url, secretKey);
+  const profileRow = profile as Record<string, unknown>;
+  const operatorRow = operator as Record<string, unknown>;
+
+  // If the business profile exposes a slug, use the same authoritative RPC
+  // used by the public booking/review routes.
+  const slug = cleanString(profileRow.slug);
+  if (slug) {
+    const { data: resolved, error: resolveError } = await privileged
+      .rpc("resolve_public_booking_business", {
+        requested_slug: slug,
+        fallback_business_id: fallbackBusinessId || null,
+      })
+      .maybeSingle();
+
+    const row = resolved as { business_id?: unknown } | null;
+    const resolvedId = cleanString(row?.business_id);
+
+    if (!resolveError && resolvedId) {
+      return { privileged, userId: user.id, businessId: resolvedId };
+    }
+  }
+
+  // Fall back to identifiers from the RLS-scoped business profile itself.
   const businessId =
-    typeof rawBusinessId === "string" && rawBusinessId.trim()
-      ? rawBusinessId.trim()
-      : "";
+    cleanString(profileRow.business_id) ||
+    cleanString(profileRow.id) ||
+    cleanString(profileRow.account_id) ||
+    cleanString(profileRow.tenant_id) ||
+    cleanString(operatorRow.business_id);
 
   if (!businessId) {
     return {
-      error:
-        "This operator account is not linked to a business for review moderation.",
+      error: "This operator account is not linked to a review business.",
       status: 500 as const,
     };
   }
@@ -81,7 +125,9 @@ export async function GET(request: Request) {
 
   const { data, error } = await context.privileged
     .from("customer_reviews")
-    .select("id,reviewer_name,reviewer_area,journey_type,rating,review_text,status,created_at")
+    .select(
+      "id,reviewer_name,reviewer_area,journey_type,rating,review_text,status,created_at"
+    )
     .eq("business_id", context.businessId)
     .order("created_at", { ascending: false })
     .limit(200);
