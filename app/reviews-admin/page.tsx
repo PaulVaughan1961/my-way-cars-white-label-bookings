@@ -131,7 +131,7 @@ export default function ReviewsAdminPage() {
                         <p className="text-sm text-[#696772]">
                           {[review.reviewer_area, review.journey_type]
                             .filter(Boolean)
-                            .join(" \u00b7 ")}
+                            .join(" Â· ")}
                         </p>
                       </div>
                       <div className="font-semibold">{review.rating} / 5 {"\u2605"}</div>
@@ -176,6 +176,15 @@ export default function ReviewsAdminPage() {
                   <p className="mt-2 line-clamp-2 text-sm text-[#696772]">
                     {review.review_text}
                   </p>
+                  {review.status === "approved" && (
+                    <button
+                      disabled={busyId === review.id}
+                      onClick={() => void moderate(review.id, "reject")}
+                      className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      Remove from public
+                    </button>
+                  )}
                 </div>
               ))}
             </section>
