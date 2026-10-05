@@ -16,8 +16,8 @@ type Review = {
 function Stars({ rating }: { rating: number }) {
   return (
     <span aria-label={`${rating} out of 5 stars`} className="tracking-wide text-amber-500">
-      {"â˜…â˜…â˜…â˜…â˜…".slice(0, rating)}
-      <span className="text-slate-300">{"â˜…â˜…â˜…â˜…â˜…".slice(rating)}</span>
+      {"\u2605\u2605\u2605\u2605\u2605".slice(0, rating)}
+      <span className="text-slate-300">{"\u2605\u2605\u2605\u2605\u2605".slice(rating)}</span>
     </span>
   );
 }
@@ -172,7 +172,7 @@ function ReviewsContent() {
                         : "border-slate-300 bg-white"
                     }`}
                   >
-                    {value} â˜…
+                    {value} {"\u2605"}
                   </button>
                 ))}
               </div>

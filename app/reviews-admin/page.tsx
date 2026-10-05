@@ -134,7 +134,7 @@ export default function ReviewsAdminPage() {
                             .join(" Â· ")}
                         </p>
                       </div>
-                      <div className="font-semibold">{review.rating} / 5 â˜…</div>
+                      <div className="font-semibold">{review.rating} / 5 {"\u2605"}</div>
                     </div>
                     <p className="mt-4 whitespace-pre-wrap text-slate-700">
                       {review.review_text}
