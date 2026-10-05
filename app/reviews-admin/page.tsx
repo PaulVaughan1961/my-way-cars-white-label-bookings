@@ -131,7 +131,7 @@ export default function ReviewsAdminPage() {
                         <p className="text-sm text-[#696772]">
                           {[review.reviewer_area, review.journey_type]
                             .filter(Boolean)
-                            .join(" Â· ")}
+                            .join(" \u00b7 ")}
                         </p>
                       </div>
                       <div className="font-semibold">{review.rating} / 5 {"\u2605"}</div>
