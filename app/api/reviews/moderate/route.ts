@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { loadBusinessName } from "@/lib/businessBranding";
 
 type ReviewAction = "approve" | "reject";
 
@@ -13,8 +14,8 @@ function config() {
   };
 }
 
-function stringValue(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
+function normalise(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 async function context(request: Request) {
@@ -39,22 +40,21 @@ async function context(request: Request) {
     return { error: "Your operator session has expired.", status: 401 as const };
   }
 
-  const { data: operator, error: operatorError } = await operatorClient
+  const { data: operator } = await operatorClient
     .from("operator_users")
-    .select("*")
+    .select("user_id")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (operatorError || !operator) {
+  if (!operator) {
     return { error: "Operator access required", status: 403 as const };
   }
 
-  const { data: profile, error: profileError } = await operatorClient
-    .from("business_profiles")
-    .select("*")
-    .single();
+  // Use the existing RLS-scoped branding lookup to identify which business
+  // the signed-in operator belongs to. This avoids guessing at hidden IDs.
+  const operatorBusinessName = await loadBusinessName(operatorClient, "");
 
-  if (profileError || !profile) {
+  if (!operatorBusinessName) {
     return {
       error: "Could not identify this operator's business.",
       status: 500 as const,
@@ -69,7 +69,7 @@ async function context(request: Request) {
     },
   });
 
-  // Resolve exactly the same business used by the public customer review page.
+  // Resolve the exact same public business used by the customer review page.
   const { data: resolved, error: resolveError } = await admin
     .rpc("resolve_public_booking_business", {
       requested_slug: "my-way-cars",
@@ -77,40 +77,22 @@ async function context(request: Request) {
     })
     .maybeSingle();
 
-  const resolvedRow = resolved as { business_id?: unknown } | null;
-  const businessId = stringValue(resolvedRow?.business_id);
+  const row = resolved as
+    | { business_id?: unknown; display_name?: unknown }
+    | null;
 
-  if (resolveError || !businessId) {
+  if (resolveError || !row?.business_id) {
     return {
       error: "Could not resolve the My Way Cars review business.",
       status: 500 as const,
     };
   }
 
-  // Tenant safety:
-  // RLS has already limited these rows to the signed-in operator.
-  // Verify that the resolved public business ID appears in one of the
-  // operator/profile ownership ID fields. Do not compare display names.
-  const profileRow = profile as Record<string, unknown>;
-  const operatorRow = operator as Record<string, unknown>;
-
-  const ownedIds = new Set(
-    [
-      profileRow.business_id,
-      profileRow.account_id,
-      profileRow.tenant_id,
-      profileRow.id,
-      operatorRow.business_id,
-      operatorRow.account_id,
-      operatorRow.tenant_id,
-    ]
-      .map(stringValue)
-      .filter(Boolean)
-  );
-
-  if (!ownedIds.has(businessId)) {
+  // Safety check: the signed-in operator's RLS-scoped business name must
+  // match the public business before moderation is allowed.
+  if (normalise(operatorBusinessName) !== normalise(row.display_name)) {
     return {
-      error: "This operator account is not linked to the review business.",
+      error: "This operator account does not match the review business.",
       status: 403 as const,
     };
   }
@@ -118,7 +100,7 @@ async function context(request: Request) {
   return {
     admin,
     userId: user.id,
-    businessId,
+    businessId: String(row.business_id),
   };
 }
 
