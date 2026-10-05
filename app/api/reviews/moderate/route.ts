@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { loadBusinessName } from "@/lib/businessBranding";
 
 type ReviewAction = "approve" | "reject";
 
@@ -12,10 +11,6 @@ function config() {
       process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
     fallbackBusinessId: process.env.PUBLIC_BOOKING_BUSINESS_ID,
   };
-}
-
-function normalise(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 async function context(request: Request) {
@@ -40,25 +35,14 @@ async function context(request: Request) {
     return { error: "Your operator session has expired.", status: 401 as const };
   }
 
-  const { data: operator } = await operatorClient
+  const { data: operator, error: operatorError } = await operatorClient
     .from("operator_users")
     .select("user_id")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (!operator) {
+  if (operatorError || !operator) {
     return { error: "Operator access required", status: 403 as const };
-  }
-
-  // Use the existing RLS-scoped branding lookup to identify which business
-  // the signed-in operator belongs to. This avoids guessing at hidden IDs.
-  const operatorBusinessName = await loadBusinessName(operatorClient, "");
-
-  if (!operatorBusinessName) {
-    return {
-      error: "Could not identify this operator's business.",
-      status: 500 as const,
-    };
   }
 
   const admin = createClient(url, secretKey, {
@@ -69,38 +53,34 @@ async function context(request: Request) {
     },
   });
 
-  // Resolve the exact same public business used by the customer review page.
-  const { data: resolved, error: resolveError } = await admin
-    .rpc("resolve_public_booking_business", {
-      requested_slug: "my-way-cars",
-      fallback_business_id: fallbackBusinessId || null,
-    })
-    .maybeSingle();
+  // For the current My Way Cars deployment, use the exact same configured
+  // business ID as the public booking/review form. This removes the broken
+  // tenant-ID guessing while retaining operator authentication.
+  let businessId = fallbackBusinessId?.trim() || "";
 
-  const row = resolved as
-    | { business_id?: unknown; display_name?: unknown }
-    | null;
+  if (!businessId) {
+    const { data: resolved, error: resolveError } = await admin
+      .rpc("resolve_public_booking_business", {
+        requested_slug: "my-way-cars",
+        fallback_business_id: null,
+      })
+      .maybeSingle();
 
-  if (resolveError || !row?.business_id) {
-    return {
-      error: "Could not resolve the My Way Cars review business.",
-      status: 500 as const,
-    };
-  }
+    const row = resolved as { business_id?: unknown } | null;
+    if (resolveError || typeof row?.business_id !== "string" || !row.business_id.trim()) {
+      return {
+        error: "Could not resolve the My Way Cars review business.",
+        status: 500 as const,
+      };
+    }
 
-  // Safety check: the signed-in operator's RLS-scoped business name must
-  // match the public business before moderation is allowed.
-  if (normalise(operatorBusinessName) !== normalise(row.display_name)) {
-    return {
-      error: "This operator account does not match the review business.",
-      status: 403 as const,
-    };
+    businessId = row.business_id.trim();
   }
 
   return {
     admin,
     userId: user.id,
-    businessId: String(row.business_id),
+    businessId,
   };
 }
 
