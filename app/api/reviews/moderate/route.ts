@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { loadBusinessName } from "@/lib/businessBranding";
 
 type ReviewAction = "approve" | "reject";
 
-function env() {
+function config() {
   return {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -13,122 +14,108 @@ function env() {
   };
 }
 
-function privilegedClient(url: string, key: string) {
-  return createClient(url, key, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+function normalise(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-function cleanString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-async function operatorContext(request: Request) {
+async function context(request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return { error: "Not signed in", status: 401 as const };
 
-  const { url, anonKey, secretKey, fallbackBusinessId } = env();
+  const { url, anonKey, secretKey, fallbackBusinessId } = config();
   if (!url || !anonKey || !secretKey) {
     return { error: "Supabase is not configured", status: 500 as const };
   }
 
-  const authClient = createClient(url, anonKey, {
+  const operatorClient = createClient(url, anonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
   const {
     data: { user },
-  } = await authClient.auth.getUser(token);
+  } = await operatorClient.auth.getUser(token);
 
   if (!user) {
     return { error: "Your operator session has expired.", status: 401 as const };
   }
 
-  // Verify operator access using the same authenticated/RLS-aware pattern
-  // already used elsewhere in the application.
-  const { data: operator, error: operatorError } = await authClient
+  const { data: operator } = await operatorClient
     .from("operator_users")
-    .select("*")
+    .select("user_id")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (operatorError || !operator) {
+  if (!operator) {
     return { error: "Operator access required", status: 403 as const };
   }
 
-  // Resolve the operator's own business through business_profiles under RLS.
-  // This avoids guessing that an operator_users account/tenant field is the
-  // same identifier used by public booking/review business resolution.
-  const { data: profile, error: profileError } = await authClient
-    .from("business_profiles")
-    .select("*")
-    .single();
+  // Use the existing RLS-scoped branding lookup to identify which business
+  // the signed-in operator belongs to. This avoids guessing at hidden IDs.
+  const operatorBusinessName = await loadBusinessName(operatorClient, "");
 
-  if (profileError || !profile) {
+  if (!operatorBusinessName) {
     return {
-      error: "Could not resolve this operator's business.",
+      error: "Could not identify this operator's business.",
       status: 500 as const,
     };
   }
 
-  const privileged = privilegedClient(url, secretKey);
-  const profileRow = profile as Record<string, unknown>;
-  const operatorRow = operator as Record<string, unknown>;
+  const admin = createClient(url, secretKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
 
-  // If the business profile exposes a slug, use the same authoritative RPC
-  // used by the public booking/review routes.
-  const slug = cleanString(profileRow.slug);
-  if (slug) {
-    const { data: resolved, error: resolveError } = await privileged
-      .rpc("resolve_public_booking_business", {
-        requested_slug: slug,
-        fallback_business_id: fallbackBusinessId || null,
-      })
-      .maybeSingle();
+  // Resolve the exact same public business used by the customer review page.
+  const { data: resolved, error: resolveError } = await admin
+    .rpc("resolve_public_booking_business", {
+      requested_slug: "my-way-cars",
+      fallback_business_id: fallbackBusinessId || null,
+    })
+    .maybeSingle();
 
-    const row = resolved as { business_id?: unknown } | null;
-    const resolvedId = cleanString(row?.business_id);
+  const row = resolved as
+    | { business_id?: unknown; display_name?: unknown }
+    | null;
 
-    if (!resolveError && resolvedId) {
-      return { privileged, userId: user.id, businessId: resolvedId };
-    }
-  }
-
-  // Fall back to identifiers from the RLS-scoped business profile itself.
-  const businessId =
-    cleanString(profileRow.business_id) ||
-    cleanString(profileRow.id) ||
-    cleanString(profileRow.account_id) ||
-    cleanString(profileRow.tenant_id) ||
-    cleanString(operatorRow.business_id);
-
-  if (!businessId) {
+  if (resolveError || !row?.business_id) {
     return {
-      error: "This operator account is not linked to a review business.",
+      error: "Could not resolve the My Way Cars review business.",
       status: 500 as const,
     };
   }
 
-  return { privileged, userId: user.id, businessId };
+  // Safety check: the signed-in operator's RLS-scoped business name must
+  // match the public business before moderation is allowed.
+  if (normalise(operatorBusinessName) !== normalise(row.display_name)) {
+    return {
+      error: "This operator account does not match the review business.",
+      status: 403 as const,
+    };
+  }
+
+  return {
+    admin,
+    userId: user.id,
+    businessId: String(row.business_id),
+  };
 }
 
 export async function GET(request: Request) {
-  const context = await operatorContext(request);
-  if ("error" in context) {
-    return NextResponse.json({ error: context.error }, { status: context.status });
+  const ctx = await context(request);
+  if ("error" in ctx) {
+    return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   }
 
-  const { data, error } = await context.privileged
+  const { data, error } = await ctx.admin
     .from("customer_reviews")
     .select(
       "id,reviewer_name,reviewer_area,journey_type,rating,review_text,status,created_at"
     )
-    .eq("business_id", context.businessId)
+    .eq("business_id", ctx.businessId)
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -143,9 +130,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const context = await operatorContext(request);
-  if ("error" in context) {
-    return NextResponse.json({ error: context.error }, { status: context.status });
+  const ctx = await context(request);
+  if ("error" in ctx) {
+    return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   }
 
   try {
@@ -166,15 +153,15 @@ export async function POST(request: Request) {
 
     const status = action === "approve" ? "approved" : "rejected";
 
-    const { error } = await context.privileged
+    const { error } = await ctx.admin
       .from("customer_reviews")
       .update({
         status,
         moderated_at: new Date().toISOString(),
-        moderated_by: context.userId,
+        moderated_by: ctx.userId,
       })
       .eq("id", id)
-      .eq("business_id", context.businessId);
+      .eq("business_id", ctx.businessId);
 
     if (error) {
       return NextResponse.json(
