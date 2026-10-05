@@ -86,18 +86,18 @@ export default function ReviewsAdminPage() {
   const previous = reviews.filter((review) => review.status !== "pending");
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
+    <main className="min-h-screen bg-[#f5f4f7] px-4 py-8 text-[#25212a]">
       <div className="mx-auto max-w-5xl space-y-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Customer Reviews</h1>
-            <p className="mt-1 text-slate-600">
+            <h1 className="text-3xl font-bold text-[#53204f]">Customer Reviews</h1>
+            <p className="mt-1 text-[#696772]">
               Approve genuine reviews before they appear publicly.
             </p>
           </div>
           <a
             href="/dashboard"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-medium"
+            className="rounded-xl border border-[#53204f] bg-white px-4 py-2 font-medium text-[#53204f]"
           >
             Back to dashboard
           </a>
@@ -114,21 +114,21 @@ export default function ReviewsAdminPage() {
         ) : (
           <>
             <section className="space-y-4">
-              <h2 className="text-xl font-bold">Pending ({pending.length})</h2>
+              <h2 className="text-xl font-bold text-[#53204f]">Pending ({pending.length})</h2>
               {pending.length === 0 ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-600">
+                <div className="rounded-2xl border border-[#dedce3] bg-white p-5 text-[#696772]">
                   No reviews are waiting for approval.
                 </div>
               ) : (
                 pending.map((review) => (
                   <article
                     key={review.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                    className="rounded-2xl border border-[#dedce3] bg-white p-5 shadow-sm"
                   >
                     <div className="flex flex-wrap justify-between gap-2">
                       <div>
                         <h3 className="font-semibold">{review.reviewer_name}</h3>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-[#696772]">
                           {[review.reviewer_area, review.journey_type]
                             .filter(Boolean)
                             .join(" Â· ")}
@@ -136,7 +136,7 @@ export default function ReviewsAdminPage() {
                       </div>
                       <div className="font-semibold">{review.rating} / 5 {"\u2605"}</div>
                     </div>
-                    <p className="mt-4 whitespace-pre-wrap text-slate-700">
+                    <p className="mt-4 whitespace-pre-wrap text-[#25212a]">
                       {review.review_text}
                     </p>
                     <div className="mt-5 flex flex-wrap gap-3">
@@ -161,19 +161,19 @@ export default function ReviewsAdminPage() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-xl font-bold">Previous decisions</h2>
+              <h2 className="text-xl font-bold text-[#53204f]">Previous decisions</h2>
               {previous.slice(0, 50).map((review) => (
                 <div
                   key={review.id}
-                  className="rounded-xl border border-slate-200 bg-white p-4"
+                  className="rounded-xl border border-[#dedce3] bg-white p-4"
                 >
                   <div className="flex flex-wrap justify-between gap-2">
                     <span className="font-medium">{review.reviewer_name}</span>
-                    <span className="text-sm capitalize text-slate-500">
+                    <span className="text-sm capitalize text-[#696772]">
                       {review.status}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-slate-600">
+                  <p className="mt-2 line-clamp-2 text-sm text-[#696772]">
                     {review.review_text}
                   </p>
                 </div>

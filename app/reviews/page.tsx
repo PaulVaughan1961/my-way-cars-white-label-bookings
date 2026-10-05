@@ -15,9 +15,9 @@ type Review = {
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <span aria-label={`${rating} out of 5 stars`} className="tracking-wide text-amber-500">
+    <span aria-label={`${rating} out of 5 stars`} className="tracking-wide text-[#6d2663]">
       {"\u2605\u2605\u2605\u2605\u2605".slice(0, rating)}
-      <span className="text-slate-300">{"\u2605\u2605\u2605\u2605\u2605".slice(rating)}</span>
+      <span className="text-[#ded7df]">{"\u2605\u2605\u2605\u2605\u2605".slice(rating)}</span>
     </span>
   );
 }
@@ -65,7 +65,8 @@ function ReviewsContent() {
     event.preventDefault();
     if (sending) return;
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setSending(true);
     setError("");
     setMessage("");
@@ -92,7 +93,7 @@ function ReviewsContent() {
         payload.message ||
           "Thank you. Your review has been received and will appear after approval."
       );
-      event.currentTarget.reset();
+      formElement.reset();
       setRating(5);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send review.");
@@ -102,22 +103,22 @@ function ReviewsContent() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
+    <main className="min-h-screen bg-[#f5f4f7] px-4 py-8 text-[#25212a]">
       <div className="mx-auto max-w-4xl space-y-8">
-        <header className="rounded-3xl bg-slate-900 p-7 text-white shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
+        <header className="rounded-3xl bg-[#53204f] p-7 text-white shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ded7df]">
             Customer Reviews
           </p>
           <h1 className="mt-2 text-3xl font-bold">{businessName}</h1>
-          <p className="mt-3 max-w-2xl text-slate-200">
+          <p className="mt-3 max-w-2xl text-[#f1eaf0]">
             Read genuine customer feedback or leave a review about your journey.
             New reviews are checked before they are published.
           </p>
         </header>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-[#dedce3] bg-white p-6 shadow-sm">
           <h2 className="text-2xl font-bold">Leave a review</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-[#696772]">
             Your review will be submitted for approval before appearing publicly.
           </p>
 
@@ -129,7 +130,7 @@ function ReviewsContent() {
                   name="name"
                   required
                   maxLength={80}
-                  className="rounded-xl border border-slate-300 px-3 py-3"
+                  className="rounded-xl border border-[#c9c4cd] px-3 py-3"
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
@@ -137,7 +138,7 @@ function ReviewsContent() {
                 <input
                   name="area"
                   maxLength={100}
-                  className="rounded-xl border border-slate-300 px-3 py-3"
+                  className="rounded-xl border border-[#c9c4cd] px-3 py-3"
                 />
               </label>
             </div>
@@ -146,7 +147,7 @@ function ReviewsContent() {
               Journey type
               <select
                 name="journeyType"
-                className="rounded-xl border border-slate-300 px-3 py-3"
+                className="rounded-xl border border-[#c9c4cd] px-3 py-3"
                 defaultValue=""
               >
                 <option value="">Choose if applicable</option>
@@ -168,8 +169,8 @@ function ReviewsContent() {
                     aria-pressed={rating === value}
                     className={`rounded-xl border px-4 py-2 ${
                       rating === value
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white"
+                        ? "border-[#53204f] bg-[#53204f] text-white"
+                        : "border-[#c9c4cd] bg-white"
                     }`}
                   >
                     {value} {"\u2605"}
@@ -185,7 +186,7 @@ function ReviewsContent() {
                 required
                 maxLength={1200}
                 rows={5}
-                className="rounded-xl border border-slate-300 px-3 py-3"
+                className="rounded-xl border border-[#c9c4cd] px-3 py-3"
               />
             </label>
 
@@ -208,7 +209,7 @@ function ReviewsContent() {
             <button
               type="submit"
               disabled={sending}
-              className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white disabled:opacity-60"
+              className="rounded-xl bg-[#53204f] px-5 py-3 font-semibold text-white disabled:opacity-60"
             >
               {sending ? "Sending..." : "Submit review"}
             </button>
@@ -218,27 +219,27 @@ function ReviewsContent() {
         <section className="space-y-4">
           <div>
             <h2 className="text-2xl font-bold">What customers say</h2>
-            <p className="text-sm text-slate-600">{reviewCountLabel}</p>
+            <p className="text-sm text-[#696772]">{reviewCountLabel}</p>
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="rounded-2xl border border-[#dedce3] bg-white p-5">
               Loading reviews...
             </div>
           ) : reviews.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-700">
+            <div className="rounded-2xl border border-[#dedce3] bg-white p-6 text-[#25212a]">
               No approved reviews yet. Be the first to leave one.
             </div>
           ) : (
             reviews.map((review) => (
               <article
                 key={review.id}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                className="rounded-2xl border border-[#dedce3] border-l-4 border-l-[#6d2663] bg-white p-6 shadow-sm"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="font-semibold">{review.reviewer_name}</h3>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-[#696772]">
                       {[review.reviewer_area, review.journey_type]
                         .filter(Boolean)
                         .join(" Â· ")}
@@ -246,10 +247,10 @@ function ReviewsContent() {
                   </div>
                   <Stars rating={review.rating} />
                 </div>
-                <p className="mt-4 whitespace-pre-wrap leading-7 text-slate-700">
+                <p className="mt-4 whitespace-pre-wrap leading-7 text-[#25212a]">
                   {review.review_text}
                 </p>
-                <p className="mt-3 text-xs text-slate-400">
+                <p className="mt-3 text-xs text-[#9196ae]">
                   {new Intl.DateTimeFormat("en-GB", {
                     month: "short",
                     year: "numeric",
@@ -268,8 +269,8 @@ export default function ReviewsPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
-          <div className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6">
+        <main className="min-h-screen bg-[#f5f4f7] px-4 py-8 text-[#25212a]">
+          <div className="mx-auto max-w-4xl rounded-2xl border border-[#dedce3] bg-white p-6">
             Loading customer reviews...
           </div>
         </main>
