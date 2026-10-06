@@ -1202,7 +1202,54 @@ async function acceptBookingRequest(booking: BookingRow) {
       throw new Error(result.error || "Unable to accept booking request");
     }
     await loadBookings();
-    window.alert(result.message || "Booking request accepted.");
+    const customerPhone =
+      booking.passenger_phone ??
+      booking.phone ??
+      booking.mobile ??
+      null;
+
+    if (customerPhone) {
+      const pickup =
+        booking.pickup_address ??
+        booking.pickup ??
+        booking.from_address ??
+        "Pickup not supplied";
+      const dropoff =
+        booking.dropoff_address ??
+        booking.dropoff ??
+        booking.to_address ??
+        "Destination not supplied";
+      const when =
+        booking.pickup_datetime ??
+        booking.pickup_at ??
+        booking.journey_at ??
+        booking.date_time ??
+        null;
+      const whenText = when ? fmtDateTime(when) : "Date/time not supplied";
+
+      const acceptanceMessage = `${businessDisplayName.toUpperCase()}
+
+Your booking is confirmed.
+
+When:
+${whenText}
+
+From:
+${pickup}
+
+To:
+${dropoff}
+
+We will send your driver details separately.
+
+${businessDisplayName}`;
+
+      window.location.href = `sms:${String(customerPhone).replace(/\s+/g, "")}?body=${encodeURIComponent(acceptanceMessage)}`;
+    } else {
+      window.alert(
+        "Booking request accepted. No customer phone number is available, so please contact the customer manually."
+      );
+    }
   } catch (error) {
     setErrorMessage(
       error instanceof Error ? error.message : "Unable to accept booking request"
