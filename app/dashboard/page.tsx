@@ -1268,7 +1268,58 @@ async function rejectBookingRequest(booking: BookingRow) {
     }
 
     await loadBookings();
-    window.alert(result.message || "Booking request rejected.");
+
+    const customerPhone =
+      booking.passenger_phone ??
+      booking.phone ??
+      booking.mobile ??
+      null;
+
+    if (customerPhone) {
+      const pickup =
+        booking.pickup_address ??
+        booking.pickup ??
+        booking.from_address ??
+        "Pickup not supplied";
+      const dropoff =
+        booking.dropoff_address ??
+        booking.dropoff ??
+        booking.to_address ??
+        "Destination not supplied";
+      const when =
+        booking.pickup_datetime ??
+        booking.pickup_at ??
+        booking.journey_at ??
+        booking.date_time ??
+        null;
+      const whenText = when ? fmtDateTime(when) : "Date/time not supplied";
+
+      const rejectionMessage = `${businessDisplayName.toUpperCase()}
+
+    Unfortunately, we are unable to accept your booking request.
+
+    When:
+    ${whenText}
+
+    From:
+    ${pickup}
+
+    To:
+    ${dropoff}
+
+    Reason:
+    ${reason}
+
+    We apologise that we cannot help on this occasion.
+
+    ${businessDisplayName}`;
+
+      window.location.href = `sms:${String(customerPhone).replace(/\s+/g, "")}?body=${encodeURIComponent(rejectionMessage)}`;
+    } else {
+      window.alert(
+        `${result.message || "Booking request rejected."} No customer phone number is available, so please contact the customer manually.`
+      );
+    }
   } catch (error) {
     setErrorMessage(
       error instanceof Error ? error.message : "Unable to reject booking request"
