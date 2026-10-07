@@ -15,7 +15,7 @@ export default function OperatorPushNotifications(){
       const kr=await fetch("/api/operator-push",{headers:{Authorization:`Bearer ${t}`},cache:"no-store"});const k=await kr.json();
       if(!kr.ok||!k.publicKey)throw new Error(k.error||"Push notifications are not configured.");
       if(await Notification.requestPermission()!=="granted")throw new Error("Notification permission was not granted.");
-      const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
+      let reg=await navigator.serviceWorker.getRegistration();if(!reg){reg=await navigator.serviceWorker.register("/sw.js");}await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
       if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:keyBytes(k.publicKey) as BufferSource});
       const sr=await fetch("/api/operator-push",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${t}`},body:JSON.stringify(sub.toJSON())});const s=await sr.json();
       if(!sr.ok)throw new Error(s.error||"Could not enable booking alerts.");
@@ -31,5 +31,5 @@ export default function OperatorPushNotifications(){
     }catch(e){setMessage(e instanceof Error?e.message:"Could not disable booking alerts.");}finally{setBusy(false);}
   }
   if(!supported)return null;
-  return <div className="flex flex-col items-start gap-1"><button type="button" disabled={busy} onClick={enabled?disable:enable} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm disabled:opacity-50">{busy?"Workingâ€¦":enabled?"Booking alerts: ON":"Enable booking alerts"}</button>{message?<span className="max-w-xs text-xs text-slate-600">{message}</span>:null}</div>;
+  return <div className="flex flex-col items-start gap-1"><button type="button" disabled={busy} onClick={enabled?disable:enable} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm disabled:opacity-50">{busy?"WorkingÃ¢â‚¬Â¦":enabled?"Booking alerts: ON":"Enable booking alerts"}</button>{message?<span className="max-w-xs text-xs text-slate-600">{message}</span>:null}</div>;
 }
