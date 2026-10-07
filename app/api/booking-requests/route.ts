@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { notifyOperatorNewBookingRequest } from "@/lib/operatorPush";
 import {
   DEFAULT_BUSINESS_NAME,
   normaliseBusinessName,
@@ -182,6 +183,12 @@ export async function POST(request: Request) {
         console.error("Public booking request failed:", error.message);
       }
       return NextResponse.json({ error: message }, { status });
+    }
+
+    try {
+      await notifyOperatorNewBookingRequest({ businessId: resolved.businessId, businessName, payload });
+    } catch (notificationError) {
+      console.error("Operator booking-request push failed:", notificationError);
     }
 
     return NextResponse.json({ received: true }, { status: 201 });

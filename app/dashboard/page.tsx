@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import OperatorLogoutButton from "@/app/components/OperatorLogoutButton";
+import OperatorPushNotifications from "@/app/components/OperatorPushNotifications";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
@@ -2353,6 +2354,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 {refreshing ? "Refreshing..." : "Refresh"}
               </button>
               <OperatorLogoutButton />
+        <OperatorPushNotifications />
             </div>
           </div>
         </div>
