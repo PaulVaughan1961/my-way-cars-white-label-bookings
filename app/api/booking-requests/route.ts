@@ -170,7 +170,7 @@ export async function POST(request: Request) {
     }
     const businessName = resolved.displayName;
 
-    const { error } = await supabase.rpc("submit_public_booking_request", {
+    const { data: submitted, error } = await supabase.rpc("submit_public_booking_request_v2", {
       requested_business_id: resolved.businessId,
       request_source_key: clientSource(request, secretKey),
       request_payload: payload,
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      await notifyOperatorNewBookingRequest({ businessId: resolved.businessId, businessName, payload });
+      if (!submitted?.duplicate) await notifyOperatorNewBookingRequest({ businessId: resolved.businessId, businessName, payload });
     } catch (notificationError) {
       console.error("Operator booking-request push failed:", notificationError);
     }

@@ -2,7 +2,7 @@
 import BookingRequestFinished from "./BookingRequestFinished";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePublicBusinessName } from "@/lib/usePublicBusinessName";
 
@@ -32,6 +32,11 @@ function BookingRequestForm() {
   const initialDate = todayYYYYMMDD();
   const initialTime = nowHHMM();
 
+  const [requestIntent, setRequestIntent] = useState<"" | "booking" | "enquiry">("");
+  const [submittedIntent, setSubmittedIntent] = useState("");
+  const [homeAddress, setHomeAddress] = useState("");
+  const [pickupIsHome, setPickupIsHome] = useState(false);
+  const requestKeyRef = useRef("");
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -69,6 +74,7 @@ function BookingRequestForm() {
     const freshDate = todayYYYYMMDD();
     const freshTime = nowHHMM();
 
+    setRequestIntent(""); setHomeAddress(""); setPickupIsHome(false); requestKeyRef.current = "";
     setPassengerName("");
     setPassengerPhone("");
     setPassengerEmail("");
@@ -101,6 +107,7 @@ function BookingRequestForm() {
     if (saving) return;
 
     setErrorMessage("");
+    if (!requestIntent) { setErrorMessage("Please choose a booking request or an enquiry."); return; }
 
     const outwardDateTime = isoFromDateTime(pickupDate, pickupTime);
     const outwardMs = new Date(outwardDateTime).getTime();
@@ -140,7 +147,11 @@ function BookingRequestForm() {
 
     setSaving(true);
 
+    if (!requestKeyRef.current) requestKeyRef.current = crypto.randomUUID();
     const payload = {
+      requestIntent,
+      requestKey: requestKeyRef.current,
+      homeAddress: pickupIsHome ? pickupAddress.trim() : homeAddress.trim(),
       businessSlug: businessSlug || undefined,
       website,
       passengerName: passengerName.trim(),
@@ -189,6 +200,7 @@ function BookingRequestForm() {
         return;
       }
 
+      setSubmittedIntent(requestIntent);
       resetForm();
       setSubmitted(true);
     } catch {
@@ -205,13 +217,13 @@ function BookingRequestForm() {
       <main className="min-h-screen bg-gray-50 px-4 py-12">
         <div className="mx-auto max-w-md rounded-2xl border border-green-200 bg-white p-6 shadow">
           <div className="mb-3 text-4xl" aria-hidden="true">✓</div>
-          <h1 className="text-2xl font-bold">Request received</h1>
+          <h1 className="text-2xl font-bold">{submittedIntent === "enquiry" ? "Enquiry received" : "Booking request received"}</h1>
           <p className="mt-3 text-gray-700">
             Thank you. {businessName} will check availability and contact you
             shortly.
           </p>
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            This is a booking request and is not confirmed until {businessName}{" "}contacts you.
+            {submittedIntent === "enquiry" ? "You have asked for a quote or information. No booking has been confirmed." : "Your booking request is awaiting the operator's acceptance. It is not yet confirmed."}
           </div>
           <button
             type="button"
@@ -250,8 +262,7 @@ function BookingRequestForm() {
         <div className="mb-4">
           <h1 className="text-2xl font-bold">Request a journey</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Send your journey details and {businessName} will confirm availability
-            and price.
+            Choose whether you want to request a booking or ask {businessName} for a quote.
           </p>
           <p className="mt-2 text-sm font-medium text-amber-800">
             Your journey is not confirmed until we contact you.
@@ -276,6 +287,11 @@ function BookingRequestForm() {
               onChange={(event) => setWebsite(event.target.value)}
             />
           </div>
+          <fieldset className="space-y-3 rounded-xl border border-purple-200 p-4">
+            <legend className="px-1 font-bold">What would you like to do?</legend>
+            <label className="flex gap-3"><input type="radio" name="request-intent" required value="booking" checked={requestIntent === "booking"} onChange={() => setRequestIntent("booking")} className="mt-1 h-5 w-5 shrink-0" /><span><strong className="block">Request a booking</strong><span className="text-sm text-gray-600">I would like to book this journey. The operator must accept it before it is confirmed.</span></span></label>
+            <label className="flex gap-3"><input type="radio" name="request-intent" required value="enquiry" checked={requestIntent === "enquiry"} onChange={() => setRequestIntent("enquiry")} className="mt-1 h-5 w-5 shrink-0" /><span><strong className="block">Ask for a quote / make an enquiry</strong><span className="text-sm text-gray-600">I would like a price or more information before deciding.</span></span></label>
+          </fieldset>
           <section className="space-y-4">
             <h2 className="font-semibold">Your details</h2>
 
@@ -326,6 +342,12 @@ function BookingRequestForm() {
               />
             </div>
 
+            <div className="rounded-xl bg-gray-50 p-3">
+              <label htmlFor="home-address" className="text-sm font-medium">Home address <span className="font-normal text-gray-500">(optional)</span></label>
+              <p className="mt-1 text-xs text-gray-600">Your address for our customer records. This may be different from the journey pickup.</p>
+              <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={pickupIsHome} onChange={e => setPickupIsHome(e.target.checked)} className="mt-1" />My home address is the outward pickup address below</label>
+              {!pickupIsHome && <textarea id="home-address" maxLength={500} autoComplete="street-address" className={fieldClass} value={homeAddress} onChange={e => setHomeAddress(e.target.value)} rows={2} placeholder="House name/number, street, town and postcode" />}
+            </div>
             <div>
               <label htmlFor="account-name" className="text-sm font-medium">
                 Business or account name <span className="font-normal text-gray-500">(optional)</span>
@@ -352,7 +374,7 @@ function BookingRequestForm() {
               <input
                 id="pickup-address"
                 required
-                autoComplete="street-address"
+                autoComplete="off"
                 className={fieldClass}
                 placeholder="Full pickup address"
                 value={pickupAddress}
@@ -428,7 +450,7 @@ function BookingRequestForm() {
                   required
                   type="number"
                   min="1"
-                  max="99"
+                  max="16"
                   className={fieldClass}
                   value={passengers}
                   onChange={(e) => setPassengers(e.target.value)}
@@ -441,7 +463,7 @@ function BookingRequestForm() {
                   required
                   type="number"
                   min="0"
-                  max="99"
+                  max="20"
                   className={fieldClass}
                   value={largeBags}
                   onChange={(e) => setLargeBags(e.target.value)}
@@ -454,7 +476,7 @@ function BookingRequestForm() {
                   required
                   type="number"
                   min="0"
-                  max="99"
+                  max="20"
                   className={fieldClass}
                   value={smallBags}
                   onChange={(e) => setSmallBags(e.target.value)}
@@ -572,7 +594,7 @@ function BookingRequestForm() {
                         required
                         type="number"
                         min="1"
-                        max="99"
+                        max="16"
                         className={fieldClass}
                         value={returnPassengers}
                         onChange={(e) => setReturnPassengers(e.target.value)}
@@ -587,7 +609,7 @@ function BookingRequestForm() {
                         required
                         type="number"
                         min="0"
-                        max="99"
+                        max="20"
                         className={fieldClass}
                         value={returnLargeBags}
                         onChange={(e) => setReturnLargeBags(e.target.value)}
@@ -602,7 +624,7 @@ function BookingRequestForm() {
                         required
                         type="number"
                         min="0"
-                        max="99"
+                        max="20"
                         className={fieldClass}
                         value={returnSmallBags}
                         onChange={(e) => setReturnSmallBags(e.target.value)}
@@ -688,11 +710,11 @@ function BookingRequestForm() {
             disabled={saving}
             className="w-full rounded-xl bg-black py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Sending request…" : "Send booking request"}
+            {saving ? "Sending..." : requestIntent === "enquiry" ? "Send enquiry" : "Send booking request"}
           </button>
 
           <p className="text-center text-xs text-gray-500">
-            Your details are used only to respond to this booking request.
+            Your details are used to handle your journey request and maintain your customer record.
           </p>
         </form>
       </div>

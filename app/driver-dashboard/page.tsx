@@ -76,7 +76,7 @@ export default function DriverDashboardPage() {
         .neq("status", "Completed")
         .order("pickup_datetime", { ascending: true });
 
-      const hiddenStatuses = new Set(["Completed", "Cancelled", "Rejected"]);
+      const hiddenStatuses = new Set(["Completed", "Cancelled", "Rejected", "Pending Approval", "TBC"]);
       const visibleJobs = ((bookings as Booking[]) || []).filter((booking) => {
         const bookingStatus = (booking.status ?? "Scheduled").toString();
         return (

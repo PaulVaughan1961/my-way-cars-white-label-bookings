@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { isTentative } from "@/lib/bookingWorkflow";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
 
@@ -119,7 +120,7 @@ const monthBookingCount = bookings.filter((booking) => {
 
   if (
     status === "Cancelled" ||
-    status === "Rejected"
+    status === "Rejected" || isTentative(status)
   ) {
     return false;
   }
@@ -184,7 +185,7 @@ return (
   </h2>
 
   <div className="text-sm text-slate-600">
-    {monthBookingCount} booking
+    {monthBookingCount} confirmed booking
     {monthBookingCount !== 1 ? "s" : ""} this month
   </div>
 </div>
@@ -214,7 +215,9 @@ return (
           <div className="mt-2 grid grid-cols-7 gap-2">
             {days.map((day) => {
               const key = dateKey(day);
-              const count = bookingsForDate(key).length;
+              const dayBookings = bookingsForDate(key);
+              const count = dayBookings.filter(b => !isTentative(b.status)).length;
+              const tentativeCount = dayBookings.length - count;
               const isCurrentMonth =
                 day.getMonth() === currentMonth.getMonth();
                 const bgColour =
@@ -250,7 +253,7 @@ className={`min-h-24 rounded-2xl border p-2 text-left
                   <div className="mt-2 text-xs">
 {count === 0 ? (
   <span className="font-semibold text-emerald-700">
-    🟢 Free
+    No confirmed jobs
   </span>
 ) : count <= 2 ? (
   <span className="font-semibold text-yellow-600">
@@ -266,6 +269,7 @@ className={`min-h-24 rounded-2xl border p-2 text-left
   </span>
 )}
                   </div>
+                  {tentativeCount > 0 && <div className="mt-1 rounded bg-purple-100 px-1 text-xs font-bold text-purple-900">{tentativeCount} TBC / pending</div>}
                 </button>
               );
             })}
@@ -326,7 +330,7 @@ className={`min-h-24 rounded-2xl border p-2 text-left
     </div>
 
     <div className="mt-1 text-xs text-slate-500">
-      {booking.status || "No status"}
+      {isTentative(booking.status) ? `${booking.status} — not confirmed` : booking.status || "No status"}
     </div>
     {expandedBookingId === booking.id && (
   <div className="mt-4 border-t pt-4 text-sm text-slate-700">
@@ -347,7 +351,7 @@ className={`min-h-24 rounded-2xl border p-2 text-left
 
     <div>
       <strong>Status:</strong>{" "}
-      {booking.status || "No status"}
+      {isTentative(booking.status) ? `${booking.status} — not confirmed` : booking.status || "No status"}
     </div>
 
     <div className="mt-3">

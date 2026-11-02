@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import BookingQuoteEditor, { type QuoteSummary } from "@/app/components/BookingQuoteEditor";
+import { isTentative, requestIntentLabel, deadlineText } from "@/lib/bookingWorkflow";
 import OperatorLogoutButton from "@/app/components/OperatorLogoutButton";
 import OperatorPushNotifications from "@/app/components/OperatorPushNotifications";
 import { useSearchParams } from "next/navigation";
@@ -397,6 +399,8 @@ function DashboardContent() {
   const [businessDisplayName, setBusinessDisplayName] = useState(
     DEFAULT_BUSINESS_NAME
   );
+  const [quoteBookingId, setQuoteBookingId] = useState<string | null>(null);
+  const [quoteSummaries, setQuoteSummaries] = useState<QuoteSummary[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [drivers, setDrivers] = useState<DriverOption[]>([]);
   const [allDrivers, setAllDrivers] = useState<DriverOption[]>([]);
@@ -481,6 +485,8 @@ const [showPassengerNames, setShowPassengerNames] =
       if (error) throw error;
 
       setBookings((data as BookingRow[]) ?? []);
+      const summaries = await supabase.rpc("get_booking_quote_summaries");
+      if (!summaries.error) setQuoteSummaries(summaries.data || []);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load bookings";
@@ -664,9 +670,11 @@ const filteredBookings = useMemo(() => {
         when >= now - graceMs &&
         status !== "Cancelled" &&
         status !== "Completed" &&
-        status !== "Rejected"
+        status !== "Rejected" && !isTentative(status)
       );
     });
+  } else if (statusFilter === "Enquiries") {
+    result = result.filter(row => row.request_intent === "enquiry" && isTentative(row.status));
   } else if (statusFilter === "Unpaid") {
     result = result.filter((row) => {
       const payment = (row.payment_status ?? "Unpaid").toString();
@@ -680,7 +688,7 @@ const filteredBookings = useMemo(() => {
       const status = (row.status ?? "Scheduled").toString();
       const assignment = (row.driver_assignment_status ?? "").toString();
 
-      if (status === "Pending Approval") return true;
+      if (isTentative(status)) return true;
       if (assignment === "Declined") return true;
       if (assignment === "Awaiting response") return true;
       if (status === "Scheduled" && !getDriver(row)) return true;
@@ -690,7 +698,7 @@ const filteredBookings = useMemo(() => {
         when < now &&
         status !== "Completed" &&
         status !== "Cancelled" &&
-        status !== "Rejected"
+        status !== "Rejected" && !isTentative(status)
       );
     });
   } else if (statusFilter !== "All") {
@@ -812,7 +820,7 @@ const unpaidTotal = useMemo(() => {
         !Number.isNaN(whenMs) &&
         whenMs >= today.getTime() &&
         whenMs < tomorrow.getTime() &&
-        status !== "Cancelled"
+        status !== "Cancelled" && status !== "Rejected" && !isTentative(status)
       ) {
         jobs += 1;
 
@@ -850,7 +858,7 @@ const unpaidTotal = useMemo(() => {
         !Number.isNaN(whenMs) &&
         whenMs >= today.getTime() &&
         whenMs < tomorrow.getTime() &&
-        status !== "Cancelled"
+        status !== "Cancelled" && status !== "Rejected" && !isTentative(status)
       ) {
         jobs += 1;
 
@@ -887,7 +895,7 @@ const unpaidTotal = useMemo(() => {
         (row) =>
           !Number.isNaN(row.whenMs) &&
           row.status !== "Cancelled" &&
-          row.status !== "Completed"
+          row.status !== "Completed" && row.status !== "Rejected" && row.status !== "Pending Approval"
       )
       .sort((a, b) => a.whenMs - b.whenMs);
 
@@ -1032,7 +1040,7 @@ const selectedTotal = useMemo(
         status !== "Cancelled" &&
         status !== "Completed" &&
 status !== "POB" &&
-status !== "Rejected"
+status !== "Rejected" && !isTentative(status)
       );
     })
     .sort((a, b) => getWhenMs(a) - getWhenMs(b))[0] ?? null
@@ -1054,6 +1062,7 @@ status !== "Rejected"
           return false;
         }
         return (
+          isTentative(status) ||
           assignment === "Declined" ||
           assignment === "Awaiting response" ||
           (status === "Scheduled" && !getDriver(booking))
@@ -1181,7 +1190,25 @@ async function assignBookingToDriver(
   }
 }
 
+async function workflowAction(booking: BookingRow, action: "hold" | "withdraw" | "approve") {
+  if (!window.confirm(action === "hold" ? "Mark this journey TBC? It will stay tentative until confirmed." : action === "approve" ? "Confirm all journeys in this accepted quote? Check availability first. Please notify the customer after confirming." : "Withdraw the current confirmation link?")) return;
+  try {
+    setBusyId(booking.id); setErrorMessage("");
+    const { data: { session } } = await getSupabase().auth.getSession();
+    if (!session) throw new Error("Please sign in again.");
+    const response = await fetch("/api/booking-requests/workflow", { method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+      body: JSON.stringify({ action, bookingId: booking.id }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Unable to update booking.");
+    await loadBookings(false);
+    if (action === "approve") window.alert("Booking confirmed. Please notify the customer. Their quote link now also shows confirmation.");
+  } catch (e) { setErrorMessage(e instanceof Error ? e.message : "Unable to update booking."); }
+  finally { setBusyId(null); }
+}
+
 async function acceptBookingRequest(booking: BookingRow) {
+  if (booking.status === "TBC" && !window.confirm("Confirm this journey now? This makes it a live booking. Any outstanding quote link for this journey will no longer accept a second confirmation.")) return;
   try {
     setBusyId(booking.id);
     setErrorMessage("");
@@ -1198,7 +1225,7 @@ async function acceptBookingRequest(booking: BookingRow) {
       },
       body: JSON.stringify({ bookingId: booking.id }),
     });
-    const result = (await response.json()) as { error?: string; message?: string };
+    const result = (await response.json()) as { error?: string; message?: string; notification?: string };
     if (!response.ok) {
       throw new Error(result.error || "Unable to accept booking request");
     }
@@ -1209,7 +1236,9 @@ async function acceptBookingRequest(booking: BookingRow) {
       booking.mobile ??
       null;
 
-    if (customerPhone) {
+    if (result.notification && result.notification !== "manual") {
+      window.alert(result.message || "Booking confirmed and customer notified.");
+    } else if (customerPhone) {
       const pickup =
         booking.pickup_address ??
         booking.pickup ??
@@ -1470,6 +1499,9 @@ function toggleBookingSelection(id: string) {
     const dropoff = getDropoff(booking);
     const fare = getFare(booking);
     const status = (booking.status ?? "Scheduled").toString();
+    const tentative = isTentative(status);
+    const intentLabel = requestIntentLabel(booking.request_intent);
+    const quoteSummary = quoteSummaries.find(q => q.bookingId === booking.id);
     const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
     const driverAssignmentStatus = (
       booking.driver_assignment_status ?? ""
@@ -1512,7 +1544,7 @@ function toggleBookingSelection(id: string) {
         className={`relative cursor-pointer rounded-2xl border p-4 transition hover:shadow-md ${
           highlightClash
             ? "border-rose-500 bg-rose-50 shadow-md ring-2 ring-rose-300"
-            : status === "Pending Approval"
+            : isTentative(status)
             ? "border-amber-500 bg-amber-50 shadow-lg ring-4 ring-amber-200"
             : driverAssignmentStatus === "Declined"
             ? "border-red-500 bg-red-50 shadow-lg ring-4 ring-red-200"
@@ -1540,9 +1572,9 @@ function toggleBookingSelection(id: string) {
   <div className="flex items-center justify-between gap-2 overflow-hidden text-sm text-slate-900">
 
     <div className="flex items-center gap-2 overflow-hidden">
-      {status === "Pending Approval" ? (
+      {isTentative(status) ? (
         <span className="shrink-0 rounded-full bg-amber-500 px-2 py-1 text-xs font-black text-slate-950">
-          NEW REQUEST
+          {status === "TBC" ? "TBC · " : ""}{intentLabel}
         </span>
       ) : null}
       {driverAssignmentStatus === "Declined" ? (
@@ -1609,6 +1641,7 @@ function toggleBookingSelection(id: string) {
     </div>
 
     <button
+      disabled={tentative}
       onClick={(e) => {
         e.stopPropagation();
         toggleBookingSelection(booking.id);
@@ -1626,9 +1659,9 @@ function toggleBookingSelection(id: string) {
 ) : (
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              {status === "Pending Approval" ? (
+              {isTentative(status) ? (
                 <div className="mb-3 rounded-xl bg-amber-500 px-4 py-2 text-center text-sm font-black tracking-wide text-slate-950 shadow">
-                  NEW BOOKING REQUEST — ACTION REQUIRED
+                  {status === "TBC" ? "TBC — " : ""}{intentLabel} — ACTION REQUIRED
                 </div>
               ) : null}
               {highlightClash ? (
@@ -1778,6 +1811,19 @@ function toggleBookingSelection(id: string) {
                 );
               })()}
 
+              {tentative && <div className="mt-3 space-y-3 rounded-xl border border-purple-300 bg-purple-50 p-3" onClick={e => e.stopPropagation()}>
+                <p className="font-bold">{intentLabel} · {status === "TBC" ? "To Be Confirmed" : "Awaiting review"}</p>
+                {typeof booking.customer_home_address === "string" && booking.customer_home_address && <p className="text-sm"><strong>Supplied home address:</strong> {booking.customer_home_address}</p>}
+                {booking.customer_home_address && !booking.customer_id ? <p className="text-sm text-amber-900">Customer matching needs review. The supplied address is retained on this request.</p> : null}
+                {quoteSummary && <p className="text-sm">Quote: {quoteSummary.state === "issued" && Date.parse(quoteSummary.expiresAt) <= Date.now() ? "expired" : quoteSummary.state.replaceAll("_", " ")} · deadline {deadlineText(quoteSummary.expiresAt)} UK time. {quoteSummary.state === "issued" && Date.parse(quoteSummary.expiresAt) > Date.now() ? quoteSummary.holdAvailability ? "Availability held until deadline." : "Subject to availability." : ""}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={isBusy} onClick={() => setQuoteBookingId(booking.id)} className="rounded-xl bg-purple-800 px-3 py-3 font-semibold text-white">Quote / send confirmation link</button>
+                  {quoteSummary?.state === "awaiting_operator" && <button type="button" disabled={isBusy} onClick={() => void workflowAction(booking,"approve")} className="rounded-xl bg-green-700 px-3 py-3 font-bold text-white">Approve accepted quote — all journeys</button>}
+                  {status !== "TBC" && <button type="button" disabled={isBusy} onClick={() => void workflowAction(booking,"hold")} className="rounded-xl border border-purple-600 px-3 py-3 font-semibold">Mark TBC</button>}
+                  {quoteSummary && ["issued","recheck_requested","awaiting_operator"].includes(quoteSummary.state) && <button type="button" disabled={isBusy} onClick={() => void workflowAction(booking,"withdraw")} className="rounded-xl border px-3 py-3">Withdraw quote link</button>}
+                </div>
+              </div>}
+              {status === "Scheduled" && !driver && <button type="button" disabled={isBusy} onClick={e => { e.stopPropagation(); void workflowAction(booking,"hold"); }} className="mt-3 rounded-xl border border-purple-600 px-3 py-2 text-sm font-semibold">Mark TBC</button>}
               {status === "Scheduled" ? (
                 <div
                   className="mt-3 rounded-xl border border-slate-300 bg-slate-50 p-3"
@@ -2057,19 +2103,19 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 Dropoff map
               </a>
             ) : null}
-{status === "Pending Approval" ? (
+{isTentative(status) ? (
   <div className="mb-3 rounded-2xl border-2 border-amber-500 bg-amber-100 p-3 shadow-md">
     <div className="mb-2 text-center text-xs font-black uppercase tracking-wide text-amber-950">
-      Accept or reject this request
+      {status === "TBC" ? "To Be Confirmed" : "Review this request"}
     </div>
     <div className="flex gap-2">
-    <button
+    {booking.request_intent !== "enquiry" || status === "TBC" ? <button
       onClick={() => void acceptBookingRequest(booking)}
       disabled={isBusy}
       className="flex-1 rounded-xl bg-green-700 px-4 py-3 text-base font-bold text-white shadow disabled:opacity-60"
     >
-      {isBusy ? "Working..." : "ACCEPT REQUEST"}
-    </button>
+      {isBusy ? "Working..." : status === "TBC" ? "CONFIRM BOOKING" : "ACCEPT REQUEST"}
+    </button> : null}
 
     <button
       onClick={() => void rejectBookingRequest(booking)}
@@ -2081,7 +2127,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
     </div>
   </div>
 ) : null}
-            {status !== "Completed" && status !== "Rejected" ? (
+            {!tentative && status !== "Completed" && status !== "Rejected" ? (
               <button
                 onClick={() =>
                   void updateBooking(booking.id, {
@@ -2097,7 +2143,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               </button>
             ) : null}
 
-            {status !== "Completed" && status !== "Rejected" ? (
+            {!tentative && status !== "Completed" && status !== "Rejected" ? (
               <button
                 onClick={() =>
                   void updateBooking(booking.id, {
@@ -2151,6 +2197,9 @@ ${vehicle || "To be confirmed"}${returnNote}`;
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
+      {quoteBookingId && <BookingQuoteEditor key={quoteBookingId}
+        journeys={bookings.filter(b => { const selected = bookings.find(x => x.id === quoteBookingId); return b.id === quoteBookingId || (!!selected?.return_group_id && b.return_group_id === selected.return_group_id); }).sort((a,b) => getWhenMs(a)-getWhenMs(b))}
+        businessName={businessDisplayName} onClose={() => setQuoteBookingId(null)} onSaved={() => loadBookings(false)} />}
       {completedFlash ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
@@ -2716,6 +2765,9 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               "All",
               "Upcoming",
               "Needs Action",
+              "Enquiries",
+              "TBC",
+              "Pending Approval",
               "Scheduled",
               "Completed",
               "Unpaid",

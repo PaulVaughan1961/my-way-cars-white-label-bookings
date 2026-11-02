@@ -639,6 +639,10 @@ router.push(`/dashboard?focus=${id}`);
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
+                <option value="Pending Approval">Pending Approval</option>
+                <option value="TBC">TBC — To Be Confirmed</option>
+                <option value="Rejected">Rejected</option>
+                <option value="On My Way">On My Way</option>
                 <option value="Scheduled">Scheduled</option>
                 <option value="Completed">Completed</option>
                 <option value="Cancelled">Cancelled</option>

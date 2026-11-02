@@ -18,7 +18,7 @@ function serverClient() {
   return createClient(url, secretKey, { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false } });
 }
 
-export async function notifyOperatorNewBookingRequest(input:{businessId:string;businessName:string;payload:BookingPayload}) {
+export async function notifyOperatorNewBookingRequest(input:{businessId:string;businessName:string;payload:BookingPayload;event?:"confirmed"|"accepted_quote"|"recheck"}) {
   const publicKey=process.env.VAPID_PUBLIC_KEY;
   const privateKey=process.env.VAPID_PRIVATE_KEY;
   const subject=process.env.VAPID_SUBJECT || "mailto:notifications@mywaycars.co.uk";
@@ -31,13 +31,15 @@ export async function notifyOperatorNewBookingRequest(input:{businessId:string;b
 
   webpush.setVapidDetails(subject,publicKey,privateKey);
 
-  const name=pickText(input.payload,["passenger_name","lead_passenger","customer_name","name","account_name"])||"Customer";
-  const pickup=pickText(input.payload,["pickup_address","pickup","from_address"]);
-  const dropoff=pickText(input.payload,["dropoff_address","dropoff","to_address"]);
-  const when=pickText(input.payload,["pickup_datetime","pickup_at","journey_at","date_time"]);
-  const journey=[pickup,dropoff].filter(Boolean).join(" â†’ ");
-  const detail=[name,when,journey].filter(Boolean).join(" â€¢ ");
-  const payload=JSON.stringify({title:`${input.businessName}: new booking request`,body:detail||"A new customer booking request needs your attention.",url:"/dashboard",tag:`booking-request-${Date.now()}`});
+  const outward = input.payload.outward && typeof input.payload.outward === "object" ? input.payload.outward as BookingPayload : {};
+  const name=pickText(input.payload,["passengerName","passenger_name","lead_passenger","customer_name","name","account_name"])||"Customer";
+  const pickup=pickText(outward,["pickupAddress"])||pickText(input.payload,["pickup_address","pickup","from_address"]);
+  const dropoff=pickText(outward,["dropoffAddress"])||pickText(input.payload,["dropoff_address","dropoff","to_address"]);
+  const when=pickText(outward,["pickupDateTime"])||pickText(input.payload,["pickup_datetime","pickup_at","journey_at","date_time"]);
+  const journey=[pickup,dropoff].filter(Boolean).join(" to ");
+  const detail=[name,when,journey].filter(Boolean).join(" | ");
+  const label = input.event === "confirmed" ? "customer confirmed booking" : input.event === "accepted_quote" ? "quote accepted: approval needed" : input.event === "recheck" ? "availability recheck requested" : input.payload.requestIntent === "enquiry" ? "new enquiry" : input.payload.requestIntent === "booking" ? "new booking request" : "new request: intent not specified";
+  const payload=JSON.stringify({title:`${input.businessName}: ${label}`,body:detail||"A new customer booking request needs your attention.",url:"/dashboard",tag:`booking-request-${Date.now()}`});
 
   let sent=0;
   await Promise.all(subs.map(async row=>{

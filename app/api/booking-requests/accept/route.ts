@@ -97,6 +97,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Booking request not found" }, { status: 404 });
     }
     const selected = data as BookingRequest;
+    if (!["Pending Approval", "TBC"].includes(selected.status || "")) {
+      return NextResponse.json({ error: "This journey has already been handled. Refresh the dashboard." }, { status: 409 });
+    }
     let linked = [selected];
     if (selected.return_group_id) {
       const result = await supabase
@@ -113,13 +116,14 @@ export async function POST(request: Request) {
     const update = await supabase
       .from("bookings")
       .update({ status: "Scheduled", notes: updatedNotes })
-      .eq("id", selected.id);
+      .eq("id", selected.id).eq("status", selected.status).select("id");
     if (update.error) throw update.error;
+    if (!update.data?.length) return NextResponse.json({ error: "This journey has already been handled. Refresh the dashboard." }, { status: 409 });
 
     const other = linked.find((booking) => booking.id !== selected.id);
     const otherStatus = other?.status ?? "";
     const suffix =
-      other && otherStatus === "Pending Approval"
+      other && ["Pending Approval", "TBC"].includes(otherStatus)
         ? ` Your ${label === "outward journey" ? "return journey" : "outward journey"} is still being reviewed.`
         : other && otherStatus === "Scheduled"
         ? " Both parts of your return booking are now confirmed."
