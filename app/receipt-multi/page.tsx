@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -665,8 +666,15 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
 }
 export default function MultiReceiptPage() {
   return (
-    <Suspense fallback={<div className="p-6">Loading...</div>}>
-      <MultiReceiptContent />
-    </Suspense>
+    <>
+      <nav className="mx-auto max-w-5xl px-6 py-4 print:hidden">
+        <Link href="/dashboard" className="font-semibold text-blue-700 underline">
+          Back to dashboard
+        </Link>
+      </nav>
+      <Suspense fallback={<div className="p-6">Loading...</div>}>
+        <MultiReceiptContent />
+      </Suspense>
+    </>
   );
 }

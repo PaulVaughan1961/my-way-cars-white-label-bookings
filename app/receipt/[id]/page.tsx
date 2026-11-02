@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 
 
@@ -39,7 +40,7 @@ export default function ReceiptPage() {
     if (id) load();
   }, [id]);
 
-  if (!booking) return <div className="p-6">Loading...</div>;
+  if (!booking) return <div className="p-6"><Link href="/dashboard" className="text-blue-700 underline">Back to dashboard</Link><p className="mt-4">Loading...</p></div>;
 
 const isReceipt = booking.payment_status === "Paid";
 
@@ -54,6 +55,11 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
 
   return (
 <main className="min-h-screen bg-white p-6">
+  <nav className="mx-auto max-w-3xl mb-4 print:hidden">
+    <Link href="/dashboard" className="font-semibold text-blue-700 underline">
+      Back to dashboard
+    </Link>
+  </nav>
   <div className="mx-auto max-w-3xl bg-white p-10">
 
     <div className="flex justify-between items-start mb-10">
