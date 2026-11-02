@@ -2768,7 +2768,6 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               "Enquiries",
               "TBC",
               "Pending Approval",
-              "Scheduled",
               "Completed",
               "Unpaid",
               "Cancelled",
