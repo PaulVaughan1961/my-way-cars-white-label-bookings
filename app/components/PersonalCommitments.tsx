@@ -170,7 +170,7 @@ export function PersonalCommitmentsPanel({ diary, date, compact = false }: {
       : !date && !compact ? <p className="mt-2 text-sm text-violet-900">Select a day to see its personal commitments.</p>
       : !shown.length ? <p className="mt-2 text-sm text-violet-900">{compact ? "No personal commitments in the next 7 days." : "No personal commitments on this day."}</p>
       : <ul className="mt-2 space-y-1">{shown.map(entry => <li key={entry.id}>
-        <button type="button" onClick={() => setEditing(entry)} className="w-full rounded-lg px-1 py-2 text-left text-sm text-violet-950 hover:bg-violet-100">
+        <button type="button" onClick={() => setEditing(entry)} className="w-full break-words rounded-lg px-1 py-2 text-left text-sm text-violet-950 hover:bg-violet-100">
           <span className="font-semibold">{compact ? `${new Date(`${entry.starts_at.slice(0, 10)}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/London" })} · ` : ""}{commitmentTime(entry, date || undefined)}</span> · {entry.title}<span className="ml-2 text-xs underline">Edit</span>
         </button>
       </li>)}</ul>}

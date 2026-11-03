@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { isTentative } from "@/lib/bookingWorkflow";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
 import { PersonalCommitmentsPanel, usePersonalCommitments } from "@/app/components/PersonalCommitments";
 import { commitmentTime, commitmentsForDay, moveDay } from "@/lib/personalCommitments";
@@ -21,6 +21,7 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+  const dayDetails = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function loadBookings() {
@@ -87,6 +88,10 @@ export default function CalendarPage() {
   }, [currentMonth]);
 
   const personalDiary = usePersonalCommitments(dateKey(days[0]), moveDay(dateKey(days[days.length - 1]), 1));
+
+  useEffect(() => {
+    if (selectedDate && personalDiary.enabled) dayDetails.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedDate, personalDiary.enabled]);
 
   function dateKey(date: Date) {
   const year = date.getFullYear();
@@ -160,7 +165,7 @@ return (
           </div>
         </div>
 
-        <PersonalCommitmentsPanel diary={personalDiary} date={selectedDate} />
+        {!selectedDate && <PersonalCommitmentsPanel diary={personalDiary} />}
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <button
@@ -238,7 +243,10 @@ return (
               return (
                 <button
                   key={key}
-                  onClick={() => setSelectedDate(key)}
+                  onClick={() => {
+                    setSelectedDate(key);
+                    if (selectedDate === key && personalDiary.enabled) dayDetails.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
 className={`min-h-24 rounded-2xl border p-2 text-left
   ${bgColour}
   ${
@@ -287,7 +295,7 @@ className={`min-h-24 rounded-2xl border p-2 text-left
         </div>
 
         {selectedDate && (
-          <div className="rounded-3xl bg-white p-5 shadow-sm">
+          <div ref={dayDetails} className="scroll-mt-4 rounded-3xl bg-white p-5 shadow-sm">
             <h2 className="mb-4 text-xl font-bold">
               {new Date(selectedDate).toLocaleDateString("en-GB", {
                 weekday: "long",
@@ -296,6 +304,9 @@ className={`min-h-24 rounded-2xl border p-2 text-left
                 year: "numeric",
               })}
             </h2>
+            {personalDiary.enabled && <div className="mb-4">
+              <PersonalCommitmentsPanel diary={personalDiary} date={selectedDate} />
+            </div>}
             <div className="mb-4">
   <Link
     href={`/add?date=${selectedDate}`}
