@@ -4,6 +4,8 @@ import Link from "next/link";
 import { isTentative } from "@/lib/bookingWorkflow";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
+import { PersonalCommitmentsPanel, usePersonalCommitments } from "@/app/components/PersonalCommitments";
+import { commitmentTime, commitmentsForDay, moveDay } from "@/lib/personalCommitments";
 
 type Booking = {
   id: string;
@@ -84,6 +86,8 @@ export default function CalendarPage() {
     return result;
   }, [currentMonth]);
 
+  const personalDiary = usePersonalCommitments(dateKey(days[0]), moveDay(dateKey(days[days.length - 1]), 1));
+
   function dateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -156,6 +160,7 @@ return (
           </div>
         </div>
 
+        <PersonalCommitmentsPanel diary={personalDiary} date={selectedDate} />
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <button
@@ -218,6 +223,7 @@ return (
               const dayBookings = bookingsForDate(key);
               const count = dayBookings.filter(b => !isTentative(b.status)).length;
               const tentativeCount = dayBookings.length - count;
+              const personalEntries = personalDiary.enabled ? commitmentsForDay(personalDiary.entries, key) : [];
               const isCurrentMonth =
                 day.getMonth() === currentMonth.getMonth();
                 const bgColour =
@@ -270,6 +276,10 @@ className={`min-h-24 rounded-2xl border p-2 text-left
 )}
                   </div>
                   {tentativeCount > 0 && <div className="mt-1 rounded bg-purple-100 px-1 text-xs font-bold text-purple-900">{tentativeCount} TBC / pending</div>}
+                  {personalEntries.slice(0, 2).map(entry => <div key={entry.id} className="mt-1 truncate rounded border-l-4 border-violet-700 bg-violet-100 px-1 py-0.5 text-xs font-semibold text-violet-950" title={`${commitmentTime(entry, key)} · ${entry.title}`}>
+                    <span aria-hidden="true">● </span>{commitmentTime(entry, key)} · {entry.title}
+                  </div>)}
+                  {personalEntries.length > 2 && <div className="mt-1 text-xs font-semibold text-violet-900">+{personalEntries.length - 2} personal</div>}
                 </button>
               );
             })}
