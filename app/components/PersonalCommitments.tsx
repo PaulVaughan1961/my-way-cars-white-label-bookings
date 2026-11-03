@@ -156,9 +156,9 @@ export function PersonalCommitmentsPanel({ diary, date, compact = false }: {
   if (!diary.enabled) return null;
   const entries = date ? commitmentsForDay(diary.entries, date) : diary.entries;
   const shown = compact ? entries.slice(0, 4) : entries;
-  return <aside aria-label="Personal diary" className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 print:hidden">
+  const content = <>
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div><span className="font-bold text-violet-950">Personal diary</span><span className="ml-2 text-xs font-medium text-violet-800">Private{compact ? " · next 7 days" : ""}</span></div>
+      {!compact && <div><span className="font-bold text-violet-950">Personal diary</span><span className="ml-2 text-xs font-medium text-violet-800">Private</span></div>}
       <div className="flex flex-wrap gap-2">
         {compact && <Link href="/calendar" className="rounded-lg border border-violet-300 bg-white px-3 py-2 text-sm font-semibold text-violet-900">View calendar</Link>}
         <button type="button" onClick={() => { setSaved(false); setEditing(null); }} className="rounded-lg bg-violet-800 px-3 py-2 text-sm font-semibold text-white">+ Add personal commitment</button>
@@ -176,7 +176,17 @@ export function PersonalCommitmentsPanel({ diary, date, compact = false }: {
       </li>)}</ul>}
     {compact && entries.length > shown.length && <Link href="/calendar" className="mt-2 inline-block text-sm font-semibold text-violet-900 underline">View all personal commitments</Link>}
     {editing !== undefined && <PersonalCommitmentEditor entry={editing} date={date || ukToday()} onClose={() => setEditing(undefined)} onSaved={async () => { await diary.reload(); setSaved(true); }} />}
-  </aside>;
+  </>;
+  if (compact) return <details className="group rounded-2xl border border-violet-200 bg-violet-50 print:hidden">
+    <summary className="cursor-pointer px-4 py-3 text-sm text-violet-950">
+      <span className="font-bold">Personal diary</span>
+      <span className="ml-2 text-xs">{diary.error ? "Needs attention" : diary.loading ? "Loading…" : `${entries.length} in the next 7 days`}</span>
+      <span className="float-right text-xs font-semibold group-open:hidden">Show</span>
+      <span className="float-right hidden text-xs font-semibold group-open:inline">Hide</span>
+    </summary>
+    <div className="border-t border-violet-200 px-4 py-3">{content}</div>
+  </details>;
+  return <aside aria-label="Personal diary" className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 print:hidden">{content}</aside>;
 }
 
 export default function PersonalDiaryStrip() {
