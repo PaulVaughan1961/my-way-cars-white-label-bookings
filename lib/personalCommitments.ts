@@ -10,6 +10,8 @@ export type PersonalClashBooking = {
   id: string;
   driver_name?: string | null;
   passenger_name?: string | null;
+  pickup_address?: string | null;
+  dropoff_address?: string | null;
   pickup_datetime?: string | null;
   booking_type?: string | null;
   status?: string | null;
@@ -46,10 +48,12 @@ function wallMinute(value: string) {
   return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 16) === canonical ? ms : Number.NaN;
 }
 
-export function personalJobMinutes(type: string | null | undefined) {
+export function personalJobMinutes(type: string | null | undefined, pickup?: string | null, dropoff?: string | null) {
   const value = (type || "").trim().toLowerCase();
+  // Older bookings can have no type even when their route names an airport.
+  const airportRoute = [pickup, dropoff].some(address => /\b(?:airports?|heathrow|gatwick)\b/i.test(address || ""));
   // Match the existing booking-clash windows; these are estimates, not actual journey ends.
-  return value.includes("airport") || value.includes("long") ? 120 : 30;
+  return value.includes("airport") || value.includes("long") || airportRoute ? 120 : 30;
 }
 
 export function findPersonalJobClashes(entries: PersonalCommitment[], bookings: PersonalClashBooking[], driverName: string) {
@@ -63,7 +67,7 @@ export function findPersonalJobClashes(entries: PersonalCommitment[], bookings: 
       || ["declined", "rejected"].includes((booking.driver_assignment_status || "").trim().toLowerCase())) continue;
     const start = wallMinute(booking.pickup_datetime || "");
     if (!Number.isFinite(start)) continue;
-    const estimatedMinutes = personalJobMinutes(booking.booking_type);
+    const estimatedMinutes = personalJobMinutes(booking.booking_type, booking.pickup_address, booking.dropoff_address);
     const end = start + estimatedMinutes * 60_000;
     for (const entry of entries) {
       const personalStart = wallMinute(entry.starts_at);
