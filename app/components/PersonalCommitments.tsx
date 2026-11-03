@@ -1,15 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
-import { commitmentTime, commitmentsForDay, moveDay, moveMinutes, ukToday, type PersonalCommitment } from "@/lib/personalCommitments";
+import { commitmentTime, commitmentsForDay, DEFAULT_PERSONAL_DRIVER, findPersonalJobClashes, moveDay, moveMinutes, normaliseDriverName, PERSONAL_DRIVER_METADATA_KEY, personalClashesForDay, personalDateTime, ukToday, type PersonalClashBooking, type PersonalCommitment, type PersonalJobClash } from "@/lib/personalCommitments";
 
-export function usePersonalCommitments(from: string, to: string) {
+export function usePersonalCommitments(from: string, to: string, bookings: PersonalClashBooking[], availableDrivers: string[] = []) {
   const [enabled, setEnabled] = useState(false);
   const [entries, setEntries] = useState<PersonalCommitment[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [driverName, setDriverName] = useState(DEFAULT_PERSONAL_DRIVER);
+  const [driverReady, setDriverReady] = useState(false);
+  const [driverError, setDriverError] = useState("");
+  const [savingDriver, setSavingDriver] = useState(false);
   const requestId = useRef(0);
   const authUser = useRef<string | null>(null);
 
@@ -20,14 +24,24 @@ export function usePersonalCommitments(from: string, to: string) {
     const access = await client.rpc("my_way_personal_calendar_enabled");
     if (request !== requestId.current) return;
     if (access.error || access.data !== true) {
-      setEnabled(false); setEntries([]); setError(""); setLoading(false); return;
+      setEnabled(false); setEntries([]); setError(""); setLoading(false); setDriverReady(false); return;
     }
     setEnabled(true); setLoading(true);
-    const result = await client.rpc("my_way_list_personal_commitments", {
-      requested_from: `${from}T00:00`, requested_to: `${to}T00:00`,
-    });
+    const [result, userResult] = await Promise.all([
+      client.rpc("my_way_list_personal_commitments", {
+        requested_from: `${from}T00:00`, requested_to: `${to}T00:00`,
+      }),
+      client.auth.getUser(),
+    ]);
     if (request !== requestId.current) return;
     setLoading(false);
+    if (userResult.error || !userResult.data.user) {
+      setDriverReady(false); setDriverError("Your driver-name setting could not be loaded. Please try again.");
+    } else {
+      const savedName: unknown = userResult.data.user.user_metadata?.[PERSONAL_DRIVER_METADATA_KEY];
+      setDriverName(typeof savedName === "string" && savedName.trim() ? savedName.trim() : DEFAULT_PERSONAL_DRIVER);
+      setDriverReady(true); setDriverError("");
+    }
     if (result.error) {
       setEntries([]); setError("Your personal diary could not be loaded. Please try again."); return;
     }
@@ -45,7 +59,7 @@ export function usePersonalCommitments(from: string, to: string) {
       const userId = session?.user.id || null;
       if (authUser.current === userId) return;
       authUser.current = userId;
-      ++requestId.current; setEnabled(false); setEntries([]); setError("");
+      ++requestId.current; setEnabled(false); setEntries([]); setError(""); setDriverReady(false);
       // Avoid making another auth request inside the auth callback.
       clearTimeout(timer); timer = setTimeout(() => void reload(), 0);
     });
@@ -57,13 +71,42 @@ export function usePersonalCommitments(from: string, to: string) {
     };
   }, [reload]);
 
-  return { enabled, entries, error, loading, reload };
+  async function changeDriver(value: string) {
+    setSavingDriver(true); setDriverError("");
+    const request = requestId.current;
+    try {
+      const { error: failure } = await getSupabase().auth.updateUser({ data: { [PERSONAL_DRIVER_METADATA_KEY]: value } });
+      if (failure) throw failure;
+      if (request === requestId.current) { setDriverName(value); setDriverReady(true); }
+      else await reload();
+    } catch {
+      if (request === requestId.current) setDriverError("Your driver name could not be saved. Please try again.");
+    } finally { setSavingDriver(false); }
+  }
+
+  const names = [driverName, ...availableDrivers, ...bookings.map(job => job.driver_name || "")].map(name => name.trim()).filter(Boolean);
+  const driverNames = names.filter((name, index) => names.findIndex(value => normaliseDriverName(value) === normaliseDriverName(name)) === index).sort();
+  const clashes = useMemo(() => enabled && driverReady ? findPersonalJobClashes(entries, bookings, driverName) : [], [enabled, driverReady, entries, bookings, driverName]);
+  return { enabled, entries, error, loading, reload, bookings, driverName, driverNames, driverReady, driverError, savingDriver, changeDriver, clashes };
 }
 
 type DiaryState = ReturnType<typeof usePersonalCommitments>;
 
-function PersonalCommitmentEditor({ entry, date, onClose, onSaved }: {
+function PersonalClashWarnings({ clashes }: { clashes: PersonalJobClash[] }) {
+  if (!clashes.length) return null;
+  return <div role="status" className="mt-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-950">
+    <p className="font-bold">Possible clash{clashes.length === 1 ? "" : "es"} with your jobs</p>
+    <ul className="mt-2 space-y-2">{clashes.map(clash => <li key={clash.key}>
+      <span className="font-semibold">{clash.commitmentTitle}</span> ({personalDateTime(clash.commitmentStart)}–{personalDateTime(clash.commitmentEnd)}) overlaps {clash.passengerName} at {personalDateTime(clash.bookingStart)}.
+      {" "}<Link href={`/dashboard?focus=${encodeURIComponent(clash.bookingId)}`} target="_blank" rel="noopener noreferrer" className="font-semibold underline">View job</Link>
+    </li>)}</ul>
+    <p className="mt-2 text-xs">Estimated job time: 30 minutes for local/unspecified jobs; 2 hours for airport/long-distance jobs. Allow for travel and actual journey length.</p>
+  </div>;
+}
+
+function PersonalCommitmentEditor({ entry, date, bookings, driverName, driverReady, onClose, onSaved }: {
   entry: PersonalCommitment | null; date: string; onClose: () => void; onSaved: () => Promise<void>;
+  bookings: PersonalClashBooking[]; driverName: string; driverReady: boolean;
 }) {
   const [id] = useState(() => entry?.id || crypto.randomUUID());
   const [title, setTitle] = useState(entry?.title || "");
@@ -74,6 +117,12 @@ function PersonalCommitmentEditor({ entry, date, onClose, onSaved }: {
   const [error, setError] = useState("");
   const heading = entry ? "Edit personal commitment" : "Add personal commitment";
   const titleInput = useRef<HTMLInputElement>(null);
+  const validDay = /^\d{4}-\d{2}-\d{2}T/.test(start);
+  const preview = driverReady ? findPersonalJobClashes([{
+    id, title: title.trim() || "This commitment", all_day: allDay,
+    starts_at: allDay && validDay ? `${start.slice(0, 10)}T00:00` : start,
+    ends_at: allDay && validDay ? `${moveDay(start.slice(0, 10), 1)}T00:00` : end,
+  }], bookings, driverName) : [];
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -83,6 +132,7 @@ function PersonalCommitmentEditor({ entry, date, onClose, onSaved }: {
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (allDay && !validDay) { setError("Please choose a date."); return; }
     const startsAt = allDay ? `${start.slice(0, 10)}T00:00` : start;
     const endsAt = allDay ? `${moveDay(start.slice(0, 10), 1)}T00:00` : end;
     if (!title.trim()) { setError("Please enter a title."); return; }
@@ -126,7 +176,7 @@ function PersonalCommitmentEditor({ entry, date, onClose, onSaved }: {
         </label>
         <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={allDay} onChange={event => setAllDay(event.target.checked)} className="h-5 w-5" />All day</label>
         {allDay ? <label className="block text-sm font-semibold">Date
-          <input required type="date" value={start.slice(0, 10)} onChange={event => setStart(`${event.target.value}T09:00`)} className={field} />
+          <input required type="date" value={start.slice(0, 10)} onChange={event => setStart(event.target.value ? `${event.target.value}T09:00` : "")} className={field} />
         </label> : <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-semibold">Starts (UK time)
             <input required type="datetime-local" value={start} onChange={event => {
@@ -138,6 +188,8 @@ function PersonalCommitmentEditor({ entry, date, onClose, onSaved }: {
             <input required type="datetime-local" value={end} onChange={event => setEnd(event.target.value)} className={field} />
           </label>
         </div>}
+        <PersonalClashWarnings clashes={preview} />
+        {!driverReady && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your assigned-job clash check is unavailable until your driver-name setting is loaded.</p>}
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
         <div className="flex flex-wrap items-center justify-between gap-3">
           {entry && <button type="button" onClick={() => void remove()} disabled={busy} className="rounded-xl border border-red-300 px-4 py-3 font-semibold text-red-800 disabled:opacity-50">Delete</button>}
@@ -156,6 +208,7 @@ export function PersonalCommitmentsPanel({ diary, date, compact = false }: {
   if (!diary.enabled) return null;
   const entries = date ? commitmentsForDay(diary.entries, date) : diary.entries;
   const shown = compact ? entries.slice(0, 4) : entries;
+  const clashes = date ? personalClashesForDay(diary.clashes, date) : diary.clashes;
   const content = <>
     <div className="flex flex-wrap items-center justify-between gap-2">
       {!compact && <div><span className="font-bold text-violet-950">Personal diary</span><span className="ml-2 text-xs font-medium text-violet-800">Private</span></div>}
@@ -164,6 +217,16 @@ export function PersonalCommitmentsPanel({ diary, date, compact = false }: {
         <button type="button" onClick={() => { setSaved(false); setEditing(null); }} className="rounded-lg bg-violet-800 px-3 py-2 text-sm font-semibold text-white">+ Add personal commitment</button>
       </div>
     </div>
+    <div className="mt-3 text-sm text-violet-950">
+      <label className="font-semibold">My driver name
+        <select value={diary.driverName} disabled={!diary.driverReady || diary.savingDriver} onChange={event => void diary.changeDriver(event.target.value)} className="ml-2 max-w-full rounded-lg border border-violet-300 bg-white px-2 py-1 font-normal disabled:opacity-50">
+          {diary.driverNames.map(name => <option key={normaliseDriverName(name)} value={name}>{name}</option>)}
+        </select>
+      </label>
+      <span className="ml-2 text-xs">{diary.savingDriver ? "Saving…" : "Clash checks use this assigned-driver name."}</span>
+      {diary.driverError && <p role="alert" className="mt-1 text-red-800">{diary.driverError} <button type="button" onClick={() => void diary.reload()} className="underline">Try again</button></p>}
+    </div>
+    <PersonalClashWarnings clashes={clashes} />
     {saved && <p role="status" className="mt-2 text-sm font-semibold text-violet-900">Personal diary updated.</p>}
     {diary.error ? <p role="alert" className="mt-2 text-sm text-red-800">{diary.error} <button type="button" onClick={() => void diary.reload()} className="underline">Try again</button></p>
       : diary.loading && !shown.length ? <p className="mt-2 text-sm text-violet-900">Loading your diary…</p>
@@ -175,12 +238,13 @@ export function PersonalCommitmentsPanel({ diary, date, compact = false }: {
         </button>
       </li>)}</ul>}
     {compact && entries.length > shown.length && <Link href="/calendar" className="mt-2 inline-block text-sm font-semibold text-violet-900 underline">View all personal commitments</Link>}
-    {editing !== undefined && <PersonalCommitmentEditor entry={editing} date={date || ukToday()} onClose={() => setEditing(undefined)} onSaved={async () => { await diary.reload(); setSaved(true); }} />}
+    {editing !== undefined && <PersonalCommitmentEditor entry={editing} date={date || ukToday()} bookings={diary.bookings} driverName={diary.driverName} driverReady={diary.driverReady} onClose={() => setEditing(undefined)} onSaved={async () => { await diary.reload(); setSaved(true); }} />}
   </>;
   if (compact) return <details className="group rounded-2xl border border-violet-200 bg-violet-50 print:hidden">
     <summary className="cursor-pointer px-4 py-3 text-sm text-violet-950">
       <span className="font-bold">Personal diary</span>
-      <span className="ml-2 text-xs">{diary.error ? "Needs attention" : diary.loading ? "Loading…" : `${entries.length} in the next 7 days`}</span>
+      <span className="ml-2 text-xs">{diary.error || diary.driverError ? "Needs attention" : diary.loading ? "Loading…" : `${entries.length} in the next 7 days`}</span>
+      {clashes.length > 0 && <span className="ml-2 rounded bg-red-700 px-2 py-0.5 text-xs font-bold text-white">{clashes.length} clash{clashes.length === 1 ? "" : "es"}</span>}
       <span className="float-right text-xs font-semibold group-open:hidden">Show</span>
       <span className="float-right hidden text-xs font-semibold group-open:inline">Hide</span>
     </summary>
@@ -189,8 +253,8 @@ export function PersonalCommitmentsPanel({ diary, date, compact = false }: {
   return <aside aria-label="Personal diary" className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 print:hidden">{content}</aside>;
 }
 
-export default function PersonalDiaryStrip() {
+export default function PersonalDiaryStrip({ bookings, driverNames }: { bookings: PersonalClashBooking[]; driverNames: string[] }) {
   const today = ukToday();
-  const diary = usePersonalCommitments(today, moveDay(today, 7));
+  const diary = usePersonalCommitments(today, moveDay(today, 7), bookings, driverNames);
   return <PersonalCommitmentsPanel diary={diary} compact />;
 }

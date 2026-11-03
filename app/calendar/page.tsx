@@ -5,7 +5,7 @@ import { isTentative } from "@/lib/bookingWorkflow";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
 import { PersonalCommitmentsPanel, usePersonalCommitments } from "@/app/components/PersonalCommitments";
-import { commitmentTime, commitmentsForDay, moveDay } from "@/lib/personalCommitments";
+import { commitmentTime, commitmentsForDay, moveDay, personalClashesForDay } from "@/lib/personalCommitments";
 
 type Booking = {
   id: string;
@@ -14,10 +14,14 @@ type Booking = {
   dropoff_address?: string | null;
   pickup_datetime?: string | null;
   status?: string | null;
+  driver_name?: string | null;
+  booking_type?: string | null;
+  driver_assignment_status?: string | null;
 };
 
 export default function CalendarPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingsError, setBookingsError] = useState("");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
@@ -29,11 +33,14 @@ export default function CalendarPage() {
 
       const { data, error } = await supabase
         .from("bookings")
-        .select("id, passenger_name, pickup_address, dropoff_address, pickup_datetime, status")
+        .select("id, passenger_name, pickup_address, dropoff_address, pickup_datetime, status, driver_name, booking_type, driver_assignment_status")
         .order("pickup_datetime", { ascending: true });
 
       if (!error && data) {
         setBookings(data);
+        setBookingsError("");
+      } else {
+        setBookingsError("Jobs could not be loaded. Personal clash checks are unavailable; please refresh the calendar.");
       }
     }
 
@@ -87,7 +94,7 @@ export default function CalendarPage() {
     return result;
   }, [currentMonth]);
 
-  const personalDiary = usePersonalCommitments(dateKey(days[0]), moveDay(dateKey(days[days.length - 1]), 1));
+  const personalDiary = usePersonalCommitments(dateKey(days[0]), moveDay(dateKey(days[days.length - 1]), 1), bookings);
 
   useEffect(() => {
     if (selectedDate && personalDiary.enabled) dayDetails.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -165,6 +172,7 @@ return (
           </div>
         </div>
 
+        {personalDiary.enabled && bookingsError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{bookingsError}</p>}
         {!selectedDate && <PersonalCommitmentsPanel diary={personalDiary} />}
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
@@ -229,6 +237,7 @@ return (
               const count = dayBookings.filter(b => !isTentative(b.status)).length;
               const tentativeCount = dayBookings.length - count;
               const personalEntries = personalDiary.enabled ? commitmentsForDay(personalDiary.entries, key) : [];
+              const dayPersonalClashes = personalDiary.enabled ? personalClashesForDay(personalDiary.clashes, key) : [];
               const isCurrentMonth =
                 day.getMonth() === currentMonth.getMonth();
                 const bgColour =
@@ -284,7 +293,7 @@ className={`min-h-24 rounded-2xl border p-2 text-left
 )}
                   </div>
                   {tentativeCount > 0 && <div className="mt-1 rounded bg-purple-100 px-1 text-xs font-bold text-purple-900">{tentativeCount} TBC / pending</div>}
-                  {personalEntries.slice(0, 2).map(entry => <div key={entry.id} className="mt-1 truncate rounded border-l-4 border-violet-700 bg-violet-100 px-1 py-0.5 text-xs font-semibold text-violet-950" title={`${commitmentTime(entry, key)} · ${entry.title}`}>
+                  {personalEntries.slice(0, 2).map(entry => <div key={entry.id} className={`mt-1 truncate rounded border-l-4 px-1 py-0.5 text-xs font-semibold ${dayPersonalClashes.some(clash => clash.commitmentId === entry.id) ? "border-red-700 bg-red-100 text-red-950" : "border-violet-700 bg-violet-100 text-violet-950"}`} title={`${commitmentTime(entry, key)} · ${entry.title}`}>
                     <span aria-hidden="true">● </span>{commitmentTime(entry, key)} · {entry.title}
                   </div>)}
                   {personalEntries.length > 2 && <div className="mt-1 text-xs font-semibold text-violet-900">+{personalEntries.length - 2} personal</div>}

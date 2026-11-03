@@ -6,6 +6,92 @@ export type PersonalCommitment = {
   all_day: boolean;
 };
 
+export type PersonalClashBooking = {
+  id: string;
+  driver_name?: string | null;
+  passenger_name?: string | null;
+  pickup_datetime?: string | null;
+  booking_type?: string | null;
+  status?: string | null;
+  driver_assignment_status?: string | null;
+};
+
+export type PersonalJobClash = {
+  key: string;
+  commitmentId: string;
+  commitmentTitle: string;
+  bookingId: string;
+  passengerName: string;
+  bookingStart: string;
+  bookingEnd: string;
+  commitmentStart: string;
+  commitmentEnd: string;
+  overlapStart: string;
+  overlapEnd: string;
+  estimatedMinutes: number;
+};
+
+export const DEFAULT_PERSONAL_DRIVER = "Paul Vaughan";
+export const PERSONAL_DRIVER_METADATA_KEY = "my_way_personal_driver_name";
+
+export function normaliseDriverName(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function wallMinute(value: string) {
+  const match = value.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/);
+  if (!match) return Number.NaN;
+  const canonical = match[0].replace(" ", "T");
+  const ms = Date.parse(`${canonical}:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 16) === canonical ? ms : Number.NaN;
+}
+
+export function personalJobMinutes(type: string | null | undefined) {
+  const value = (type || "").trim().toLowerCase();
+  // Match the existing booking-clash windows; these are estimates, not actual journey ends.
+  return value.includes("airport") || value.includes("long") ? 120 : 30;
+}
+
+export function findPersonalJobClashes(entries: PersonalCommitment[], bookings: PersonalClashBooking[], driverName: string) {
+  const driver = normaliseDriverName(driverName);
+  if (!driver) return [];
+  const excluded = new Set(["cancelled", "rejected", "completed", "pending approval", "tbc"]);
+  const clashes: PersonalJobClash[] = [];
+  for (const booking of bookings) {
+    if (normaliseDriverName(booking.driver_name || "") !== driver
+      || excluded.has((booking.status || "Scheduled").trim().toLowerCase())
+      || ["declined", "rejected"].includes((booking.driver_assignment_status || "").trim().toLowerCase())) continue;
+    const start = wallMinute(booking.pickup_datetime || "");
+    if (!Number.isFinite(start)) continue;
+    const estimatedMinutes = personalJobMinutes(booking.booking_type);
+    const end = start + estimatedMinutes * 60_000;
+    for (const entry of entries) {
+      const personalStart = wallMinute(entry.starts_at);
+      const personalEnd = wallMinute(entry.ends_at);
+      if (!Number.isFinite(personalStart) || !Number.isFinite(personalEnd) || personalEnd <= personalStart) continue;
+      if (start >= personalEnd || end <= personalStart) continue;
+      const minute = (ms: number) => new Date(ms).toISOString().slice(0, 16);
+      clashes.push({
+        key: `${entry.id}:${booking.id}`, commitmentId: entry.id, commitmentTitle: entry.title,
+        bookingId: booking.id, passengerName: booking.passenger_name || "Unnamed booking",
+        bookingStart: minute(start), bookingEnd: minute(end),
+        commitmentStart: minute(personalStart), commitmentEnd: minute(personalEnd),
+        overlapStart: minute(Math.max(start, personalStart)), overlapEnd: minute(Math.min(end, personalEnd)),
+        estimatedMinutes,
+      });
+    }
+  }
+  return clashes.sort((a, b) => a.overlapStart.localeCompare(b.overlapStart) || a.key.localeCompare(b.key));
+}
+
+export function personalClashesForDay(clashes: PersonalJobClash[], day: string) {
+  return clashes.filter(clash => clash.overlapStart < `${moveDay(day, 1)}T00:00` && clash.overlapEnd > `${day}T00:00`);
+}
+
+export function personalDateTime(value: string) {
+  return `${value.slice(8, 10)}/${value.slice(5, 7)} ${value.slice(11, 16)}`;
+}
+
 export function ukToday() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit",
