@@ -45,7 +45,7 @@ export default function BookingQuoteEditor({ journeys, businessName, onClose, on
     <div className="mx-auto max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-xl">
       <div className="flex items-start justify-between gap-4"><h2 id="quote-heading" className="text-xl font-bold">Quote and customer confirmation</h2><button type="button" disabled={busy} onClick={onClose} className="rounded-lg border px-3 py-2">Close</button></div>
       <p className="text-sm">{first?.passenger_name}. {journeys.length > 1 ? "This quote covers both linked journeys." : "This quote covers this journey."}</p>
-      <div>{journeys.map((j, i) => <PassengerCount key={j.id} value={j.passengers} journey={journeys.length > 1 ? i === 0 ? "Outward" : "Return" : undefined} />)}</div>
+      <div className="flex flex-wrap gap-2">{journeys.map((j, i) => <PassengerCount key={j.id} value={j.passengers} journey={journeys.length > 1 ? i === 0 ? "Outward" : "Return" : undefined} />)}</div>
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{error}</p>}
       {issued ? <>
         <p className="rounded-xl bg-green-50 p-3 font-semibold">Quote prepared. Confirmation closes {deadlineText(issued.expiresAt)} UK time.</p>
@@ -61,6 +61,7 @@ export default function BookingQuoteEditor({ journeys, businessName, onClose, on
           <span className="block font-semibold">{journeys.length > 1 ? i === 0 ? "Outward" : "Return" : "Journey"}: {ukDateTime(j.pickup_datetime || "")}</span>
           <span className="block">{j.pickup_address} to {j.dropoff_address}</span>
           <span className="mt-2 block font-bold">{passengerInfo(j.passengers).label}</span>
+          {passengerInfo(j.passengers).requiresLargerVehicle && <span className="block text-xs text-amber-900">Check capacity: minibus, larger vehicle or two vehicles.</span>}
           Price (GBP)<input required type="number" min="0" max="100000" step="0.01" value={fares[j.id] || ""} onChange={e => setFares(old => ({ ...old, [j.id]: e.target.value }))} className="mt-1 w-full rounded-lg border p-3" />
         </label>)}
         <label className="block text-sm font-semibold">Quote valid for (hours after creation)
