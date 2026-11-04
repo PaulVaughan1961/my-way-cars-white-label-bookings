@@ -5,11 +5,13 @@ import { isTentative } from "@/lib/bookingWorkflow";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
 import { PersonalCommitmentsPanel, usePersonalCommitments } from "@/app/components/PersonalCommitments";
+import PassengerCount from "@/app/components/PassengerCount";
 import { commitmentTime, commitmentsForDay, moveDay, personalClashesForDay } from "@/lib/personalCommitments";
 
 type Booking = {
   id: string;
   passenger_name?: string | null;
+  passengers?: number | string | null;
   pickup_address?: string | null;
   dropoff_address?: string | null;
   pickup_datetime?: string | null;
@@ -33,7 +35,7 @@ export default function CalendarPage() {
 
       const { data, error } = await supabase
         .from("bookings")
-        .select("id, passenger_name, pickup_address, dropoff_address, pickup_datetime, status, driver_name, booking_type, driver_assignment_status")
+        .select("id, passenger_name, passengers, pickup_address, dropoff_address, pickup_datetime, status, driver_name, booking_type, driver_assignment_status")
         .order("pickup_datetime", { ascending: true });
 
       if (!error && data) {
@@ -341,7 +343,8 @@ className={`min-h-24 rounded-2xl border p-2 text-left
   }
   className="cursor-pointer rounded-2xl border border-slate-200 p-4 hover:bg-slate-50"
 >
-    <div className="font-semibold">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <div className="max-w-full font-semibold [overflow-wrap:anywhere]">
       {booking.pickup_datetime
         ? new Date(booking.pickup_datetime).toLocaleTimeString(
             "en-GB",
@@ -352,6 +355,8 @@ className={`min-h-24 rounded-2xl border p-2 text-left
           )
         : "No time"}{" "}
       — {booking.passenger_name || "Unnamed passenger"}
+    </div>
+    <PassengerCount value={booking.passengers} />
     </div>
 
     <div className="mt-1 text-sm text-slate-600">
