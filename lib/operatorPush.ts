@@ -19,7 +19,7 @@ function serverClient() {
   return createClient(url, secretKey, { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false } });
 }
 
-export async function notifyOperatorNewBookingRequest(input:{businessId:string;businessName:string;payload:BookingPayload;event?:"confirmed"|"accepted_quote"|"recheck"}) {
+export async function notifyOperatorNewBookingRequest(input:{businessId:string;businessName:string;payload:BookingPayload;event?:"confirmed"|"accepted_quote"|"declined_quote"|"recheck"}) {
   const publicKey=process.env.VAPID_PUBLIC_KEY;
   const privateKey=process.env.VAPID_PRIVATE_KEY;
   const subject=process.env.VAPID_SUBJECT || "mailto:notifications@mywaycars.co.uk";
@@ -40,7 +40,7 @@ export async function notifyOperatorNewBookingRequest(input:{businessId:string;b
   const journey=[pickup,dropoff].filter(Boolean).join(" to ");
   const passengers = input.event ? null : requestPassengerInfo(input.payload);
   const detail=[passengers?.label,name,when,journey].filter(Boolean).join(" | ");
-  const label = input.event === "confirmed" ? "customer confirmed booking" : input.event === "accepted_quote" ? "quote accepted: approval needed" : input.event === "recheck" ? "availability recheck requested" : input.payload.requestIntent === "enquiry" ? "new enquiry" : input.payload.requestIntent === "booking" ? "new booking request" : "new request: intent not specified";
+  const label = input.event === "confirmed" ? "NEW BOOKING: customer confirmed — check driver assignment" : input.event === "accepted_quote" ? "CUSTOMER ACCEPTED: confirm booking and assign driver" : input.event === "declined_quote" ? "customer declined quote" : input.event === "recheck" ? "availability recheck requested" : input.payload.requestIntent === "enquiry" ? "new enquiry" : input.payload.requestIntent === "booking" ? "new booking request" : "new request: intent not specified";
   const payload=JSON.stringify({title:`${input.businessName}: ${passengers?.requiresLargerVehicle ? "MINIBUS / LARGER VEHICLE OR TWO VEHICLES — " : ""}${label}`,body:detail||"A new customer booking request needs your attention.",url:"/dashboard",tag:`booking-request-${Date.now()}`});
 
   let sent=0;

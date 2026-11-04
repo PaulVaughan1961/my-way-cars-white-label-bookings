@@ -12,7 +12,7 @@ export default function ConfirmationClient() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [now, setNow] = useState(Date.now());
-  async function act(action: "view" | "confirm" | "recheck") {
+  async function act(action: "view" | "confirm" | "decline" | "recheck") {
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/booking-quotes", { method: "POST", cache: "no-store",
@@ -41,6 +41,7 @@ export default function ConfirmationClient() {
       <div aria-live="polite" className={`rounded-xl p-4 ${quote.state === "confirmed" ? "bg-green-100 text-green-950" : "bg-amber-50 text-amber-950"}`}>
         {quote.state === "confirmed" ? <><strong>Your booking is confirmed.</strong><p>Keep this page as your confirmation. Contact your operator if your plans change.</p></> :
           quote.state === "awaiting_operator" ? <><strong>Quote accepted — awaiting operator confirmation.</strong><p>Your operator will check availability and contact you. Your journey is not yet confirmed.</p></> :
+          quote.state === "declined" ? <><strong>You have declined this quote.</strong><p>Your response has been recorded for your operator. No booking has been confirmed. Contact your operator if you would like a different quote.</p></> :
           quote.state === "recheck_requested" ? <><strong>Your availability request has been received.</strong><p>Your journey is not confirmed. Your operator will contact you.</p></> :
           expired ? <><strong>This quote has expired.</strong><p>Please call us to check availability, or request availability again below.</p></> :
           quote.state === "withdrawn" ? <><strong>This quote has been withdrawn or replaced.</strong><p>Use the latest link sent by your operator, or call us.</p></> :
@@ -62,6 +63,7 @@ export default function ConfirmationClient() {
       {ready && <button disabled={busy} onClick={() => void act("confirm")} className="w-full rounded-xl bg-green-700 p-4 font-bold text-white disabled:opacity-50">
         {busy ? "Please wait..." : quote.holdAvailability ? "Confirm this booking" : "Accept quote and request booking"}
       </button>}
+      {ready && <button disabled={busy} onClick={() => void act("decline")} className="w-full rounded-xl border border-red-500 p-3 font-semibold text-red-800 disabled:opacity-50">Decline quote</button>}
       {callNumber && <a href={`tel:${callNumber}`} className="block rounded-xl bg-slate-900 p-4 text-center font-bold text-white">Call {quote.businessName}</a>}
       {(quote.canRecheck || (expired && quote.state === "issued")) && <button disabled={busy} onClick={() => void act("recheck")} className="w-full rounded-xl border border-slate-400 p-4 font-semibold disabled:opacity-50">{busy ? "Please wait..." : "Request availability again"}</button>}
     </>}

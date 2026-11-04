@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import BookingQuoteEditor, { type QuoteSummary } from "@/app/components/BookingQuoteEditor";
-import { isTentative, requestIntentLabel, deadlineText } from "@/lib/bookingWorkflow";
+import { isTentative, requestIntentLabel, deadlineText, customerAcceptedQuote, customerQuoteAction } from "@/lib/bookingWorkflow";
 import OperatorLogoutButton from "@/app/components/OperatorLogoutButton";
 import OperatorPushNotifications from "@/app/components/OperatorPushNotifications";
 import PersonalDiaryStrip from "@/app/components/PersonalCommitments";
@@ -489,6 +489,7 @@ const [showPassengerNames, setShowPassengerNames] =
       setBookings((data as BookingRow[]) ?? []);
       const summaries = await supabase.rpc("get_booking_quote_summaries");
       if (!summaries.error) setQuoteSummaries(summaries.data || []);
+      else setErrorMessage("Bookings loaded, but customer quote responses could not be refreshed. Please refresh before handling an accepted quote.");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load bookings";
@@ -615,7 +616,28 @@ useEffect(() => {
     return () => window.clearInterval(timer);
   }, []);
 
+const customerResponses = useMemo(() => {
+  const states = new Map(quoteSummaries.map(quote => [quote.bookingId, quote.state]));
+  const groups = new Map<string, { booking: BookingRow; action: string | null; declined: boolean }>();
+  for (const booking of [...bookings].sort((a, b) => getWhenMs(a) - getWhenMs(b))) {
+    const state = states.get(booking.id);
+    const action = customerQuoteAction(booking, state);
+    const declined = state === "declined" && isTentative(booking.status);
+    if (!action && !declined) continue;
+    const key = booking.return_group_id || booking.id;
+    if (!groups.has(key)) groups.set(key, { booking, action, declined });
+  }
+  return [...groups.values()];
+}, [bookings, quoteSummaries]);
+
+function reviewCustomerResponses(filter: "Customer accepted" | "Customer declined") {
+  setStatusFilter(filter); setSearchTerm("");
+  setCardModes(current => ({ ...current, ...Object.fromEntries(bookings.map(booking => [booking.id, "full" as const])) }));
+  window.setTimeout(() => scrollToRefWithOffset(bookingFiltersRef, 0), 0);
+}
+
 const filteredBookings = useMemo(() => {
+  const quoteStates = new Map(quoteSummaries.map(quote => [quote.bookingId, quote.state]));
   const now = Date.now();
   const needle = searchTerm.trim().toLowerCase();
   const normalisedNeedle = needle.replace(/[^\dA-Za-z]/g, "");
@@ -672,11 +694,15 @@ const filteredBookings = useMemo(() => {
         when >= now - graceMs &&
         status !== "Cancelled" &&
         status !== "Completed" &&
-        status !== "Rejected" && !isTentative(status)
+        status !== "Rejected" && (!isTentative(status) || customerAcceptedQuote(quoteStates.get(row.id)))
       );
     });
   } else if (statusFilter === "Enquiries") {
-    result = result.filter(row => row.request_intent === "enquiry" && isTentative(row.status));
+    result = result.filter(row => row.request_intent === "enquiry" && isTentative(row.status) && !customerAcceptedQuote(quoteStates.get(row.id)));
+  } else if (statusFilter === "Customer accepted") {
+    result = result.filter(row => !!customerQuoteAction(row, quoteStates.get(row.id)));
+  } else if (statusFilter === "Customer declined") {
+    result = result.filter(row => quoteStates.get(row.id) === "declined" && isTentative(row.status));
   } else if (statusFilter === "Unpaid") {
     result = result.filter((row) => {
       const payment = (row.payment_status ?? "Unpaid").toString();
@@ -766,7 +792,7 @@ const filteredBookings = useMemo(() => {
       matchesDriverRecord
     );
   });
-}, [allDrivers, bookings, statusFilter, searchTerm]);
+}, [allDrivers, bookings, quoteSummaries, statusFilter, searchTerm]);
 
 const matchedDriverSearch = useMemo(() => {
   const needle = searchTerm.trim().toLowerCase();
@@ -1204,7 +1230,12 @@ async function workflowAction(booking: BookingRow, action: "hold" | "withdraw" |
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Unable to update booking.");
     await loadBookings(false);
-    if (action === "approve") window.alert("Booking confirmed. Please notify the customer. Their quote link now also shows confirmation.");
+    if (action === "approve") {
+      setStatusFilter("Upcoming"); setSearchTerm("");
+      setCardModes(current => ({ ...current, ...Object.fromEntries(bookings.filter(row => row.id === booking.id || (!!booking.return_group_id && row.return_group_id === booking.return_group_id)).map(row => [row.id, "full" as const])) }));
+      window.setTimeout(() => scrollToRefWithOffset(bookingFiltersRef, 0), 0);
+      window.alert("Booking confirmed. Assign a driver next and notify the customer. Their quote link now also shows confirmation.");
+    }
   } catch (e) { setErrorMessage(e instanceof Error ? e.message : "Unable to update booking."); }
   finally { setBusyId(null); }
 }
@@ -1502,8 +1533,9 @@ function toggleBookingSelection(id: string) {
     const fare = getFare(booking);
     const status = (booking.status ?? "Scheduled").toString();
     const tentative = isTentative(status);
-    const intentLabel = requestIntentLabel(booking.request_intent);
     const quoteSummary = quoteSummaries.find(q => q.bookingId === booking.id);
+    const intentLabel = customerAcceptedQuote(quoteSummary?.state) ? "CUSTOMER ACCEPTED" : quoteSummary?.state === "declined" ? "CUSTOMER DECLINED" : requestIntentLabel(booking.request_intent);
+    const customerAction = customerQuoteAction(booking, quoteSummary?.state);
     const paymentStatus = (booking.payment_status ?? "Unpaid").toString();
     const driverAssignmentStatus = (
       booking.driver_assignment_status ?? ""
@@ -1570,6 +1602,14 @@ function toggleBookingSelection(id: string) {
               })()
         }`}
       >
+        {customerAction && <div className="mb-3 rounded-xl border-2 border-blue-600 bg-blue-50 p-3 text-sm text-blue-950">
+          <p className="font-semibold">{name}</p>
+          <p className="font-black">{quoteSummary?.state === "awaiting_operator" ? "CUSTOMER ACCEPTED — BOOKING REQUEST NEEDS ACTION" : "NEW CUSTOMER BOOKING — ACTION REQUIRED"}</p>
+          <p>{quoteSummary?.state === "awaiting_operator" ? "Customer accepted the quote. Awaiting your confirmation; this journey is not confirmed yet." : "Customer confirmed the booking."}</p>
+          <p className="font-bold">Next: {customerAction}.</p>
+          {compact && <button type="button" onClick={event => { event.stopPropagation(); setCardModes(current => ({ ...current, [booking.id]: "full" })); }} className="mt-2 rounded-lg bg-blue-700 px-3 py-2 font-semibold text-white">Review booking</button>}
+        </div>}
+        {quoteSummary?.state === "declined" && tentative && <p className="mb-3 rounded-xl border border-slate-300 bg-slate-100 p-3 text-sm font-bold">CUSTOMER DECLINED QUOTE — no booking confirmed. Review the enquiry or issue a revised quote.</p>}
   {compact ? (
   <div className="flex items-start justify-between gap-3 text-sm text-slate-900">
 
@@ -1829,7 +1869,7 @@ function toggleBookingSelection(id: string) {
                 {quoteSummary && <p className="text-sm">Quote: {quoteSummary.state === "issued" && Date.parse(quoteSummary.expiresAt) <= Date.now() ? "expired" : quoteSummary.state.replaceAll("_", " ")} · deadline {deadlineText(quoteSummary.expiresAt)} UK time. {quoteSummary.state === "issued" && Date.parse(quoteSummary.expiresAt) > Date.now() ? quoteSummary.holdAvailability ? "Availability held until deadline." : "Subject to availability." : ""}</p>}
                 <div className="flex flex-wrap gap-2">
                   <button type="button" disabled={isBusy} onClick={() => setQuoteBookingId(booking.id)} className="rounded-xl bg-purple-800 px-3 py-3 font-semibold text-white">Quote / send confirmation link</button>
-                  {quoteSummary?.state === "awaiting_operator" && <button type="button" disabled={isBusy} onClick={() => void workflowAction(booking,"approve")} className="rounded-xl bg-green-700 px-3 py-3 font-bold text-white">Approve accepted quote — all journeys</button>}
+                  {quoteSummary?.state === "awaiting_operator" && <button type="button" disabled={isBusy} onClick={() => void workflowAction(booking,"approve")} className="rounded-xl bg-green-700 px-3 py-3 font-bold text-white">Confirm accepted booking — then assign driver</button>}
                   {status !== "TBC" && <button type="button" disabled={isBusy} onClick={() => void workflowAction(booking,"hold")} className="rounded-xl border border-purple-600 px-3 py-3 font-semibold">Mark TBC</button>}
                   {quoteSummary && ["issued","recheck_requested","awaiting_operator"].includes(quoteSummary.state) && <button type="button" disabled={isBusy} onClick={() => void workflowAction(booking,"withdraw")} className="rounded-xl border px-3 py-3">Withdraw quote link</button>}
                 </div>
@@ -2120,12 +2160,12 @@ ${vehicle || "To be confirmed"}${returnNote}`;
       {status === "TBC" ? "To Be Confirmed" : "Review this request"}
     </div>
     <div className="flex gap-2">
-    {booking.request_intent !== "enquiry" || status === "TBC" ? <button
-      onClick={() => void acceptBookingRequest(booking)}
+    {(booking.request_intent !== "enquiry" || status === "TBC") && quoteSummary?.state !== "declined" ? <button
+      onClick={() => void (quoteSummary?.state === "awaiting_operator" ? workflowAction(booking, "approve") : acceptBookingRequest(booking))}
       disabled={isBusy}
       className="flex-1 rounded-xl bg-green-700 px-4 py-3 text-base font-bold text-white shadow disabled:opacity-60"
     >
-      {isBusy ? "Working..." : status === "TBC" ? "CONFIRM BOOKING" : "ACCEPT REQUEST"}
+      {isBusy ? "Working..." : quoteSummary?.state === "awaiting_operator" ? "CONFIRM ACCEPTED BOOKING" : status === "TBC" ? "CONFIRM BOOKING" : "ACCEPT REQUEST"}
     </button> : null}
 
     <button
@@ -2338,6 +2378,14 @@ ${vehicle || "To be confirmed"}${returnNote}`;
     </div>
   </div>
 )}
+        {customerResponses.length > 0 && <section aria-label="Customer quote responses requiring action" className="rounded-2xl border-2 border-blue-600 bg-blue-50 p-4 text-blue-950">
+          <h2 className="text-lg font-bold">Customer responses — action required</h2>
+          <ul className="mt-2 space-y-1">{customerResponses.map(({ booking, action, declined }) => <li key={booking.return_group_id || booking.id} className="text-sm"><strong>{getName(booking)}</strong> · {fmtDateTime(getWhen(booking))} · {declined ? "Quote declined — review enquiry" : action}{booking.return_group_id ? " (linked journeys)" : ""}</li>)}</ul>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {customerResponses.some(response => !response.declined) && <button type="button" onClick={() => reviewCustomerResponses("Customer accepted")} className="rounded-xl bg-blue-700 px-4 py-2 font-bold text-white">Review customer-accepted bookings ({customerResponses.filter(response => !response.declined).length})</button>}
+            {customerResponses.some(response => response.declined) && <button type="button" onClick={() => reviewCustomerResponses("Customer declined")} className="rounded-xl border border-slate-400 bg-white px-4 py-2 font-semibold">Review declined quotes ({customerResponses.filter(response => response.declined).length})</button>}
+          </div>
+        </section>}
         <PersonalDiaryStrip bookings={bookings} driverNames={allDrivers.map(driver => driver.name)} />
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2777,6 +2825,8 @@ ${vehicle || "To be confirmed"}${returnNote}`;
               "All",
               "Upcoming",
               "Needs Action",
+              "Customer accepted",
+              "Customer declined",
               "Enquiries",
               "TBC",
               "Pending Approval",

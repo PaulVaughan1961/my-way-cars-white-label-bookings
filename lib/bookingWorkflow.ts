@@ -8,6 +8,19 @@ export function requestIntentLabel(intent: unknown) {
   return "INTENT NOT SPECIFIED";
 }
 
+export function customerQuoteAction(booking: { status?: string | null; driver_name?: string | null; driver_assignment_status?: string | null }, quoteState?: string) {
+  if (["Completed", "Cancelled", "Rejected"].includes(booking.status || "")) return null;
+  if (quoteState === "awaiting_operator") return "Confirm booking, then assign driver";
+  if (quoteState !== "confirmed") return null;
+  if (!booking.driver_name?.trim() || booking.driver_assignment_status === "Declined") return "Assign driver";
+  if (booking.driver_assignment_status === "Awaiting response") return "Awaiting driver confirmation";
+  return null;
+}
+
+export function customerAcceptedQuote(state?: string) {
+  return state === "awaiting_operator" || state === "confirmed";
+}
+
 export function ukDateTime(value: string) {
   // Bookings store UK wall time, whereas deadlines are absolute instants.
   // Render a booking wall time literally, without the viewer's timezone.

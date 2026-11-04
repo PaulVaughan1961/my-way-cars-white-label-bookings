@@ -7,19 +7,19 @@ export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
     const body = await readWorkflowBody(request);
-    if (!["view", "confirm", "recheck"].includes(String(body.action))) throw new Error("Invalid confirmation action.");
+    if (!["view", "confirm", "decline", "recheck"].includes(String(body.action))) throw new Error("Invalid confirmation action.");
     const tokenHash = hashConfirmationToken(body.token);
     const client = workflowServiceClient();
-    const { data, error } = await client.rpc("customer_booking_quote_action", {
-      requested_token_hash: tokenHash, requested_action: body.action,
-    });
+    const { data, error } = body.action === "decline"
+      ? await client.rpc("decline_customer_booking_quote", { requested_token_hash: tokenHash })
+      : await client.rpc("customer_booking_quote_action", { requested_token_hash: tokenHash, requested_action: body.action });
     if (error) throw error;
     if (data.newAction) {
       const first = data.journeys?.[0] || {};
       try {
         await notifyOperatorNewBookingRequest({
           businessId: data.businessId, businessName: data.businessName,
-          event: data.state === "confirmed" ? "confirmed" : data.state === "awaiting_operator" ? "accepted_quote" : "recheck",
+          event: data.state === "declined" ? "declined_quote" : data.state === "confirmed" ? "confirmed" : data.state === "awaiting_operator" ? "accepted_quote" : "recheck",
           payload: { passengerName: first.passengerName, outward: {
             pickupAddress: first.pickup, dropoffAddress: first.dropoff, pickupDateTime: first.pickupDateTime,
           } },
