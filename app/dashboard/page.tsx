@@ -6,6 +6,7 @@ import { isTentative, requestIntentLabel, deadlineText } from "@/lib/bookingWork
 import OperatorLogoutButton from "@/app/components/OperatorLogoutButton";
 import OperatorPushNotifications from "@/app/components/OperatorPushNotifications";
 import PersonalDiaryStrip from "@/app/components/PersonalCommitments";
+import PassengerCount from "@/app/components/PassengerCount";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase/client";
@@ -1569,6 +1570,7 @@ function toggleBookingSelection(id: string) {
               })()
         }`}
       >
+        <PassengerCount value={booking.passengers} />
   {compact ? (
   <div className="flex items-center justify-between gap-2 overflow-hidden text-sm text-slate-900">
 

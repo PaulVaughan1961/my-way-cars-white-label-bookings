@@ -1,5 +1,6 @@
 import * as webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
+import { requestPassengerInfo } from "@/lib/passengerCount";
 
 type BookingPayload = Record<string, unknown>;
 
@@ -37,9 +38,10 @@ export async function notifyOperatorNewBookingRequest(input:{businessId:string;b
   const dropoff=pickText(outward,["dropoffAddress"])||pickText(input.payload,["dropoff_address","dropoff","to_address"]);
   const when=pickText(outward,["pickupDateTime"])||pickText(input.payload,["pickup_datetime","pickup_at","journey_at","date_time"]);
   const journey=[pickup,dropoff].filter(Boolean).join(" to ");
-  const detail=[name,when,journey].filter(Boolean).join(" | ");
+  const passengers = input.event ? null : requestPassengerInfo(input.payload);
+  const detail=[passengers?.label,name,when,journey].filter(Boolean).join(" | ");
   const label = input.event === "confirmed" ? "customer confirmed booking" : input.event === "accepted_quote" ? "quote accepted: approval needed" : input.event === "recheck" ? "availability recheck requested" : input.payload.requestIntent === "enquiry" ? "new enquiry" : input.payload.requestIntent === "booking" ? "new booking request" : "new request: intent not specified";
-  const payload=JSON.stringify({title:`${input.businessName}: ${label}`,body:detail||"A new customer booking request needs your attention.",url:"/dashboard",tag:`booking-request-${Date.now()}`});
+  const payload=JSON.stringify({title:`${input.businessName}: ${passengers?.requiresLargerVehicle ? "MINIBUS / LARGER VEHICLE OR TWO VEHICLES — " : ""}${label}`,body:detail||"A new customer booking request needs your attention.",url:"/dashboard",tag:`booking-request-${Date.now()}`});
 
   let sent=0;
   await Promise.all(subs.map(async row=>{
