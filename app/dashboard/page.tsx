@@ -1323,6 +1323,10 @@ ${businessDisplayName}`;
 }
 
 async function rejectBookingRequest(booking: BookingRow) {
+  if (quoteSummaries.some(quote => quote.bookingId === booking.id && quote.state === "declined")) {
+    setErrorMessage("This quote has already been declined by the customer.");
+    return;
+  }
   const defaultReason =
     "Unfortunately, we do not have availability for the requested journey.";
   const enteredReason = window.prompt(
@@ -1863,7 +1867,7 @@ function toggleBookingSelection(id: string) {
               })()}
 
               {tentative && <div className="mt-3 space-y-3 rounded-xl border border-purple-300 bg-purple-50 p-3" onClick={e => e.stopPropagation()}>
-                <p className="font-bold">{intentLabel} · {status === "TBC" ? "To Be Confirmed" : "Awaiting review"}</p>
+                <p className="font-bold">{quoteSummary?.state === "declined" ? "CUSTOMER DECLINED — no booking confirmed" : `${intentLabel} · ${status === "TBC" ? "To Be Confirmed" : "Awaiting review"}`}</p>
                 {typeof booking.customer_home_address === "string" && booking.customer_home_address && <p className="text-sm"><strong>Supplied home address:</strong> {booking.customer_home_address}</p>}
                 {booking.customer_home_address && !booking.customer_id ? <p className="text-sm text-amber-900">Customer matching needs review. The supplied address is retained on this request.</p> : null}
                 {quoteSummary && <p className="text-sm">Quote: {quoteSummary.state === "issued" && Date.parse(quoteSummary.expiresAt) <= Date.now() ? "expired" : quoteSummary.state.replaceAll("_", " ")} · deadline {deadlineText(quoteSummary.expiresAt)} UK time. {quoteSummary.state === "issued" && Date.parse(quoteSummary.expiresAt) > Date.now() ? quoteSummary.holdAvailability ? "Availability held until deadline." : "Subject to availability." : ""}</p>}
@@ -2154,13 +2158,13 @@ ${vehicle || "To be confirmed"}${returnNote}`;
                 Dropoff map
               </a>
             ) : null}
-{isTentative(status) ? (
+{isTentative(status) && quoteSummary?.state !== "declined" ? (
   <div className="mb-3 rounded-2xl border-2 border-amber-500 bg-amber-100 p-3 shadow-md">
     <div className="mb-2 text-center text-xs font-black uppercase tracking-wide text-amber-950">
       {status === "TBC" ? "To Be Confirmed" : "Review this request"}
     </div>
     <div className="flex gap-2">
-    {(booking.request_intent !== "enquiry" || status === "TBC") && quoteSummary?.state !== "declined" ? <button
+    {booking.request_intent !== "enquiry" || status === "TBC" ? <button
       onClick={() => void (quoteSummary?.state === "awaiting_operator" ? workflowAction(booking, "approve") : acceptBookingRequest(booking))}
       disabled={isBusy}
       className="flex-1 rounded-xl bg-green-700 px-4 py-3 text-base font-bold text-white shadow disabled:opacity-60"
