@@ -40,9 +40,7 @@ type DriverBookingAction =
   | "on_my_way"
   | "pob"
   | "complete_paid"
-  | "complete_unpaid"
-  | "mark_paid"
-  | "mark_unpaid";
+  | "complete_unpaid";
 
 export default function DriverDashboardPage() {
   const supabase = getSupabase();
@@ -147,32 +145,6 @@ export default function DriverDashboardPage() {
     return error;
   }
 
-  async function updatePaymentStatus(jobId: string, paymentStatus: string) {
-    const confirmed = window.confirm(
-      `Are you sure you want to mark this job as ${paymentStatus}?`
-    );
-
-    if (!confirmed) return;
-
-    const error = await runDriverBookingAction(
-      jobId,
-      paymentStatus === "Paid" ? "mark_paid" : "mark_unpaid"
-    );
-
-    if (error) {
-      alert("Failed to update payment status");
-      return;
-    }
-
-    setJobs((prevJobs) =>
-      prevJobs.map((job) =>
-        job.id === jobId
-          ? { ...job, payment_status: paymentStatus }
-          : job
-      )
-    );
-  }
-
   async function markPassengerOnBoard(jobId: string) {
     const confirmed = window.confirm(
       "Are you sure you want to mark this job POB?"
@@ -238,17 +210,20 @@ export default function DriverDashboardPage() {
     await refreshAssignedJobs();
   }
 
-  async function completeJob(jobId: string, paid: boolean) {
+  async function completeJob(job: Booking, paid: boolean) {
+    const alreadyPaid = job.payment_status === "Paid";
     const confirmed = window.confirm(
-      paid
-        ? "Complete this job and mark it paid?"
-        : "Complete this job and leave it unpaid?"
+      alreadyPaid
+        ? "Complete this job?"
+        : paid
+          ? "Complete this job and mark it paid?"
+          : "Complete this job and leave it unpaid?"
     );
     if (!confirmed) return;
 
     const error = await runDriverBookingAction(
-      jobId,
-      paid ? "complete_paid" : "complete_unpaid"
+      job.id,
+      paid || alreadyPaid ? "complete_paid" : "complete_unpaid"
     );
 
     if (error) {
@@ -256,7 +231,7 @@ export default function DriverDashboardPage() {
       return;
     }
 
-    setJobs((current) => current.filter((job) => job.id !== jobId));
+    setJobs((current) => current.filter((currentJob) => currentJob.id !== job.id));
     window.alert("Job completed. The operator dashboard has been updated.");
   }
 
@@ -313,6 +288,7 @@ export default function DriverDashboardPage() {
     const dropoff = job.dropoff ?? addressFallback;
     const bookingType = job.booking_type ?? "Not set";
     const vehicle = job.vehicle ?? "Not assigned";
+    const alreadyPaid = job.payment_status === "Paid";
     const fare = typeof job.fare === "number" ? `£${job.fare.toFixed(2)}` : "Not set";
     const rawDateTime = job.pickup_datetime;
     const date = rawDateTime
@@ -454,23 +430,19 @@ export default function DriverDashboardPage() {
                   >
                     Dropoff Map
                   </button>
+                  {!alreadyPaid && (
+                    <button
+                      onClick={() => void completeJob(job, false)}
+                      className="rounded-lg bg-emerald-700 px-3 py-3 text-sm font-semibold text-white"
+                    >
+                      Complete Unpaid
+                    </button>
+                  )}
                   <button
-                    onClick={() => void completeJob(job.id, false)}
-                    className="rounded-lg bg-emerald-700 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    Complete Unpaid
-                  </button>
-                  <button
-                    onClick={() => void completeJob(job.id, true)}
+                    onClick={() => void completeJob(job, true)}
                     className="rounded-lg bg-blue-700 px-3 py-3 text-sm font-semibold text-white"
                   >
-                    Complete & Paid
-                  </button>
-                  <button
-                    onClick={() => updatePaymentStatus(job.id, "Paid")}
-                    className="rounded-lg bg-green-600 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    Mark Paid
+                    {alreadyPaid ? "Complete Job" : "Complete & Paid"}
                   </button>
                 </div>
               </>
