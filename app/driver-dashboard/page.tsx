@@ -59,7 +59,7 @@ export default function DriverDashboardPage() {
 
   const refreshAssignedJobs = useCallback(async () => {
     const requestId = ++refreshId.current;
-    const { data, error } = await supabase.rpc("driver_dashboard_jobs");
+    const { data, error } = await supabase.rpc("driver_dashboard_jobs_with_cancellations");
     if (requestId !== refreshId.current) return;
 
     setJobs(error ? [] : (data as Booking[] | null) ?? []);
@@ -261,11 +261,12 @@ export default function DriverDashboardPage() {
     );
   }
 
+  const cancelledJobs = jobs.filter((job) => job.status === "Cancelled");
   const offers = jobs.filter(
-    (job) => job.driver_assignment_status === "Awaiting response"
+    (job) => job.status !== "Cancelled" && job.driver_assignment_status === "Awaiting response"
   );
   const confirmedJobs = jobs.filter(
-    (job) => job.driver_assignment_status !== "Awaiting response"
+    (job) => job.status !== "Cancelled" && job.driver_assignment_status !== "Awaiting response"
   );
   const pastCutoff = nowMs - 12 * 60 * 60 * 1000;
   const pastJobs = confirmedJobs.filter((job) => {
@@ -481,6 +482,32 @@ export default function DriverDashboardPage() {
         {jobsError && (
           <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{jobsError}</p>
         )}
+
+        <div role="status">
+          {cancelledJobs.length > 0 && (
+            <section className="space-y-3 rounded-2xl border border-red-300 bg-red-50 p-4 text-red-950">
+              <h2 className="text-lg font-bold">Cancelled jobs ({cancelledJobs.length})</h2>
+              <p className="text-sm font-semibold">Do not travel for these bookings.</p>
+              <ul className="divide-y divide-red-200">
+                {cancelledJobs.map((job) => (
+                  <li key={job.id} className="py-2">
+                    <p className="font-semibold">
+                      {job.pickup_datetime
+                        ? new Date(job.pickup_datetime).toLocaleString("en-GB", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })
+                        : "Pickup time unavailable"}
+                    </p>
+                    <p className="text-sm">
+                      {job.pickup ?? "Pickup area unavailable"} → {job.dropoff ?? "Drop-off area unavailable"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
 
         {offers.length > 0 ? (
           <section className="space-y-3">
