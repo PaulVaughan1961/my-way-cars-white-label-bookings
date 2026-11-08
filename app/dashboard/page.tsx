@@ -34,6 +34,8 @@ type BookingRow = {
   bags_large?: number | string | null;
   bags_small?: number | string | null;
   local_authority?: string | null;
+  business_id?: string | null;
+  driver_id?: string | null;
   driver_name?: string | null;
   driver_phone?: string | null;
   vehicle?: string | null;
@@ -67,6 +69,7 @@ type BookingRow = {
 
 type DriverOption = {
   id: string;
+  business_id: string;
   name: string;
   driver_phone?: string | null;
   default_vehicle?: string | null;
@@ -86,79 +89,8 @@ type ClashRow = {
   strong: boolean;
 };
 
-function buildDriverMessage(
-  booking: any,
-  businessName = DEFAULT_BUSINESS_NAME
-) {
-  const passenger =
-    booking.leadPassenger ??
-    booking.lead_passenger ??
-    booking.passenger_name ??
-    "—";
-
-  const date =
-    booking.when ??
-    booking.outbound_date ??
-    booking.date ??
-    "—";
-
-  const time =
-    booking.time ??
-    booking.outbound_time ??
-    "—";
-
-  const pickup =
-    booking.pickup ??
-    booking.outbound_pickup ??
-    booking.pickup_address ??
-    "—";
-
-  const dropoff =
-    booking.dropoff ??
-    booking.outbound_dropoff ??
-    booking.dropoff_address ??
-    "—";
-
-  const customerPhone =
-    booking.booker_phone ??
-    booking.customer_phone ??
-    booking.passenger_phone ??
-    "—";
-
-  const flightNumber = booking.return_flight_number ?? "";
-
-  const notes = booking.notes ?? booking.outbound_notes ?? "None";
-
-  return `${businessName}
-
-Passenger: ${passenger}
-Date: ${date}
-Time: ${time}
-
-Pickup:
-${pickup}
-
-Dropoff:
-${dropoff}
-
-${flightNumber ? `Flight Number:
-${flightNumber}
-
-` : ""}Customer Phone:
-${customerPhone}
-
-Notes:
-${notes}`;
-}
-
 function getDriverPhone(row: BookingRow): string {
   return pickString(row, ["driver_phone"]);
-}
-
-function getSmsLink(booking: any) {
-  const phone = booking.driver_phone || "";
-  const message = encodeURIComponent(buildDriverMessage(booking));
-  return `sms:${phone}?body=${message}`;
 }
 
 function cleanDisplayText(value: unknown): string {
@@ -509,7 +441,7 @@ const [showPassengerNames, setShowPassengerNames] =
     const { data, error } = await supabase
       .from("drivers")
       .select(
-        "id,name,driver_phone,default_vehicle,current_vehicle,active"
+        "id,business_id,name,driver_phone,default_vehicle,current_vehicle,active"
       )
       .order("name", { ascending: true });
 
@@ -1165,7 +1097,9 @@ async function assignBookingToDriver(
   booking: BookingRow,
   driverId: string
 ) {
-  const selectedDriver = drivers.find((driver) => driver.id === driverId);
+  const selectedDriver = drivers.find(
+    (driver) => driver.id === driverId && driver.business_id === booking.business_id
+  );
   if (!selectedDriver) {
     window.alert("Select a driver first.");
     return;
@@ -1186,6 +1120,7 @@ async function assignBookingToDriver(
     setBusyId(booking.id);
     setErrorMessage("");
     const patch: Partial<BookingRow> = {
+      driver_id: selectedDriver.id,
       driver_name: selectedDriver.name,
       driver_phone: selectedDriver.driver_phone?.trim() || null,
       vehicle: vehicle || null,
@@ -1544,9 +1479,11 @@ function toggleBookingSelection(id: string) {
     const driverAssignmentStatus = (
       booking.driver_assignment_status ?? ""
     ).toString();
+    const bookingDrivers = drivers.filter((option) => option.business_id === booking.business_id);
     const selectedDriverId =
       assignmentChoices[booking.id] ??
-      drivers.find((option) => option.name === driver)?.id ??
+      booking.driver_id ??
+      bookingDrivers.find((option) => option.name === driver)?.id ??
       "";
     const notes = cleanDisplayText(booking.notes);
     const via = cleanDisplayText(booking.via);
@@ -1899,7 +1836,7 @@ function toggleBookingSelection(id: string) {
                       className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                     >
                       <option value="">Choose an active driver</option>
-                      {drivers.map((option) => (
+                      {bookingDrivers.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.name}
                           {option.current_vehicle || option.default_vehicle
@@ -2049,31 +1986,15 @@ function toggleBookingSelection(id: string) {
 
                 if (!driverPhone) return;
 
-                const message = `${businessDisplayName.toUpperCase()}
-
-Passenger: ${name}
-Passenger Phone: ${displayOrDash(phone)}
-${booking.return_flight_number ? `Flight Number: ${booking.return_flight_number}
-` : ""}
-When: ${fmtDateTime(when)}
-
-From:
-${displayOrDash(pickup)}
-
-To:
-${displayOrDash(dropoff)}
-
-Estimated Price: ${fare === null ? "—" : `£${fare.toFixed(2)}`}
-
-Notes:
-${cleanDisplayText(notes) || "None"}`;
+                const link = new URL("/driver-login", window.location.origin);
+                const message = `${businessDisplayName}: open your driver dashboard to view your jobs. ${link}`;
 
                 window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
               }}
               disabled={!driverPhone}
               className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Text details to driver
+              Text driver dashboard link
             </button>
 
             <button

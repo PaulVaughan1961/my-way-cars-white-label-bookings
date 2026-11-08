@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase/client";
 import {
@@ -11,26 +11,18 @@ import {
 type Booking = {
   id: string;
   passenger_name?: string | null;
-  lead_passenger?: string | null;
-  booker_name?: string | null;
-  passenger_phone?: string | null;
-  outbound_pickup?: string | null;
   pickup?: string | null;
-  from_address?: string | null;
-  pickup_address?: string | null;
-  outbound_dropoff?: string | null;
   dropoff?: string | null;
-  to_address?: string | null;
-  dropoff_address?: string | null;
   booking_type?: string | null;
-  type?: string | null;
   vehicle?: string | null;
   pickup_datetime?: string | null;
   payment_status?: string | null;
   status?: string | null;
   driver_assignment_status?: string | null;
-  driver_response_at?: string | null;
-  driver_decline_reason?: string | null;
+  operator_phone?: string | null;
+  passengers?: number | null;
+  bags_large?: number | null;
+  bags_small?: number | null;
 };
 
 type Driver = {
@@ -63,64 +55,42 @@ export default function DriverDashboardPage() {
   const [expandedJobIds, setExpandedJobIds] = useState<string[]>([]);
   const [showPastJobs, setShowPastJobs] = useState(false);
   const [nowMs, setNowMs] = useState(0);
+  const [jobsError, setJobsError] = useState("");
+  const refreshId = useRef(0);
+
+  const refreshAssignedJobs = useCallback(async () => {
+    const requestId = ++refreshId.current;
+    const { data, error } = await supabase.rpc("driver_dashboard_jobs");
+    if (requestId !== refreshId.current) return;
+
+    setJobs(error ? [] : (data as Booking[] | null) ?? []);
+    setJobsError(error ? "Could not load jobs. Refresh to try again." : "");
+    setNowMs(Date.now());
+  }, [supabase]);
 
   useEffect(() => {
-    let bookingChannel: ReturnType<typeof supabase.channel> | null = null;
-    let jobPollTimer: number | null = null;
-
-    async function refreshAssignedJobs(name: string) {
-      const { data: bookings } = await supabase
-        .from("bookings")
-        .select("*")
-        .eq("driver_name", name)
-        .neq("status", "Completed")
-        .order("pickup_datetime", { ascending: true });
-
-      const hiddenStatuses = new Set(["Completed", "Cancelled", "Rejected", "Pending Approval", "TBC"]);
-      const visibleJobs = ((bookings as Booking[]) || []).filter((booking) => {
-        const bookingStatus = (booking.status ?? "Scheduled").toString();
-        return (
-          booking.driver_assignment_status !== "Declined" &&
-          !hiddenStatuses.has(bookingStatus)
-        );
-      });
-
-      // Job offers always take priority over the confirmed journey list.
-      visibleJobs.sort((a, b) => {
-        const aOffer = a.driver_assignment_status === "Awaiting response";
-        const bOffer = b.driver_assignment_status === "Awaiting response";
-        if (aOffer !== bOffer) return aOffer ? -1 : 1;
-
-        const aTime = a.pickup_datetime
-          ? new Date(a.pickup_datetime).getTime()
-          : Number.MAX_SAFE_INTEGER;
-        const bTime = b.pickup_datetime
-          ? new Date(b.pickup_datetime).getTime()
-          : Number.MAX_SAFE_INTEGER;
-        return aTime - bTime;
-      });
-
-      setJobs(visibleJobs);
-      setNowMs(Date.now());
-    }
+    let active = true;
+    let jobPollTimer: number | undefined;
 
     async function loadDriver() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (!active) return;
 
       if (!user || !user.email) {
         router.push("/driver-login");
         return;
       }
 
-const { data: driverData } = await supabase
-  .from("drivers")
-  .select("*")
-  .eq("email", user.email)
-  .single();
+      const { data: driverData } = await supabase
+        .from("drivers")
+        .select("*")
+        .eq("email", user.email)
+        .single();
+      if (!active) return;
 
-const driver = driverData as Driver | null;
+      const driver = driverData as Driver | null;
 
       if (
         !driver ||
@@ -135,43 +105,26 @@ const driver = driverData as Driver | null;
       setEmail(user.email);
       setDriverName(driver.name);
       setStatus("Access confirmed");
-      setBusinessName(await loadBusinessName(supabase, "Your operator"));
+      const name = await loadBusinessName(supabase, "Your operator");
+      if (!active) return;
+      setBusinessName(name);
 
-      await refreshAssignedJobs(driver.name);
-      bookingChannel = supabase
-        .channel(`driver-bookings-${driver.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "bookings",
-          },
-          () => {
-            void refreshAssignedJobs(driver.name);
-          }
-        )
-        .subscribe();
-
-      // Reliable fallback when database Realtime replication is unavailable.
+      await refreshAssignedJobs();
+      if (!active) return;
+      // Driver accounts use the limited jobs function for every refresh.
       jobPollTimer = window.setInterval(() => {
-        if (document.visibilityState === "visible") {
-          void refreshAssignedJobs(driver.name);
-        }
+        if (document.visibilityState === "visible") void refreshAssignedJobs();
       }, 5000);
     }
 
     void loadDriver();
 
     return () => {
-      if (jobPollTimer !== null) {
-        window.clearInterval(jobPollTimer);
-      }
-      if (bookingChannel) {
-        void supabase.removeChannel(bookingChannel);
-      }
+      active = false;
+      refreshId.current++;
+      window.clearInterval(jobPollTimer);
     };
-  }, [router, supabase]);
+  }, [refreshAssignedJobs, router, supabase]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -276,23 +229,12 @@ const driver = driverData as Driver | null;
       setJobs((current) => current.filter((job) => job.id !== jobId));
       window.alert("Job declined. The operator has been notified.");
     } else {
-      setJobs((current) =>
-        current.map((job) =>
-          job.id === jobId
-            ? {
-                ...job,
-                driver_assignment_status: response,
-                driver_response_at: new Date().toISOString(),
-                driver_decline_reason: declineReason,
-              }
-            : job
-        )
-      );
       setExpandedJobIds((current) =>
         current.filter((currentId) => currentId !== jobId)
       );
-      window.alert("Job accepted. It is now in your confirmed job list.");
+      window.alert("Job accepted.");
     }
+    await refreshAssignedJobs();
   }
 
   async function completeJob(jobId: string, paid: boolean) {
@@ -326,68 +268,13 @@ const driver = driverData as Driver | null;
     );
   }
 
-  function textCustomer(
-    phone: string,
-    passenger: string,
-    currentDriverName: string,
-    pickup: string
-  ) {
-    if (!phone) {
-      alert("No customer phone number found");
+  async function markOnMyWay(jobId: string) {
+    const error = await runDriverBookingAction(jobId, "on_my_way");
+    if (error) {
+      window.alert(`Could not update the journey status: ${error.message}`);
       return;
     }
-
-    const firstName = passenger?.split(" ")[0] || "Customer";
-    const driverFirstName =
-      currentDriverName?.split(" ")[0] || "Driver";
-
-    const message = `Hello ${firstName}, this is ${driverFirstName}, I'm your ${businessName} driver. I just wanted to inform you that I am on my way to ${pickup} and will see you soon.
-
-Regards
-${driverFirstName}`;
-
-    const encodedMessage = encodeURIComponent(message);
-
-    window.open(`sms:${phone}?body=${encodedMessage}`, "_blank");
-  }
-
-  function markOnMyWay(
-    jobId: string,
-    phone: string,
-    passenger: string,
-    pickup: string
-  ) {
-    // Open the phone's message composer immediately.  On iPhone/iPad, doing
-    // this after an awaited database call can cause Safari to block it.
-    textCustomer(phone, passenger, driverName, pickup);
-
-    // The text is for the customer; the saved status is for the operator.
-    // Both need to happen when the driver presses "On My Way".
-    void (async () => {
-      const error = await runDriverBookingAction(jobId, "on_my_way");
-
-      if (error) {
-        window.alert(
-          "The customer message was opened, but the operator dashboard could not be updated."
-        );
-        return;
-      }
-
-      setJobs((current) =>
-        current.map((job) =>
-          job.id === jobId ? { ...job, status: "On My Way" } : job
-        )
-      );
-    })();
-  }
-
-  function callCustomer(phone: string) {
-    if (!phone) {
-      alert("No customer phone number found");
-      return;
-    }
-
-    window.open(`tel:${phone}`, "_self");
+    await refreshAssignedJobs();
   }
 
   function toggleJob(jobId: string) {
@@ -419,24 +306,11 @@ ${driverFirstName}`;
     job: Booking,
     options: { offer?: boolean; next?: boolean; past?: boolean } = {}
   ) {
-    const passenger =
-      job.passenger_name ??
-      job.lead_passenger ??
-      job.booker_name ??
-      "Unknown";
-    const pickup =
-      job.outbound_pickup ??
-      job.pickup ??
-      job.from_address ??
-      job.pickup_address ??
-      "Not set";
-    const dropoff =
-      job.outbound_dropoff ??
-      job.dropoff ??
-      job.to_address ??
-      job.dropoff_address ??
-      "Not set";
-    const bookingType = job.booking_type ?? job.type ?? "Not set";
+    const passenger = options.offer ? "Journey offer" : job.passenger_name ?? "Passenger";
+    const addressFallback = options.offer ? "Ask the operator" : "Not set";
+    const pickup = job.pickup ?? addressFallback;
+    const dropoff = job.dropoff ?? addressFallback;
+    const bookingType = job.booking_type ?? "Not set";
     const vehicle = job.vehicle ?? "Not assigned";
     const rawDateTime = job.pickup_datetime;
     const date = rawDateTime
@@ -514,10 +388,20 @@ ${driverFirstName}`;
         {isExpanded ? (
           <div className="border-t border-slate-200 px-4 pb-4 pt-3">
             <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-              <p><strong>Type:</strong> {bookingType}</p>
               <p><strong>Vehicle:</strong> {vehicle}</p>
-              <p><strong>Payment:</strong> {job.payment_status ?? "Unknown"}</p>
-              <p><strong>Status:</strong> {job.status ?? "Unknown"}</p>
+              {options.offer ? (
+                <>
+                  <p><strong>Passengers:</strong> {job.passengers ?? "Unknown"}</p>
+                  <p><strong>Large bags:</strong> {job.bags_large ?? "Unknown"}</p>
+                  <p><strong>Small bags:</strong> {job.bags_small ?? "Unknown"}</p>
+                </>
+              ) : (
+                <>
+                  <p><strong>Type:</strong> {bookingType}</p>
+                  <p><strong>Payment:</strong> {job.payment_status ?? "Unknown"}</p>
+                  <p><strong>Status:</strong> {job.status ?? "Unknown"}</p>
+                </>
+              )}
             </div>
 
             {options.offer ? (
@@ -550,23 +434,10 @@ ${driverFirstName}`;
                     POB
                   </button>
                   <button
-                    onClick={() =>
-                      markOnMyWay(
-                        job.id,
-                        job.passenger_phone ?? "",
-                        passenger,
-                        pickup
-                      )
-                    }
+                    onClick={() => void markOnMyWay(job.id)}
                     className="rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white"
                   >
                     On My Way
-                  </button>
-                  <button
-                    onClick={() => callCustomer(job.passenger_phone ?? "")}
-                    className="rounded-lg bg-purple-600 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    Call
                   </button>
                   <button
                     onClick={() => openMap(pickup)}
@@ -601,6 +472,14 @@ ${driverFirstName}`;
                 </div>
               </>
             )}
+            {job.operator_phone && (
+              <a
+                href={`tel:${job.operator_phone}`}
+                className="mt-3 block rounded-lg bg-purple-600 px-3 py-3 text-center text-sm font-semibold text-white"
+              >
+                Call operator
+              </a>
+            )}
           </div>
         ) : null}
       </div>
@@ -623,6 +502,10 @@ ${driverFirstName}`;
             Logout
           </button>
         </header>
+
+        {jobsError && (
+          <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{jobsError}</p>
+        )}
 
         {offers.length > 0 ? (
           <section className="space-y-3">
