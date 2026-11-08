@@ -20,6 +20,7 @@ type Booking = {
   fare?: number | null;
   status?: string | null;
   driver_assignment_status?: string | null;
+  driver_cancellation_acknowledged_at?: string | null;
   details_visible?: boolean;
   can_mark_on_my_way?: boolean;
   operator_phone?: string | null;
@@ -58,6 +59,7 @@ export default function DriverDashboardPage() {
   const [nowMs, setNowMs] = useState(0);
   const [jobsError, setJobsError] = useState("");
   const [noticesUnavailable, setNoticesUnavailable] = useState(false);
+  const [acknowledgingCancellationId, setAcknowledgingCancellationId] = useState<string | null>(null);
   const refreshId = useRef(0);
 
   const refreshAssignedJobs = useCallback(async () => {
@@ -153,6 +155,26 @@ export default function DriverDashboardPage() {
     });
 
     return error;
+  }
+
+  async function acknowledgeCancellation(jobId: string) {
+    setAcknowledgingCancellationId(jobId);
+    try {
+      const { data, error } = await supabase.rpc("acknowledge_driver_cancellation", {
+        requested_booking_id: jobId,
+      });
+      if (error || typeof data !== "string") {
+        window.alert("Could not record your acknowledgement. Please refresh and try again.");
+        return;
+      }
+
+      refreshId.current++;
+      setJobs((current) => current.map((job) => job.id === jobId
+        ? { ...job, driver_cancellation_acknowledged_at: data }
+        : job));
+    } finally {
+      setAcknowledgingCancellationId(null);
+    }
   }
 
   async function markPassengerOnBoard(jobId: string) {
@@ -542,6 +564,18 @@ export default function DriverDashboardPage() {
                     <p className="text-sm">
                       {job.pickup ?? "Pickup area unavailable"} → {job.dropoff ?? "Drop-off area unavailable"}
                     </p>
+                    {job.driver_cancellation_acknowledged_at ? (
+                      <p className="mt-2 text-sm font-semibold text-green-800">Acknowledged</p>
+                    ) : job.driver_cancellation_acknowledged_at === null ? (
+                      <button
+                        type="button"
+                        onClick={() => void acknowledgeCancellation(job.id)}
+                        disabled={acknowledgingCancellationId !== null}
+                        className="mt-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {acknowledgingCancellationId === job.id ? "Saving…" : "Acknowledge cancellation"}
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>

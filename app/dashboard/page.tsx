@@ -46,6 +46,7 @@ type BookingRow = {
   driver_assigned_at?: string | null;
   driver_response_at?: string | null;
   driver_decline_reason?: string | null;
+  driver_cancellation_acknowledged_at?: string | null;
 
   lead_passenger?: string | null;
   customer_name?: string | null;
@@ -246,6 +247,14 @@ function getWhenMs(row: BookingRow): number {
   const parsed = new Date(value).getTime();
 
   return Number.isNaN(parsed) ? Number.NaN : parsed;
+}
+
+function awaitingDriverCancellationAcknowledgement(booking: BookingRow, now: number) {
+  return booking.status === "Cancelled" &&
+    Boolean(booking.driver_id) &&
+    booking.driver_assignment_status === "Accepted" &&
+    booking.driver_cancellation_acknowledged_at === null &&
+    getWhenMs(booking) >= now - 48 * 60 * 60 * 1000;
 }
 
 function fmtDateTime(value: string): string {
@@ -648,6 +657,7 @@ const filteredBookings = useMemo(() => {
       const status = (row.status ?? "Scheduled").toString();
       const assignment = (row.driver_assignment_status ?? "").toString();
 
+      if (status === "Cancelled") return awaitingDriverCancellationAcknowledgement(row, now);
       if (isTentative(status)) return true;
       if (assignment === "Declined") return true;
       if (assignment === "Awaiting response") return true;
@@ -657,7 +667,6 @@ const filteredBookings = useMemo(() => {
         !Number.isNaN(when) &&
         when < now &&
         status !== "Completed" &&
-        status !== "Cancelled" &&
         status !== "Rejected" && !isTentative(status)
       );
     });
@@ -1014,9 +1023,9 @@ status !== "Rejected" && !isTentative(status)
         const assignment = (
           booking.driver_assignment_status ?? ""
         ).toString();
+        if (status === "Cancelled") return awaitingDriverCancellationAcknowledgement(booking, nowMs);
         if (
           status === "Completed" ||
-          status === "Cancelled" ||
           status === "Rejected"
         ) {
           return false;
@@ -1028,7 +1037,7 @@ status !== "Rejected" && !isTentative(status)
           (status === "Scheduled" && !getDriver(booking))
         );
       }).length,
-    [bookings]
+    [bookings, nowMs]
   );
 
 async function updateBooking(
@@ -1479,6 +1488,10 @@ function toggleBookingSelection(id: string) {
     const driverAssignmentStatus = (
       booking.driver_assignment_status ?? ""
     ).toString();
+    const cancellationAcknowledgedAt = booking.driver_cancellation_acknowledged_at;
+    const showCancellationAcknowledgement = status === "Cancelled" &&
+      Boolean(booking.driver_id) && driverAssignmentStatus === "Accepted" &&
+      cancellationAcknowledgedAt !== undefined;
     const bookingDrivers = drivers.filter((option) => option.business_id === booking.business_id);
     const selectedDriverId =
       assignmentChoices[booking.id] ??
@@ -1543,6 +1556,19 @@ function toggleBookingSelection(id: string) {
               })()
         }`}
       >
+        {showCancellationAcknowledgement && (
+          <p className={`mb-3 rounded-xl px-3 py-2 text-sm font-semibold ${cancellationAcknowledgedAt
+            ? "bg-green-50 text-green-800"
+            : "bg-amber-50 text-amber-900"}`}>
+            {cancellationAcknowledgedAt
+              ? `Cancellation acknowledged by ${driver || "the driver"} at ${new Date(cancellationAcknowledgedAt).toLocaleString("en-GB", {
+                  dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London",
+                })} UK time`
+              : awaitingDriverCancellationAcknowledgement(booking, nowMs)
+                ? `Cancelled · Awaiting acknowledgement from ${driver || "the driver"}`
+                : "Cancelled · No driver acknowledgement recorded"}
+          </p>
+        )}
         {customerAction && <div className="mb-3 rounded-xl border-2 border-blue-600 bg-blue-50 p-3 text-sm text-blue-950">
           <p className="font-semibold">{name}</p>
           <p className="font-black">{quoteSummary?.state === "awaiting_operator" ? "CUSTOMER ACCEPTED — BOOKING REQUEST NEEDS ACTION" : "NEW CUSTOMER BOOKING — ACTION REQUIRED"}</p>
@@ -1565,7 +1591,11 @@ function toggleBookingSelection(id: string) {
           {status === "TBC" ? "TBC · " : ""}{intentLabel}
         </span>
       ) : null}
-      {driverAssignmentStatus === "Declined" ? (
+      {status === "Cancelled" ? (
+        <span className="shrink-0 rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-800">
+          CANCELLED
+        </span>
+      ) : driverAssignmentStatus === "Declined" ? (
         <span className="shrink-0 rounded-full bg-red-600 px-2 py-1 text-xs font-black text-white">
           DRIVER DECLINED
         </span>
@@ -1750,7 +1780,7 @@ function toggleBookingSelection(id: string) {
                 <span className="font-medium">Type:</span> {displayOrDash(bookingType)}
               </div>
 
-              {(() => {
+              {status !== "Cancelled" && (() => {
                 const hasDriver = !!driver;
                 const whenMs = getWhenMs(booking);
                 const diff = whenMs - nowMs;
@@ -2223,8 +2253,7 @@ ${vehicle || "To be confirmed"}${returnNote}`;
             className="w-full rounded-2xl border-2 border-red-500 bg-red-50 p-4 text-left font-bold text-red-800 shadow"
           >
             DRIVER ACTION REQUIRED — {dispatchAttentionCount} booking
-            {dispatchAttentionCount === 1 ? "" : "s"} need assignment or a
-            driver response. Tap to review.
+            {dispatchAttentionCount === 1 ? " needs" : "s need"} review. Tap to open Needs Action.
           </button>
         ) : null}
         {selectedBookings.length > 0 && (
