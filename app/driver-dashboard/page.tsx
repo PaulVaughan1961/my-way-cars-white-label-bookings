@@ -17,6 +17,7 @@ type Booking = {
   vehicle?: string | null;
   pickup_datetime?: string | null;
   payment_status?: string | null;
+  fare?: number | null;
   status?: string | null;
   driver_assignment_status?: string | null;
   operator_phone?: string | null;
@@ -307,11 +308,12 @@ export default function DriverDashboardPage() {
     options: { offer?: boolean; next?: boolean; past?: boolean } = {}
   ) {
     const passenger = options.offer ? "Journey offer" : job.passenger_name ?? "Passenger";
-    const addressFallback = options.offer ? "Ask the operator" : "Not set";
+    const addressFallback = options.offer ? "Area unavailable" : "Not set";
     const pickup = job.pickup ?? addressFallback;
     const dropoff = job.dropoff ?? addressFallback;
     const bookingType = job.booking_type ?? "Not set";
     const vehicle = job.vehicle ?? "Not assigned";
+    const fare = typeof job.fare === "number" ? `£${job.fare.toFixed(2)}` : "Not set";
     const rawDateTime = job.pickup_datetime;
     const date = rawDateTime
       ? new Date(rawDateTime).toLocaleDateString("en-GB", {
@@ -389,6 +391,7 @@ export default function DriverDashboardPage() {
           <div className="border-t border-slate-200 px-4 pb-4 pt-3">
             <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
               <p><strong>Vehicle:</strong> {vehicle}</p>
+              <p><strong>Customer fare:</strong> {fare}</p>
               {options.offer ? (
                 <>
                   <p><strong>Passengers:</strong> {job.passengers ?? "Unknown"}</p>
@@ -472,7 +475,7 @@ export default function DriverDashboardPage() {
                 </div>
               </>
             )}
-            {job.operator_phone && (
+            {!options.offer && job.operator_phone && (
               <a
                 href={`tel:${job.operator_phone}`}
                 className="mt-3 block rounded-lg bg-purple-600 px-3 py-3 text-center text-sm font-semibold text-white"
