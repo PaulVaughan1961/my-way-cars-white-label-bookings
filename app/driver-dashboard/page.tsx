@@ -20,6 +20,8 @@ type Booking = {
   fare?: number | null;
   status?: string | null;
   driver_assignment_status?: string | null;
+  details_visible?: boolean;
+  can_mark_on_my_way?: boolean;
   operator_phone?: string | null;
   passengers?: number | null;
   bags_large?: number | null;
@@ -55,15 +57,23 @@ export default function DriverDashboardPage() {
   const [showPastJobs, setShowPastJobs] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [jobsError, setJobsError] = useState("");
+  const [noticesUnavailable, setNoticesUnavailable] = useState(false);
   const refreshId = useRef(0);
 
   const refreshAssignedJobs = useCallback(async () => {
     const requestId = ++refreshId.current;
-    const { data, error } = await supabase.rpc("driver_dashboard_jobs_with_cancellations");
+    const withNotices = await supabase.rpc("driver_dashboard_jobs_with_cancellations");
+    if (requestId !== refreshId.current) return;
+
+    // Keep active jobs available if the cancellation feed fails.
+    const { data, error } = withNotices.error
+      ? await supabase.rpc("driver_dashboard_jobs")
+      : withNotices;
     if (requestId !== refreshId.current) return;
 
     setJobs(error ? [] : (data as Booking[] | null) ?? []);
     setJobsError(error ? "Could not load jobs. Refresh to try again." : "");
+    setNoticesUnavailable(!error && Boolean(withNotices.error));
     setNowMs(Date.now());
   }, [supabase]);
 
@@ -283,10 +293,14 @@ export default function DriverDashboardPage() {
     job: Booking,
     options: { offer?: boolean; next?: boolean; past?: boolean } = {}
   ) {
-    const passenger = options.offer ? "Journey offer" : job.passenger_name ?? "Passenger";
-    const addressFallback = options.offer ? "Area unavailable" : "Not set";
-    const pickup = job.pickup ?? addressFallback;
-    const dropoff = job.dropoff ?? addressFallback;
+    const detailsVisible = job.details_visible === true;
+    const canShowRoute = options.offer || typeof job.details_visible === "boolean";
+    const passenger = options.offer
+      ? "Journey offer"
+      : detailsVisible ? job.passenger_name ?? "Passenger" : "Accepted job";
+    const addressFallback = detailsVisible ? "Not set" : "Area unavailable";
+    const pickup = (canShowRoute ? job.pickup : null) ?? addressFallback;
+    const dropoff = (canShowRoute ? job.dropoff : null) ?? addressFallback;
     const bookingType = job.booking_type ?? "Not set";
     const vehicle = job.vehicle ?? "Not assigned";
     const alreadyPaid = job.payment_status === "Paid";
@@ -406,31 +420,52 @@ export default function DriverDashboardPage() {
                     JOB ACCEPTED
                   </div>
                 ) : null}
+                {!detailsVisible && (
+                  <p className="mt-3 text-sm text-slate-600">
+                    {!job.pickup_datetime
+                      ? "Contact the operator to confirm the pickup time."
+                      : job.can_mark_on_my_way
+                        ? "Tap On My Way when you leave to see the passenger name and exact addresses."
+                        : "On My Way opens one hour before pickup. The passenger name and exact addresses are shown after you tap it."}
+                  </p>
+                )}
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <button
-                    onClick={() => void markPassengerOnBoard(job.id)}
-                    className="rounded-lg bg-blue-600 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    POB
-                  </button>
-                  <button
-                    onClick={() => void markOnMyWay(job.id)}
-                    className="rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    On My Way
-                  </button>
-                  <button
-                    onClick={() => openMap(pickup)}
-                    className="rounded-lg bg-slate-700 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    Pickup Map
-                  </button>
-                  <button
-                    onClick={() => openMap(dropoff)}
-                    className="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white"
-                  >
-                    Dropoff Map
-                  </button>
+                  {detailsVisible ? (
+                    <>
+                      {job.status !== "POB" && (
+                        <button
+                          onClick={() => void markPassengerOnBoard(job.id)}
+                          className="rounded-lg bg-blue-600 px-3 py-3 text-sm font-semibold text-white"
+                        >
+                          POB
+                        </button>
+                      )}
+                      {job.pickup && (
+                        <button
+                          onClick={() => openMap(pickup)}
+                          className="rounded-lg bg-slate-700 px-3 py-3 text-sm font-semibold text-white"
+                        >
+                          Pickup Map
+                        </button>
+                      )}
+                      {job.dropoff && (
+                        <button
+                          onClick={() => openMap(dropoff)}
+                          className="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white"
+                        >
+                          Dropoff Map
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => void markOnMyWay(job.id)}
+                      disabled={!job.can_mark_on_my_way}
+                      className="rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      On My Way
+                    </button>
+                  )}
                   {!alreadyPaid && (
                     <button
                       onClick={() => void completeJob(job, false)}
@@ -482,6 +517,11 @@ export default function DriverDashboardPage() {
         {jobsError && (
           <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{jobsError}</p>
         )}
+        {noticesUnavailable && (
+          <p role="status" className="rounded-xl bg-amber-50 p-3 text-amber-900">
+            Cancellation notices could not load. Your active jobs are shown below.
+          </p>
+        )}
 
         <div role="status">
           {cancelledJobs.length > 0 && (
@@ -518,25 +558,27 @@ export default function DriverDashboardPage() {
           </section>
         ) : null}
 
-        <section className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-950">Upcoming jobs</h2>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
-              {upcomingJobs.length}
-            </span>
-          </div>
-          {upcomingJobs.length === 0 ? (
-            <p className="rounded-xl bg-slate-50 p-4 text-slate-500">
-              No upcoming confirmed jobs
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {upcomingJobs.map((job, index) =>
-                renderJobCard(job, { next: index === 0 })
-              )}
+        {!jobsError && (
+          <section className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-950">Upcoming jobs</h2>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
+                {upcomingJobs.length}
+              </span>
             </div>
-          )}
-        </section>
+            {upcomingJobs.length === 0 ? (
+              <p className="rounded-xl bg-slate-50 p-4 text-slate-500">
+                No upcoming confirmed jobs
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {upcomingJobs.map((job, index) =>
+                  renderJobCard(job, { next: index === 0 })
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {pastJobs.length > 0 ? (
           <section className="rounded-2xl border border-slate-300 bg-white p-4 shadow-sm">
