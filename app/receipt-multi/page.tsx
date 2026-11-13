@@ -257,7 +257,7 @@ async function markDocumentSent() {
             ],
             phone: "07792042081",
             email: "hello@mywaytaxis.co.uk",
-            website: "www.mywaycars.co.uk",
+            website: "hungerfordtaxis.com",
           }
         : {
             name: businessName,
@@ -407,7 +407,7 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
                 <div>Hungerford RG17 0NL</div>
                 <div>07792042081</div>
                 <div>hello@mywaytaxis.co.uk</div>
-                <div>www.mywaycars.co.uk</div>
+                <div>hungerfordtaxis.com</div>
               </>
             ) : null}
           </div>
