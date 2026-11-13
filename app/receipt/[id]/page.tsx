@@ -84,7 +84,7 @@ const isMyWayCars = isMyWayCarsBusiness(businessName);
             <div>Hungerford RG17 0NL</div>
             <div>07792042081</div>
             <div>hello@mywaytaxis.co.uk</div>
-            <div>hungerfordtaxis.com</div>
+            <div>www.hungerfordtaxis.com</div>
           </>
         ) : null}
       </div>
