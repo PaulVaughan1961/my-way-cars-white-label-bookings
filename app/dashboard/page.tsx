@@ -294,12 +294,6 @@ function smsHref(phone: string, message?: string): string {
   return `sms:${recipient}${separator}body=${encodeURIComponent(message)}`;
 }
 
-function subcontractorOfferArea(address: string): string {
-  const postcode = address.match(/\b([A-Z]{1,2}\d[A-Z0-9]?)\s*\d[A-Z]{2}\b/i);
-  const airport = address.match(/\b(Heathrow|Gatwick|Stansted|Luton|Bristol Airport|Southampton Airport|London City Airport|Birmingham Airport)\b/i);
-  return postcode?.[1].toUpperCase() || airport?.[0] || "Please ask";
-}
-
 function mapHref(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     address
@@ -1564,6 +1558,12 @@ function toggleBookingSelection(id: string) {
       : fmtDateTime(subcontractorPickupTime);
     const jobSummary = [
       subcontractorPickupTime ? `Pickup: ${subcontractorPickupLabel} UK time` : "Pickup time: To be confirmed",
+      `Passenger: ${name}`,
+      `Passenger phone: ${phone || "Not supplied"}`,
+      `From: ${displayOrDash(pickup)}`,
+      via ? `Via: ${via}` : "",
+      `To: ${displayOrDash(dropoff)}`,
+      booking.return_flight_number ? `Flight: ${booking.return_flight_number}` : "",
       passengers === null ? "" : `Passengers: ${passengers}`,
       bagsLarge === null && bagsSmall === null
         ? ""
@@ -1941,8 +1941,6 @@ function toggleBookingSelection(id: string) {
                           const message = [
                             `${businessDisplayName} job offer`,
                             ...jobSummary,
-                            `From area: ${subcontractorOfferArea(pickup)}`,
-                            `To area: ${subcontractorOfferArea(dropoff)}`,
                             "Please reply to say whether you can take this job.",
                           ].join("\n");
                           window.location.href = smsHref(selectedSubcontractor.driver_phone ?? "", message);
@@ -2097,12 +2095,6 @@ function toggleBookingSelection(id: string) {
                     const message = [
                       `${businessDisplayName} confirmed job`,
                       ...jobSummary,
-                      `From: ${displayOrDash(pickup)}`,
-                      via ? `Via: ${via}` : "",
-                      `To: ${displayOrDash(dropoff)}`,
-                      booking.return_flight_number
-                        ? `Flight: ${booking.return_flight_number}`
-                        : "",
                     ].filter(Boolean).join("\n");
                     window.location.href = smsHref(subcontractorPhone, message);
                   }}

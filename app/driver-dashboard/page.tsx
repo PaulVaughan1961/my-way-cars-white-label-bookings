@@ -11,6 +11,8 @@ import {
 type Booking = {
   id: string;
   passenger_name?: string | null;
+  passenger_phone?: string | null;
+  via?: string | null;
   pickup?: string | null;
   dropoff?: string | null;
   booking_type?: string | null;
@@ -315,14 +317,11 @@ export default function DriverDashboardPage() {
     job: Booking,
     options: { offer?: boolean; next?: boolean; past?: boolean } = {}
   ) {
-    const detailsVisible = job.details_visible === true;
-    const canShowRoute = options.offer || typeof job.details_visible === "boolean";
-    const passenger = options.offer
-      ? "Journey offer"
-      : detailsVisible ? job.passenger_name ?? "Passenger" : "Accepted job";
-    const addressFallback = detailsVisible ? "Not set" : "Area unavailable";
-    const pickup = (canShowRoute ? job.pickup : null) ?? addressFallback;
-    const dropoff = (canShowRoute ? job.dropoff : null) ?? addressFallback;
+    const passenger = job.passenger_name || "Passenger";
+    const pickup = job.pickup || "Not set";
+    const dropoff = job.dropoff || "Not set";
+    const passengerPhone = job.passenger_phone?.replace(/[^+\d]/g, "") || "";
+    const hasDeparted = job.status === "On My Way" || job.status === "POB";
     const bookingType = job.booking_type ?? "Not set";
     const vehicle = job.vehicle ?? "Not assigned";
     const alreadyPaid = job.payment_status === "Paid";
@@ -402,6 +401,18 @@ export default function DriverDashboardPage() {
 
         {isExpanded ? (
           <div className="border-t border-slate-200 px-4 pb-4 pt-3">
+            <div className="mb-3 space-y-2 break-words text-sm text-slate-700">
+              <p><strong>From:</strong> {pickup}</p>
+              {job.via && <p><strong>Via:</strong> {job.via}</p>}
+              <p><strong>To:</strong> {dropoff}</p>
+              <p><strong>Passenger phone:</strong>{" "}
+                {passengerPhone ? (
+                  <a href={`tel:${passengerPhone}`} className="font-semibold text-blue-700 underline">
+                    {job.passenger_phone}
+                  </a>
+                ) : "Not supplied"}
+              </p>
+            </div>
             <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
               <p><strong>Vehicle:</strong> {vehicle}</p>
               <p><strong>Customer fare:</strong> {fare}</p>
@@ -442,43 +453,16 @@ export default function DriverDashboardPage() {
                     JOB ACCEPTED
                   </div>
                 ) : null}
-                {!detailsVisible && (
-                  <p className="mt-3 text-sm text-slate-600">
-                    {!job.pickup_datetime
-                      ? "Contact the operator to confirm the pickup time."
-                      : job.can_mark_on_my_way
-                        ? "Tap On My Way when you leave to see the passenger name and exact addresses."
-                        : "On My Way opens one hour before pickup. The passenger name and exact addresses are shown after you tap it."}
-                  </p>
-                )}
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {detailsVisible ? (
-                    <>
-                      {job.status !== "POB" && (
-                        <button
-                          onClick={() => void markPassengerOnBoard(job.id)}
-                          className="rounded-lg bg-blue-600 px-3 py-3 text-sm font-semibold text-white"
-                        >
-                          POB
-                        </button>
-                      )}
-                      {job.pickup && (
-                        <button
-                          onClick={() => openMap(pickup)}
-                          className="rounded-lg bg-slate-700 px-3 py-3 text-sm font-semibold text-white"
-                        >
-                          Pickup Map
-                        </button>
-                      )}
-                      {job.dropoff && (
-                        <button
-                          onClick={() => openMap(dropoff)}
-                          className="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white"
-                        >
-                          Dropoff Map
-                        </button>
-                      )}
-                    </>
+                  {hasDeparted ? (
+                    job.status !== "POB" && (
+                      <button
+                        onClick={() => void markPassengerOnBoard(job.id)}
+                        className="rounded-lg bg-blue-600 px-3 py-3 text-sm font-semibold text-white"
+                      >
+                        POB
+                      </button>
+                    )
                   ) : (
                     <button
                       onClick={() => void markOnMyWay(job.id)}
@@ -486,6 +470,22 @@ export default function DriverDashboardPage() {
                       className="rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
                     >
                       On My Way
+                    </button>
+                  )}
+                  {job.pickup && (
+                    <button
+                      onClick={() => openMap(pickup)}
+                      className="rounded-lg bg-slate-700 px-3 py-3 text-sm font-semibold text-white"
+                    >
+                      Pickup Map
+                    </button>
+                  )}
+                  {job.dropoff && (
+                    <button
+                      onClick={() => openMap(dropoff)}
+                      className="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white"
+                    >
+                      Dropoff Map
                     </button>
                   )}
                   {!alreadyPaid && (
