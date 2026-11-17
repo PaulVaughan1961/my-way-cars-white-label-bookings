@@ -76,6 +76,7 @@ type DriverOption = {
   default_vehicle?: string | null;
   current_vehicle?: string | null;
   active?: boolean | null;
+  dispatch_method: "dashboard" | "subcontractor_sms";
 };
 
 type ClashRow = {
@@ -286,8 +287,17 @@ function telHref(phone: string): string {
   return `tel:${phone.replace(/\s+/g, "")}`;
 }
 
-function smsHref(phone: string): string {
-  return `sms:${phone.replace(/\s+/g, "")}`;
+function smsHref(phone: string, message?: string): string {
+  const recipient = phone.replace(/[^+\d]/g, "");
+  if (!message) return `sms:${recipient}`;
+  const separator = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "&" : "?";
+  return `sms:${recipient}${separator}body=${encodeURIComponent(message)}`;
+}
+
+function subcontractorOfferArea(address: string): string {
+  const postcode = address.match(/\b([A-Z]{1,2}\d[A-Z0-9]?)\s*\d[A-Z]{2}\b/i);
+  const airport = address.match(/\b(Heathrow|Gatwick|Stansted|Luton|Bristol Airport|Southampton Airport|London City Airport|Birmingham Airport)\b/i);
+  return postcode?.[1].toUpperCase() || airport?.[0] || "Please ask";
 }
 
 function mapHref(address: string): string {
@@ -450,7 +460,7 @@ const [showPassengerNames, setShowPassengerNames] =
     const { data, error } = await supabase
       .from("drivers")
       .select(
-        "id,business_id,name,driver_phone,default_vehicle,current_vehicle,active"
+        "id,business_id,name,driver_phone,default_vehicle,current_vehicle,active,dispatch_method"
       )
       .order("name", { ascending: true });
 
@@ -1118,32 +1128,46 @@ async function assignBookingToDriver(
     selectedDriver.current_vehicle?.trim() ||
     selectedDriver.default_vehicle?.trim() ||
     "";
+  const isSubcontractor = selectedDriver.dispatch_method === "subcontractor_sms";
   const confirmed = window.confirm(
-    `Assign this booking to ${selectedDriver.name}${
-      vehicle ? ` in ${vehicle}` : ""
-    }? The driver will need to accept it.`
+    isSubcontractor
+      ? `Has ${selectedDriver.name} accepted this job? This will assign the booking to them.`
+      : `Assign this booking to ${selectedDriver.name}${
+          vehicle ? ` in ${vehicle}` : ""
+        }? The driver will need to accept it.`
   );
   if (!confirmed) return;
 
   try {
     setBusyId(booking.id);
     setErrorMessage("");
+    const assignedAt = new Date().toISOString();
     const patch: Partial<BookingRow> = {
       driver_id: selectedDriver.id,
       driver_name: selectedDriver.name,
       driver_phone: selectedDriver.driver_phone?.trim() || null,
       vehicle: vehicle || null,
-      driver_assignment_status: "Awaiting response",
-      driver_assigned_at: new Date().toISOString(),
-      driver_response_at: null,
+      driver_assignment_status: isSubcontractor ? "Accepted" : "Awaiting response",
+      driver_assigned_at: assignedAt,
+      driver_response_at: isSubcontractor ? assignedAt : null,
       driver_decline_reason: null,
     };
     const supabase = getSupabase();
-    const { error } = await supabase
+    const update = supabase
       .from("bookings")
       .update(patch as never)
       .eq("id", booking.id);
+    if (isSubcontractor) {
+      update.eq("status", "Scheduled");
+      if (booking.driver_assigned_at) {
+        update.eq("driver_assigned_at", booking.driver_assigned_at);
+      } else {
+        update.is("driver_assigned_at", null);
+      }
+    }
+    const { data, error } = await update.select("id").maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error("The booking changed. Refresh the dashboard and try again.");
 
     setBookings((current) =>
       current.map((row) =>
@@ -1151,7 +1175,9 @@ async function assignBookingToDriver(
       )
     );
     window.alert(
-      `Booking assigned to ${selectedDriver.name}. Awaiting driver response.`
+      isSubcontractor
+        ? `Acceptance recorded for ${selectedDriver.name}. You can now text the job details.`
+        : `Booking assigned to ${selectedDriver.name}. Awaiting driver response.`
     );
   } catch (error) {
     setErrorMessage(
@@ -1498,6 +1524,17 @@ function toggleBookingSelection(id: string) {
       booking.driver_id ??
       bookingDrivers.find((option) => option.name === driver)?.id ??
       "";
+    const selectedDriver = bookingDrivers.find((option) => option.id === selectedDriverId);
+    const selectedSubcontractor = selectedDriver?.dispatch_method === "subcontractor_sms"
+      ? selectedDriver
+      : null;
+    const assignedDriver = allDrivers.find((option) =>
+      option.business_id === booking.business_id &&
+      (booking.driver_id ? option.id === booking.driver_id : option.name === driver)
+    );
+    const assignedSubcontractor = assignedDriver?.dispatch_method === "subcontractor_sms"
+      ? assignedDriver
+      : null;
     const notes = cleanDisplayText(booking.notes);
     const via = cleanDisplayText(booking.via);
     const localAuthority = cleanDisplayText(booking.local_authority);
@@ -1512,6 +1549,26 @@ function toggleBookingSelection(id: string) {
     const expanded = cardMode === "full";
     const countdown = getCountdownLabel(when, nowMs);
     const driverPhone = getDriverPhone(booking);
+    const subcontractorPhone = assignedSubcontractor?.driver_phone?.trim() || "";
+    const acceptedSubcontractor = !!assignedSubcontractor && driverAssignmentStatus === "Accepted";
+    const subcontractorPickupTime = pickString(booking, [
+      "pickup_datetime", "pickup_at", "journey_at", "date_time",
+    ]);
+    const pickupHasOffset = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(subcontractorPickupTime);
+    const subcontractorPickupLabel = pickupHasOffset && Number.isFinite(Date.parse(subcontractorPickupTime))
+      ? new Intl.DateTimeFormat("en-GB", {
+          dateStyle: "medium",
+          timeStyle: "short",
+          timeZone: "Europe/London",
+        }).format(new Date(subcontractorPickupTime))
+      : fmtDateTime(subcontractorPickupTime);
+    const jobSummary = [
+      subcontractorPickupTime ? `Pickup: ${subcontractorPickupLabel} UK time` : "Pickup time: To be confirmed",
+      passengers === null ? "" : `Passengers: ${passengers}`,
+      bagsLarge === null && bagsSmall === null
+        ? ""
+        : `Bags: ${bagsLarge ?? "unspecified"} large, ${bagsSmall ?? "unspecified"} small`,
+    ].filter(Boolean);
 
     const linkedPair = booking.return_group_id
       ? bookings
@@ -1869,12 +1926,32 @@ function toggleBookingSelection(id: string) {
                       {bookingDrivers.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.name}
+                          {option.dispatch_method === "subcontractor_sms" ? " (Subcontractor)" : ""}
                           {option.current_vehicle || option.default_vehicle
                             ? ` — ${option.current_vehicle || option.default_vehicle}`
                             : ""}
                         </option>
                       ))}
                     </select>
+                    {selectedSubcontractor && (!acceptedSubcontractor || selectedSubcontractor.id !== assignedSubcontractor?.id) ? (
+                      <button
+                        type="button"
+                        disabled={isBusy || !selectedSubcontractor.driver_phone?.trim()}
+                        onClick={() => {
+                          const message = [
+                            `${businessDisplayName} job offer`,
+                            ...jobSummary,
+                            `From area: ${subcontractorOfferArea(pickup)}`,
+                            `To area: ${subcontractorOfferArea(dropoff)}`,
+                            "Please reply to say whether you can take this job.",
+                          ].join("\n");
+                          window.location.href = smsHref(selectedSubcontractor.driver_phone ?? "", message);
+                        }}
+                        className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        Text subcontractor offer
+                      </button>
+                    ) : null}
                     <button
                       onClick={() =>
                         void assignBookingToDriver(
@@ -1885,7 +1962,7 @@ function toggleBookingSelection(id: string) {
                       disabled={isBusy || !selectedDriverId}
                       className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                     >
-                      {isBusy ? "Assigning..." : "Send to driver"}
+                      {isBusy ? "Assigning..." : selectedSubcontractor ? "Record acceptance" : "Send to driver"}
                     </button>
                   </div>
                 </div>
@@ -2010,22 +2087,48 @@ function toggleBookingSelection(id: string) {
               </a>
             ) : null}
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
+            {assignedSubcontractor ? (
+              status === "Scheduled" && acceptedSubcontractor ? (
+                <button
+                  type="button"
+                  disabled={!subcontractorPhone}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const message = [
+                      `${businessDisplayName} confirmed job`,
+                      ...jobSummary,
+                      `From: ${displayOrDash(pickup)}`,
+                      via ? `Via: ${via}` : "",
+                      `To: ${displayOrDash(dropoff)}`,
+                      booking.return_flight_number
+                        ? `Flight: ${booking.return_flight_number}`
+                        : "",
+                    ].filter(Boolean).join("\n");
+                    window.location.href = smsHref(subcontractorPhone, message);
+                  }}
+                  className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  Text subcontractor job details
+                </button>
+              ) : null
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
 
-                if (!driverPhone) return;
+                  if (!driverPhone) return;
 
-                const link = new URL("/driver-login", window.location.origin);
-                const message = `${businessDisplayName}: open your driver dashboard to view your jobs. ${link}`;
+                  const link = new URL("/driver-login", window.location.origin);
+                  const message = `${businessDisplayName}: open your driver dashboard to view your jobs. ${link}`;
 
-                window.location.href = `sms:${driverPhone.replace(/\s+/g, "")}?body=${encodeURIComponent(message)}`;
-              }}
-              disabled={!driverPhone}
-              className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Text driver dashboard link
-            </button>
+                  window.location.href = smsHref(driverPhone, message);
+                }}
+                disabled={!driverPhone}
+                className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Text driver dashboard link
+              </button>
+            )}
 
             <button
               onClick={(e) => {

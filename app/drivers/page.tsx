@@ -14,14 +14,18 @@ type DriverRow = {
   default_authority?: string | null;
   current_vehicle?: string | null;
   current_authority?: string | null;
+  dispatch_method: DriverDispatchMethod;
   active?: boolean | null;
 };
+
+type DriverDispatchMethod = "dashboard" | "subcontractor_sms";
 
 type DriverDraft = {
   name: string;
   driver_phone: string;
   default_vehicle: string;
   default_authority: string;
+  dispatch_method: DriverDispatchMethod;
   active: boolean;
 };
 
@@ -30,6 +34,7 @@ const emptyDraft: DriverDraft = {
   driver_phone: "",
   default_vehicle: "",
   default_authority: "",
+  dispatch_method: "dashboard",
   active: true,
 };
 
@@ -39,6 +44,7 @@ function draftFromDriver(driver: DriverRow): DriverDraft {
     driver_phone: driver.driver_phone ?? "",
     default_vehicle: driver.default_vehicle ?? "",
     default_authority: driver.default_authority ?? "",
+    dispatch_method: driver.dispatch_method,
     active: driver.active !== false,
   };
 }
@@ -59,7 +65,7 @@ export default function DriversPage() {
     return supabase
       .from("drivers")
       .select(
-        "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active"
+        "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active, dispatch_method"
       )
       .order("name", { ascending: true })
       .limit(500);
@@ -178,6 +184,7 @@ export default function DriversPage() {
       driver_phone: draft.driver_phone.trim() || null,
       default_vehicle: draft.default_vehicle.trim() || null,
       default_authority: draft.default_authority.trim() || null,
+      dispatch_method: draft.dispatch_method,
       active: draft.active,
     };
 
@@ -235,6 +242,20 @@ export default function DriversPage() {
               className="mt-1 w-full rounded-xl border border-slate-200 p-3 outline-none focus:ring-2 focus:ring-slate-300"
               placeholder="Full name"
             />
+          </label>
+
+          <label className="text-sm font-medium text-slate-700">
+            Driver type
+            <select
+              value={draft.dispatch_method}
+              onChange={(event) =>
+                updateDraft("dispatch_method", event.target.value)
+              }
+              className="mt-1 w-full rounded-xl border border-slate-200 p-3"
+            >
+              <option value="dashboard">Regular driver (driver dashboard)</option>
+              <option value="subcontractor_sms">Subcontractor (text message)</option>
+            </select>
           </label>
 
           <label className="text-sm font-medium text-slate-700">
@@ -425,6 +446,11 @@ export default function DriversPage() {
                         >
                           {driver.active === false ? "Inactive" : "Active"}
                         </span>
+                      </div>
+                      <div className="mt-1 text-sm text-slate-600">
+                        {driver.dispatch_method === "subcontractor_sms"
+                          ? "Subcontractor · text message"
+                          : "Regular driver · driver dashboard"}
                       </div>
                       {driver.driver_phone && (
                         <div className="mt-1 text-sm text-slate-600">
