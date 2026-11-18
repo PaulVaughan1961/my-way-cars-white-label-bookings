@@ -1557,17 +1557,16 @@ function toggleBookingSelection(id: string) {
         }).format(new Date(subcontractorPickupTime))
       : fmtDateTime(subcontractorPickupTime);
     const jobSummary = [
-      subcontractorPickupTime ? `Pickup: ${subcontractorPickupLabel} UK time` : "Pickup time: To be confirmed",
-      `Passenger: ${name}`,
-      `Passenger phone: ${phone || "Not supplied"}`,
-      `From: ${displayOrDash(pickup)}`,
-      via ? `Via: ${via}` : "",
-      `To: ${displayOrDash(dropoff)}`,
-      booking.return_flight_number ? `Flight: ${booking.return_flight_number}` : "",
-      passengers === null ? "" : `Passengers: ${passengers}`,
+      `PICKUP TIME\n${subcontractorPickupTime ? subcontractorPickupLabel + " UK time" : "To be confirmed"}`,
+      `PASSENGER\n${name}\nPhone: ${phone || "Not supplied"}`,
+      `FROM\n${displayOrDash(pickup)}`,
+      via ? `VIA\n${via}` : "",
+      `TO\n${displayOrDash(dropoff)}`,
+      booking.return_flight_number ? `FLIGHT\n${booking.return_flight_number}` : "",
+      passengers === null ? "" : `PASSENGERS\n${passengers}`,
       bagsLarge === null && bagsSmall === null
         ? ""
-        : `Bags: ${bagsLarge ?? "unspecified"} large, ${bagsSmall ?? "unspecified"} small`,
+        : `LUGGAGE\n${bagsLarge ?? "unspecified"} large bags, ${bagsSmall ?? "unspecified"} small bags`,
     ].filter(Boolean);
 
     const linkedPair = booking.return_group_id
@@ -1939,10 +1938,10 @@ function toggleBookingSelection(id: string) {
                         disabled={isBusy || !selectedSubcontractor.driver_phone?.trim()}
                         onClick={() => {
                           const message = [
-                            `${businessDisplayName} job offer`,
+                            `${businessDisplayName.toUpperCase()} — JOB OFFER`,
                             ...jobSummary,
                             "Please reply to say whether you can take this job.",
-                          ].join("\n");
+                          ].join("\n\n");
                           window.location.href = smsHref(selectedSubcontractor.driver_phone ?? "", message);
                         }}
                         className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
@@ -2093,9 +2092,9 @@ function toggleBookingSelection(id: string) {
                   onClick={(e) => {
                     e.stopPropagation();
                     const message = [
-                      `${businessDisplayName} confirmed job`,
+                      `${businessDisplayName.toUpperCase()} — CONFIRMED JOB`,
                       ...jobSummary,
-                    ].filter(Boolean).join("\n");
+                    ].filter(Boolean).join("\n\n");
                     window.location.href = smsHref(subcontractorPhone, message);
                   }}
                   className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
