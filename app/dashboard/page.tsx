@@ -1117,6 +1117,10 @@ async function assignBookingToDriver(
     window.alert("Select a driver first.");
     return;
   }
+  if (booking.driver_id === selectedDriver.id) {
+    window.alert("This driver is already assigned to the booking.");
+    return;
+  }
 
   const vehicle =
     selectedDriver.current_vehicle?.trim() ||
@@ -1519,6 +1523,7 @@ function toggleBookingSelection(id: string) {
       bookingDrivers.find((option) => option.name === driver)?.id ??
       "";
     const selectedDriver = bookingDrivers.find((option) => option.id === selectedDriverId);
+    const sameAssignedDriver = Boolean(booking.driver_id && booking.driver_id === selectedDriverId);
     const selectedSubcontractor = selectedDriver?.dispatch_method === "subcontractor_sms"
       ? selectedDriver
       : null;
@@ -1567,6 +1572,7 @@ function toggleBookingSelection(id: string) {
       bagsLarge === null && bagsSmall === null
         ? ""
         : `LUGGAGE\n${bagsLarge ?? "unspecified"} large bags, ${bagsSmall ?? "unspecified"} small bags`,
+      notes ? `BOOKING NOTES\n${notes}` : "",
     ].filter(Boolean);
 
     const linkedPair = booking.return_group_id
@@ -1956,10 +1962,10 @@ function toggleBookingSelection(id: string) {
                           selectedDriverId
                         )
                       }
-                      disabled={isBusy || !selectedDriverId}
+                      disabled={isBusy || !selectedDriverId || sameAssignedDriver}
                       className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                     >
-                      {isBusy ? "Assigning..." : selectedSubcontractor ? "Record acceptance" : "Send to driver"}
+                      {isBusy ? "Assigning..." : sameAssignedDriver ? "Already assigned" : selectedSubcontractor ? "Record acceptance" : driver ? "Reassign driver" : "Assign driver"}
                     </button>
                   </div>
                 </div>
@@ -2102,7 +2108,7 @@ function toggleBookingSelection(id: string) {
                   Text subcontractor job details
                 </button>
               ) : null
-            ) : (
+            ) : assignedDriver ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2117,9 +2123,9 @@ function toggleBookingSelection(id: string) {
                 disabled={!driverPhone}
                 className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Text driver dashboard link
+                Text driver login reminder
               </button>
-            )}
+            ) : null}
 
             <button
               onClick={(e) => {
