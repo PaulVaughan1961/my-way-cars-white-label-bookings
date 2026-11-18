@@ -10,6 +10,7 @@ type DriverRow = {
   id: string;
   name?: string | null;
   driver_phone?: string | null;
+  email?: string | null;
   default_vehicle?: string | null;
   default_authority?: string | null;
   current_vehicle?: string | null;
@@ -59,13 +60,14 @@ export default function DriversPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DriverDraft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState("");
 
   async function fetchDrivers() {
     return supabase
       .from("drivers")
       .select(
-        "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active, dispatch_method"
+        "id, name, driver_phone, default_vehicle, default_authority, current_vehicle, current_authority, active, dispatch_method, email"
       )
       .order("name", { ascending: true })
       .limit(500);
@@ -226,6 +228,36 @@ export default function DriversPage() {
     cancelEditing();
     setSavedMessage(`${driverName} saved successfully.`);
     await loadDrivers();
+  }
+
+  async function inviteDriver(driver: DriverRow) {
+    if (invitingId) return;
+    const address = window.prompt(`Email address for ${driver.name}'s invitation:`, driver.email ?? "");
+    if (!address) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      window.alert("Please sign in again.");
+      return;
+    }
+    setInvitingId(driver.id);
+    try {
+      const response = await fetch("/api/driver-invitations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ driverId: driver.id, email: address }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not send the invitation.");
+      window.alert(`Invitation emailed to ${address.trim()}.`);
+      await loadDrivers();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not send the invitation.");
+    } finally {
+      setInvitingId(null);
+    }
   }
 
   function driverForm(title: string) {
@@ -452,6 +484,22 @@ export default function DriversPage() {
                           ? "Subcontractor · text message"
                           : "Regular driver · driver dashboard"}
                       </div>
+                      {driver.dispatch_method === "dashboard" && (
+                        <div className="mt-2">
+                          {driver.email ? (
+                            <p className="text-sm text-slate-600">Login email: {driver.email}</p>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={invitingId === driver.id}
+                              onClick={() => void inviteDriver(driver)}
+                              className="rounded-xl bg-blue-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                            >
+                              {invitingId === driver.id ? "Sending invitation..." : "Invite to driver dashboard"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                       {driver.driver_phone && (
                         <div className="mt-1 text-sm text-slate-600">
                           Phone: {driver.driver_phone}
